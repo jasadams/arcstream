@@ -1,0 +1,429 @@
+services:
+
+  # ── Layer 0: Infrastructure (no dependencies) ──────────────────────
+
+  redpanda:
+    image: redpandadata/redpanda:v24.3.7
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --memory=512M
+      - --reserve-memory=0M
+      - --overprovisioned
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
+      - --pandaproxy-addr=0.0.0.0:8082
+      - --advertise-pandaproxy-addr=localhost:8082
+      - --schema-registry-addr=0.0.0.0:8081
+    ports:
+      - "19092:19092"
+      - "8082:8082"
+      - "9644:9644"
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9644/v1/status/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  zookeeper:
+    image: zookeeper:3.9
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_4LW_COMMANDS_WHITELIST: ruok,stat
+    volumes:
+      - zookeeper-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  scylladb:
+    image: scylladb/scylla:6.2
+    command: --smp=1 --memory=512M --overprovisioned=1
+    ports:
+      - "9042:9042"
+    volumes:
+      - scylladb-data:/var/lib/scylla
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'SELECT now() FROM system.local'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address :9001
+    ports:
+      - "9100:9000"
+      - "9101:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ── Layer 1: Pinot cluster ─────────────────────────────────────────
+
+  pinot-controller:
+    image: apachepinot/pinot:1.3.0
+    platform: linux/amd64
+    command: StartController -zkAddress zookeeper:2181 -dataDir /var/pinot/controller/data
+    ports:
+      - "9000:9000"
+    environment:
+      JAVA_OPTS: -Xms256m -Xmx1g
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    volumes:
+      - pinot-controller-data:/var/pinot/controller/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  pinot-broker:
+    image: apachepinot/pinot:1.3.0
+    platform: linux/amd64
+    command: StartBroker -zkAddress zookeeper:2181
+    ports:
+      - "8099:8099"
+    environment:
+      JAVA_OPTS: -Xms256m -Xmx512m
+    depends_on:
+      pinot-controller:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8099/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  pinot-server:
+    image: apachepinot/pinot:1.3.0
+    platform: linux/amd64
+    command: StartServer -zkAddress zookeeper:2181 -dataDir /var/pinot/server/data/dataDir -segmentDir /var/pinot/server/data/segments
+    environment:
+      JAVA_OPTS: -Xms512m -Xmx1g
+    depends_on:
+      pinot-controller:
+        condition: service_healthy
+    volumes:
+      - pinot-server-data:/var/pinot/server/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8097/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  # ── Layer 2: Init containers (one-shot) ────────────────────────────
+
+  init-scylla:
+    image: cassandra:5.0
+    restart: "no"
+    depends_on:
+      scylladb:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        for i in $(seq 1 30); do
+          if cqlsh scylladb 9042 -e "SELECT now() FROM system.local" >/dev/null 2>&1; then
+            echo "ScyllaDB is reachable, applying schema..."
+            cqlsh scylladb 9042 -e "CREATE KEYSPACE IF NOT EXISTS cdp WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}"
+            cqlsh scylladb 9042 -e "CREATE TABLE IF NOT EXISTS cdp.profiles (tenant_id text, canonical_id text, user_id text, first_seen timestamp, last_seen timestamp, total_events bigint, total_sessions bigint, events_1d bigint, events_7d bigint, events_30d bigint, events_90d bigint, sessions_1d bigint, sessions_7d bigint, sessions_30d bigint, sessions_90d bigint, avg_session_duration_sec bigint, current_session_active boolean, current_session_duration_sec bigint, page_views bigint, clicks bigint, logins bigint, feature_uses bigint, last_page text, last_country text, last_device text, last_browser text, top_pages list<text>, top_features list<text>, PRIMARY KEY ((tenant_id, canonical_id)))"
+            echo "ScyllaDB schema applied successfully"
+            exit 0
+          fi
+          echo "Waiting for ScyllaDB... ($$i/30)"
+          sleep 3
+        done
+        echo "Failed to apply ScyllaDB schema"
+        exit 1
+
+  init-minio:
+    image: minio/mc:latest
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        mc alias set local http://minio:9000 minioadmin minioadmin
+        mc mb --ignore-existing local/flink-checkpoints
+        mc mb --ignore-existing local/iceberg-warehouse
+        echo "MinIO buckets created"
+
+  init-pinot:
+    image: curlimages/curl:latest
+    restart: "no"
+    depends_on:
+      pinot-controller:
+        condition: service_healthy
+      pinot-broker:
+        condition: service_healthy
+      pinot-server:
+        condition: service_healthy
+    volumes:
+      - ./config/pinot-schemas:/schemas:ro,Z
+      - ./config/pinot-tables:/tables:ro,Z
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for Pinot server to register..."
+        sleep 10
+
+        for schema in /schemas/*.json; do
+          name=$(basename "$$schema" .json)
+          echo "Creating schema: $$name"
+          curl -s -X POST "http://pinot-controller:9000/schemas" \
+            -H "Content-Type: application/json" \
+            -d @"$$schema"
+          echo ""
+        done
+
+        for table in /tables/*.json; do
+          name=$(basename "$$table" .json)
+          echo "Creating table: $$name"
+          sed 's/redpanda\.data-pipeline\.svc\.cluster\.local/redpanda/g' "$$table" | \
+            curl -s -X POST "http://pinot-controller:9000/tables" \
+              -H "Content-Type: application/json" \
+              -d @-
+          echo ""
+        done
+
+        echo "Pinot schemas and tables created"
+
+  # ── Layer 3: Flink cluster ─────────────────────────────────────────
+
+  flink-jobmanager:
+    image: ghcr.io/jasadams/arcstream/flink:latest
+    platform: linux/amd64
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        mkdir -p /opt/flink/plugins/s3-fs-hadoop
+        cp /opt/flink/opt/flink-s3-fs-hadoop-1.20.1.jar /opt/flink/plugins/s3-fs-hadoop/
+        exec /docker-entrypoint.sh jobmanager
+    ports:
+      - "8081:8081"
+    environment:
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      AWS_REGION: us-east-1
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        jobmanager.rpc.port: 6123
+        jobmanager.memory.process.size: 1024m
+        taskmanager.memory.process.size: 2048m
+        taskmanager.numberOfTaskSlots: 4
+        parallelism.default: 1
+        rest.port: 8081
+        rest.address: 0.0.0.0
+        blob.server.port: 6124
+        taskmanager.rpc.port: 6122
+        state.backend: rocksdb
+        fs.allowed-fallback-filesystems: s3a
+        state.checkpoints.dir: s3a://flink-checkpoints/checkpoints
+        state.savepoints.dir: s3a://flink-checkpoints/savepoints
+        execution.checkpointing.interval: 60000
+        execution.checkpointing.min-pause: 30000
+        execution.checkpointing.externalized-checkpoint-retention: RETAIN_ON_CANCELLATION
+        s3.endpoint: http://minio:9000
+        s3.path-style-access: true
+      FLINK_ENV_JAVA_OPTS: "--add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED"
+    depends_on:
+      init-minio:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/overview"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  flink-taskmanager:
+    image: ghcr.io/jasadams/arcstream/flink:latest
+    platform: linux/amd64
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        mkdir -p /opt/flink/plugins/s3-fs-hadoop
+        cp /opt/flink/opt/flink-s3-fs-hadoop-1.20.1.jar /opt/flink/plugins/s3-fs-hadoop/
+        exec /docker-entrypoint.sh taskmanager
+    environment:
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      AWS_REGION: us-east-1
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        jobmanager.rpc.port: 6123
+        jobmanager.memory.process.size: 1024m
+        taskmanager.memory.process.size: 2048m
+        taskmanager.numberOfTaskSlots: 4
+        parallelism.default: 1
+        rest.port: 8081
+        rest.address: 0.0.0.0
+        blob.server.port: 6124
+        taskmanager.rpc.port: 6122
+        state.backend: rocksdb
+        fs.allowed-fallback-filesystems: s3a
+        state.checkpoints.dir: s3a://flink-checkpoints/checkpoints
+        state.savepoints.dir: s3a://flink-checkpoints/savepoints
+        execution.checkpointing.interval: 60000
+        execution.checkpointing.min-pause: 30000
+        execution.checkpointing.externalized-checkpoint-retention: RETAIN_ON_CANCELLATION
+        s3.endpoint: http://minio:9000
+        s3.path-style-access: true
+      FLINK_ENV_JAVA_OPTS: "--add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED"
+    depends_on:
+      flink-jobmanager:
+        condition: service_healthy
+
+  # ── Layer 4: Flink job submission (one-shot) ───────────────────────
+
+  init-flink-jobs:
+    image: ghcr.io/jasadams/arcstream/flink:latest
+    platform: linux/amd64
+    restart: "no"
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+      SCYLLA_CONTACT_POINTS: scylladb:9042
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      HADOOP_CONF_DIR: /opt/hadoop/conf
+      AWS_REGION: us-east-1
+      FLINK_ENV_JAVA_OPTS: "--add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED"
+    depends_on:
+      flink-jobmanager:
+        condition: service_healthy
+      flink-taskmanager:
+        condition: service_started
+      redpanda:
+        condition: service_healthy
+      init-scylla:
+        condition: service_completed_successfully
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        mkdir -p /opt/flink/plugins/s3-fs-hadoop
+        cp /opt/flink/opt/flink-s3-fs-hadoop-1.20.1.jar /opt/flink/plugins/s3-fs-hadoop/
+
+        cat > /opt/flink/conf/flink-conf.yaml << 'FCONF'
+        jobmanager.rpc.address: flink-jobmanager
+        jobmanager.rpc.port: 6123
+        rest.address: flink-jobmanager
+        rest.port: 8081
+        s3.endpoint: http://minio:9000
+        s3.path-style-access: true
+        fs.allowed-fallback-filesystems: s3a
+        FCONF
+        sed -i 's/^        //' /opt/flink/conf/flink-conf.yaml
+
+        echo "Waiting for Flink task slots..."
+        for i in $(seq 1 60); do
+          slots=$(curl -s http://flink-jobmanager:8081/overview 2>/dev/null | grep -o '"slots-available":[0-9]*' | cut -d: -f2)
+          if [ -n "$$slots" ] && [ "$$slots" -gt 0 ]; then
+            echo "Flink has $$slots available slots"
+            break
+          fi
+          sleep 5
+        done
+
+        echo "Submitting Identity Resolution job..."
+        /opt/flink/bin/flink run -d \
+          -c com.pipeline.identity.IdentityResolutionJob \
+          /opt/flink/jobs/identity-resolution.jar
+
+        echo "Submitting Profile Updater job..."
+        /opt/flink/bin/flink run -d \
+          -c com.pipeline.profile.ProfileUpdaterJob \
+          /opt/flink/jobs/identity-resolution.jar
+
+        echo "Submitting Sessionization job..."
+        /opt/flink/bin/flink run -d \
+          -c com.pipeline.session.SessionizationJob \
+          /opt/flink/jobs/identity-resolution.jar
+
+        echo "All Flink jobs submitted"
+
+  # ── Layer 5: Application services ──────────────────────────────────
+
+  event-producer:
+    image: ghcr.io/jasadams/arcstream/event-producer:latest
+    platform: linux/amd64
+    command: ["--broker=redpanda:9092", "--topic=raw-events", "--tenants=5", "--target-daily-events=3200000", "--daily-variance=3.0"]
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    restart: unless-stopped
+
+  query-api:
+    image: ghcr.io/jasadams/arcstream/query-api:latest
+    platform: linux/amd64
+    ports:
+      - "8080:8080"
+    environment:
+      PINOT_BROKER_URL: http://pinot-broker:8099/query/sql
+      SCYLLA_CONTACT_POINTS: scylladb:9042
+      KAFKA_BROKERS: redpanda:9092
+      ENABLE_PLAYGROUND: "true"
+    depends_on:
+      pinot-broker:
+        condition: service_healthy
+      scylladb:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+      init-scylla:
+        condition: service_completed_successfully
+      init-pinot:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  dashboard:
+    image: ghcr.io/jasadams/arcstream/dashboard:latest
+    platform: linux/amd64
+    ports:
+      - "3000:3000"
+    environment:
+      QUERY_API_URL: http://query-api:8080/graphql
+      LEPTOS_SITE_ROOT: /site
+      LEPTOS_SITE_PKG_DIR: pkg
+      LEPTOS_SITE_ADDR: 0.0.0.0:3000
+      LEPTOS_OUTPUT_NAME: dashboard
+    depends_on:
+      query-api:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  redpanda-data:
+  zookeeper-data:
+  scylladb-data:
+  minio-data:
+  pinot-controller-data:
+  pinot-server-data:

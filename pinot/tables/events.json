@@ -1,0 +1,59 @@
+{
+  "tableName": "events",
+  "tableType": "REALTIME",
+  "segmentsConfig": {
+    "timeColumnName": "event_time",
+    "timeType": "MILLISECONDS",
+    "retentionTimeUnit": "DAYS",
+    "retentionTimeValue": "90",
+    "replication": "1"
+  },
+  "tableIndexConfig": {
+    "invertedIndexColumns": ["tenant_id", "event_type", "device_type", "country", "canonical_id", "event_id"],
+    "bloomFilterColumns": ["canonical_id", "event_id"],
+    "rangeIndexColumns": ["event_time"],
+    "sortedColumn": ["event_time"],
+    "starTreeIndexConfigs": [{
+      "dimensionsSplitOrder": ["tenant_id", "event_date", "event_hour", "country", "event_type", "device_type", "browser", "page_url"],
+      "skipStarNodeCreationForDimensions": [],
+      "aggregationConfigs": [
+        { "columnName": "*", "aggregationFunction": "COUNT" },
+        { "columnName": "canonical_id", "aggregationFunction": "DISTINCTCOUNTHLL", "functionParameters": { "log2m": "14" } },
+        { "columnName": "session_id", "aggregationFunction": "DISTINCTCOUNTHLL" },
+        { "columnName": "event_count", "aggregationFunction": "SUM" }
+      ],
+      "maxLeafRecords": 10000
+    }]
+  },
+  "ingestionConfig": {
+    "continueOnError": true,
+    "transformConfigs": [
+      {
+        "columnName": "event_date",
+        "transformFunction": "substr(event_time, 0, 10)"
+      },
+      {
+        "columnName": "event_hour",
+        "transformFunction": "substr(event_time, 0, 13)"
+      }
+    ],
+    "streamIngestionConfig": {
+      "streamConfigMaps": [{
+        "streamType": "kafka",
+        "stream.kafka.topic.name": "unified-events",
+        "stream.kafka.broker.list": "redpanda.data-pipeline.svc.cluster.local:9092",
+        "stream.kafka.consumer.type": "lowLevel",
+        "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
+        "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+        "stream.kafka.consumer.prop.auto.offset.reset": "smallest"
+      }]
+    }
+  },
+  "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
+  },
+  "metadata": {
+    "customConfigs": {}
+  }
+}

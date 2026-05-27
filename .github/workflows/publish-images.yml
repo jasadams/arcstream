@@ -1,0 +1,86 @@
+name: Publish Docker Images
+
+on:
+  push:
+    tags: ['v*']
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: dashboard
+            dockerfile: docker/dashboard.Dockerfile
+            context: .
+          - image: query-api
+            dockerfile: docker/query-api.Dockerfile
+            context: .
+          - image: event-producer
+            dockerfile: docker/event-producer.Dockerfile
+            context: .
+          - image: flink
+            dockerfile: flink/Dockerfile
+            context: flink
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  # ---------------------------------------------------------------------------
+  # Deploy: notify arcstream-cloud to deploy from GHCR
+  # ---------------------------------------------------------------------------
+  deploy-notify:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ secrets.ARC_APP_ID }}
+          private-key: ${{ secrets.ARC_APP_PRIVATE_KEY }}
+          owner: jasadams
+          repositories: arcstream-cloud
+
+      - name: Dispatch deploy to arcstream-cloud
+        uses: peter-evans/repository-dispatch@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          repository: jasadams/arcstream-cloud
+          event-type: public-repo-updated
+          client-payload: >-
+            {
+              "version": "${{ github.ref_name }}",
+              "sha": "${{ github.sha }}"
+            }

@@ -1,0 +1,38 @@
+{
+  "schemaName": "profiles",
+  "primaryKeyColumns": ["tenant_id", "canonical_id"],
+  "dimensionFieldSpecs": [
+    {"name": "tenant_id", "dataType": "STRING"},
+    {"name": "canonical_id", "dataType": "STRING"},
+    {"name": "user_id", "dataType": "STRING"},
+    {"name": "last_country", "dataType": "STRING"},
+    {"name": "last_device", "dataType": "STRING"},
+    {"name": "last_browser", "dataType": "STRING"},
+    {"name": "last_page", "dataType": "STRING"},
+    {"name": "top_pages", "dataType": "STRING", "singleValueField": false},
+    {"name": "top_features", "dataType": "STRING", "singleValueField": false},
+    {"name": "action", "dataType": "STRING"}
+  ],
+  "dateTimeFieldSpecs": [
+    {"name": "first_seen", "dataType": "TIMESTAMP", "format": "1:MILLISECONDS:EPOCH", "granularity": "1:MILLISECONDS"},
+    {"name": "last_seen", "dataType": "TIMESTAMP", "format": "1:MILLISECONDS:EPOCH", "granularity": "1:MILLISECONDS"},
+    {"name": "updated_at", "dataType": "TIMESTAMP", "format": "1:MILLISECONDS:EPOCH", "granularity": "1:MILLISECONDS"}
+  ],
+  "metricFieldSpecs": [
+    {"name": "total_events", "dataType": "LONG"},
+    {"name": "total_sessions", "dataType": "LONG"},
+    {"name": "events_1d", "dataType": "LONG"},
+    {"name": "events_7d", "dataType": "LONG"},
+    {"name": "events_30d", "dataType": "LONG"},
+    {"name": "events_90d", "dataType": "LONG"},
+    {"name": "sessions_1d", "dataType": "LONG"},
+    {"name": "sessions_7d", "dataType": "LONG"},
+    {"name": "sessions_30d", "dataType": "LONG"},
+    {"name": "sessions_90d", "dataType": "LONG"},
+    {"name": "avg_session_duration_sec", "dataType": "LONG"},
+    {"name": "page_views", "dataType": "LONG"},
+    {"name": "clicks", "dataType": "LONG"},
+    {"name": "logins", "dataType": "LONG"},
+    {"name": "feature_uses", "dataType": "LONG"}
+  ]
+}

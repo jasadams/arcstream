@@ -1,0 +1,20 @@
+# Local docs (not yet curated for public release)
+local-docs/
+
+# Kubernetes deployment details (cluster-specific)
+k8s/
+
+# Build artifacts
+**/target/
+dashboard/dist/
+
+# Maven
+flink/identity-resolution/target/
+
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.gstack/
+.claude/

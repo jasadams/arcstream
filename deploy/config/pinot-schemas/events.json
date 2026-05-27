@@ -1,0 +1,27 @@
+{
+  "schemaName": "events",
+  "dimensionFieldSpecs": [
+    {"name": "event_id", "dataType": "STRING"},
+    {"name": "event_type", "dataType": "STRING"},
+    {"name": "tenant_id", "dataType": "STRING"},
+    {"name": "canonical_id", "dataType": "STRING"},
+    {"name": "anonymous_id", "dataType": "STRING"},
+    {"name": "session_id", "dataType": "STRING"},
+    {"name": "user_id", "dataType": "STRING"},
+    {"name": "page_url", "dataType": "STRING"},
+    {"name": "device_type", "dataType": "STRING"},
+    {"name": "browser", "dataType": "STRING"},
+    {"name": "country", "dataType": "STRING"},
+    {"name": "event_date", "dataType": "STRING"},
+    {"name": "event_hour", "dataType": "STRING"}
+  ],
+  "dateTimeFieldSpecs": [{
+    "name": "event_time",
+    "dataType": "TIMESTAMP",
+    "format": "1:MILLISECONDS:EPOCH",
+    "granularity": "1:MILLISECONDS"
+  }],
+  "metricFieldSpecs": [
+    {"name": "event_count", "dataType": "INT", "defaultNullValue": 1}
+  ]
+}
