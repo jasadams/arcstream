@@ -562,7 +562,6 @@ tbody tr:last-child td {
 }
 
 .profile-placeholder {
-    min-height: 340px;
     animation: none;
 }
 
