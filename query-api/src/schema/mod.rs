@@ -32,20 +32,31 @@ impl TenantQuery {
     async fn tenants(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<Tenant>> {
         let pinot = ctx.data::<Arc<dyn PinotQuerier>>()?;
 
-        let sql = "SELECT tenant_id, COUNT(*) as total_events, \
-                   DISTINCTCOUNTHLL(user_id) as unique_users \
-                   FROM events \
-                   GROUP BY tenant_id ORDER BY total_events DESC";
+        let events_sql = "SELECT tenant_id, COUNT(*) as total_events \
+                          FROM events GROUP BY tenant_id ORDER BY total_events DESC";
+        let users_sql = "SELECT tenant_id, COUNT(*) as unique_users \
+                         FROM profiles GROUP BY tenant_id";
 
-        let body = pinot.query(sql).await.map_err(async_graphql::Error::new)?;
-        let rows: Vec<TenantRow> = parse_jsonl(&body);
+        let (events_body, users_body) = tokio::try_join!(
+            pinot.query(events_sql),
+            pinot.query(users_sql),
+        ).map_err(async_graphql::Error::new)?;
 
-        Ok(rows
+        #[derive(Deserialize)]
+        struct EventsRow { tenant_id: String, total_events: u64 }
+        #[derive(Deserialize)]
+        struct UsersRow { tenant_id: String, unique_users: u64 }
+
+        let events: Vec<EventsRow> = parse_jsonl(&events_body);
+        let users: Vec<UsersRow> = parse_jsonl(&users_body);
+        let user_map: std::collections::HashMap<String, u64> = users.into_iter().map(|r| (r.tenant_id, r.unique_users)).collect();
+
+        Ok(events
             .into_iter()
             .map(|r| Tenant {
+                unique_users: user_map.get(&r.tenant_id).copied().unwrap_or(0),
                 id: r.tenant_id,
                 total_events: r.total_events,
-                unique_users: r.unique_users,
             })
             .collect())
     }
@@ -58,21 +69,29 @@ impl TenantQuery {
         let pinot = ctx.data::<Arc<dyn PinotQuerier>>()?;
         let safe_id = sanitize_input(&id).map_err(async_graphql::Error::new)?;
 
-        let sql = format!(
-            "SELECT tenant_id, COUNT(*) as total_events, \
-             DISTINCTCOUNTHLL(user_id) as unique_users \
-             FROM events \
-             WHERE tenant_id = '{safe_id}' \
-             GROUP BY tenant_id"
+        let events_sql = format!(
+            "SELECT tenant_id, COUNT(*) as total_events \
+             FROM events WHERE tenant_id = '{safe_id}' GROUP BY tenant_id"
+        );
+        let users_sql = format!(
+            "SELECT COUNT(*) as unique_users \
+             FROM profiles WHERE tenant_id = '{safe_id}'"
         );
 
-        let body = pinot.query(&sql).await.map_err(async_graphql::Error::new)?;
-        let rows: Vec<TenantRow> = parse_jsonl(&body);
+        let (events_body, users_body) = tokio::try_join!(
+            pinot.query(&events_sql),
+            pinot.query(&users_sql),
+        ).map_err(async_graphql::Error::new)?;
 
-        Ok(rows.into_iter().next().map(|r| Tenant {
+        let events: Vec<TenantRow> = parse_jsonl(&events_body);
+        #[derive(Deserialize)]
+        struct UsersRow { unique_users: u64 }
+        let users: Vec<UsersRow> = parse_jsonl(&users_body);
+
+        Ok(events.into_iter().next().map(|r| Tenant {
             id: r.tenant_id,
             total_events: r.total_events,
-            unique_users: r.unique_users,
+            unique_users: users.first().map(|u| u.unique_users).unwrap_or(0),
         }))
     }
 }

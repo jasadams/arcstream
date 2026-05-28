@@ -5,7 +5,6 @@ use serde::Deserialize;
 pub struct EventTypeSummary {
     pub event_type: String,
     pub total_events: u64,
-    pub unique_users: u64,
 }
 
 #[derive(SimpleObject, Deserialize)]
@@ -40,7 +39,6 @@ impl Dimension {
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum Metric {
     Count,
-    UniqueUsers,
     UniqueSessions,
 }
 
@@ -48,7 +46,6 @@ impl Metric {
     pub fn to_sql(self) -> &'static str {
         match self {
             Metric::Count => "COUNT(*)",
-            Metric::UniqueUsers => "DISTINCTCOUNTHLL(user_id)",
             Metric::UniqueSessions => "DISTINCTCOUNTHLL(session_id)",
         }
     }

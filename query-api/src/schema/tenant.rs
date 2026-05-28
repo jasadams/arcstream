@@ -159,8 +159,7 @@ impl Tenant {
         let safe_tenant = sanitize_input(&self.id).map_err(async_graphql::Error::new)?;
 
         let sql = format!(
-            "SELECT event_type, COUNT(*) as total_events, \
-             DISTINCTCOUNTHLL(user_id) as unique_users \
+            "SELECT event_type, COUNT(*) as total_events \
              FROM events \
              WHERE tenant_id = '{safe_tenant}' \
              GROUP BY event_type ORDER BY total_events DESC"

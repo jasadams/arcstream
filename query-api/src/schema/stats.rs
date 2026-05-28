@@ -55,6 +55,10 @@ impl TimeRange {
         }
     }
 
+    fn profiles_filter(self) -> String {
+        format!("last_seen > ago('{}')", self.ago_duration())
+    }
+
     fn events_filter(self) -> String {
         match self {
             TimeRange::Day => {
@@ -170,8 +174,9 @@ impl StatsQuery {
         let ef = range.events_filter();
         let sf = range.sessions_filter();
 
+        let pf = range.profiles_filter();
         let users_sql = format!(
-            "SELECT DISTINCTCOUNTHLL(canonical_id, 14) AS users FROM events WHERE {ef}"
+            "SELECT COUNT(*) AS users FROM profiles WHERE {pf}"
         );
         let sessions_sql = format!(
             "SELECT COUNT(*) AS sessions FROM sessions WHERE {sf}"
@@ -285,15 +290,18 @@ impl StatsQuery {
         range: TimeRange,
     ) -> async_graphql::Result<Vec<TimeSeriesPoint>> {
         let pinot = ctx.data::<Arc<dyn PinotQuerier>>()?;
-        let filter = range.events_filter();
+        let filter = range.profiles_filter();
         let granularity = range.bucket_granularity();
-        let time_col = range.events_time_column();
 
         let limit = range.query_limit();
+        let time_expr = match range {
+            TimeRange::Day => "DATETIMECONVERT(last_seen, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '1:HOURS')".to_string(),
+            _ => "DATETIMECONVERT(last_seen, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '1:DAYS')".to_string(),
+        };
         let sql = format!(
-            "SELECT {time_col} AS time_bucket, \
-             DISTINCTCOUNTHLL(canonical_id) AS value \
-             FROM events \
+            "SELECT {time_expr} AS time_bucket, \
+             COUNT(*) AS value \
+             FROM profiles \
              WHERE {filter} \
              GROUP BY time_bucket \
              ORDER BY time_bucket ASC \

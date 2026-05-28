@@ -22,8 +22,6 @@
         "COUNT__*",
         "SUM__duration_sec",
         "AVG__duration_sec",
-        "DISTINCTCOUNTHLL__canonical_id",
-        "DISTINCTCOUNTHLL__session_id",
         "SUM__event_count"
       ],
       "maxLeafRecords": 10000
