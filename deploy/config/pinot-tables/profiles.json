@@ -19,9 +19,9 @@
     "sortedColumn": ["first_seen"]
   },
   "fieldConfigList": [
-    {"name": "canonical_id", "encodingType": "RAW", "compressionCodec": "ZSTD"},
-    {"name": "user_id", "encodingType": "RAW", "compressionCodec": "ZSTD"},
-    {"name": "last_page", "encodingType": "RAW", "compressionCodec": "ZSTD"}
+    {"name": "canonical_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"},
+    {"name": "user_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"},
+    {"name": "last_page", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"}
   ],
   "routing": {
     "instanceSelectorType": "strictReplicaGroup"

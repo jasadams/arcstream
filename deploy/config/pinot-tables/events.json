@@ -29,12 +29,12 @@
     }]
   },
   "fieldConfigList": [
-    {"name": "event_id", "encodingType": "RAW", "compressionCodec": "ZSTD"},
-    {"name": "canonical_id", "encodingType": "RAW", "compressionCodec": "ZSTD"},
-    {"name": "anonymous_id", "encodingType": "RAW", "compressionCodec": "ZSTD"},
-    {"name": "session_id", "encodingType": "RAW", "compressionCodec": "ZSTD"},
-    {"name": "user_id", "encodingType": "RAW", "compressionCodec": "ZSTD"},
-    {"name": "page_url", "encodingType": "RAW", "compressionCodec": "ZSTD"}
+    {"name": "event_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"},
+    {"name": "canonical_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"},
+    {"name": "anonymous_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"},
+    {"name": "session_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"},
+    {"name": "user_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"},
+    {"name": "page_url", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"}
   ],
   "ingestionConfig": {
     "transformConfigs": [

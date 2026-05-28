@@ -30,8 +30,8 @@
     }]
   },
   "fieldConfigList": [
-    {"name": "session_id", "encodingType": "RAW", "compressionCodec": "ZSTD"},
-    {"name": "canonical_id", "encodingType": "RAW", "compressionCodec": "ZSTD"}
+    {"name": "session_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"},
+    {"name": "canonical_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"}
   ],
   "ingestionConfig": {
     "transformConfigs": [
