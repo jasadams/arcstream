@@ -138,40 +138,12 @@ pub fn UserDetailPage() -> impl IntoView {
         <Title text=page_title/>
         <A href="/profiles" attr:class="back-link">"\u{2190} Back to Profiles"</A>
 
-        <Suspense fallback=move || view! {
-            <div class="profile-header" style="animation:none">
-                <div class="profile-identity">
-                    <div class="skel-circle" style="width:48px;height:48px"></div>
-                    <div>
-                        <h2><div class="skel skel-bar w-80"></div></h2>
-                        <div class="subtitle">
-                            <div class="skel skel-bar w-full" style="margin-bottom:4px"></div>
-                            <div class="subtitle-meta"><div class="skel skel-bar w-80"></div></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="stats-row">
-                    {(0..6).map(|_| view! {
-                        <div class="stat-card">
-                            <div class="label"><div class="skel skel-bar w-64"></div></div>
-                            <div class="value"><div class="skel skel-bar w-48"></div></div>
-                        </div>
-                    }).collect::<Vec<_>>()}
-                </div>
-                <div class="stats-row">
-                    {(0..4).map(|_| view! {
-                        <div class="stat-card">
-                            <div class="label"><div class="skel skel-bar w-64"></div></div>
-                            <div class="value"><div class="skel skel-bar w-48"></div></div>
-                        </div>
-                    }).collect::<Vec<_>>()}
-                </div>
-                <div class="section-title"><div class="skel skel-bar w-48"></div></div>
-                <div class="tag-list"><span class="empty-hint">{"\u{00a0}"}</span></div>
-                <div class="section-title"><div class="skel skel-bar w-48"></div></div>
-                <div class="tag-list"><span class="empty-hint">{"\u{00a0}"}</span></div>
-            </div>
-        }>
+        // CRITICAL: This MUST be <Transition>, not <Suspense>.
+        // Suspense replaces server-rendered HTML with the fallback during hydration,
+        // causing layout shift every time — no skeleton can match the real content height.
+        // Transition preserves existing server-rendered DOM during hydration (no flash).
+        // The fallback only appears on client-side navigation when there's no prior content.
+        <Transition fallback=move || view! { <div class="profile-header profile-placeholder"></div> }>
         {move || { let _ = profile.get(); Some(view! {
         <div class="profile-header">
             <div class="profile-identity">
@@ -315,10 +287,10 @@ pub fn UserDetailPage() -> impl IntoView {
             </div>
         </div>
         }) }}
-        </Suspense>
+        </Transition>
 
         <div class="section-title">"Recent Events"</div>
-        <Suspense fallback=move || view! { <div class="timeline-placeholder"></div> }>
+        <Transition fallback=move || view! { <div class="timeline-placeholder"></div> }>
             {move || {
                 let current = live_events.get();
                 if current.is_empty() {
@@ -339,7 +311,7 @@ pub fn UserDetailPage() -> impl IntoView {
                     </div>
                 }.into_any())
             }}
-        </Suspense>
+        </Transition>
     }
 }
 
