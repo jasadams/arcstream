@@ -53,11 +53,19 @@ async fn main() {
         http: reqwest::Client::new(),
     });
 
-    let scylla_session = scylla::SessionBuilder::new()
-        .known_node(&scylla_contact_points)
-        .build()
-        .await
-        .expect("Failed to connect to ScyllaDB");
+    let scylla_session = loop {
+        match scylla::SessionBuilder::new()
+            .known_node(&scylla_contact_points)
+            .build()
+            .await
+        {
+            Ok(session) => break session,
+            Err(e) => {
+                eprintln!("ScyllaDB not ready, retrying in 5s: {e}");
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            }
+        }
+    };
 
     let scylla_client = Arc::new(ScyllaClient {
         session: Arc::new(scylla_session),
