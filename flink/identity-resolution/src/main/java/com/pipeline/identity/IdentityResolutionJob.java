@@ -35,7 +35,7 @@ public class IdentityResolutionJob {
                 .setBootstrapServers(brokers)
                 .setTopics(inputTopic)
                 .setGroupId(groupId)
-                .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetsInitializer.earliest()))
+                .setStartingOffsets(OffsetsInitializer.committedOffsets(org.apache.kafka.clients.consumer.OffsetResetStrategy.EARLIEST))
                 .setValueOnlyDeserializer(new AbstractDeserializationSchema<RawEvent>() {
                     @Override
                     public RawEvent deserialize(byte[] bytes) throws IOException {

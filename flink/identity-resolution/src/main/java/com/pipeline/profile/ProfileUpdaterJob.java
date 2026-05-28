@@ -38,7 +38,7 @@ public class ProfileUpdaterJob {
                 .setBootstrapServers(brokers)
                 .setTopics(inputTopic)
                 .setGroupId(groupId)
-                .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetsInitializer.earliest()))
+                .setStartingOffsets(OffsetsInitializer.committedOffsets(org.apache.kafka.clients.consumer.OffsetResetStrategy.EARLIEST))
                 .setValueOnlyDeserializer(new AbstractDeserializationSchema<UnifiedEvent>() {
                     @Override
                     public UnifiedEvent deserialize(byte[] bytes) throws IOException {
