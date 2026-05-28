@@ -9,6 +9,7 @@
     "timeColumnName": "updated_at",
     "timeType": "MILLISECONDS",
     "replication": "1",
+
     "completionConfig": {
       "completionMode": "DOWNLOAD"
     }
