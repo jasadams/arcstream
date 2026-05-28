@@ -9,7 +9,6 @@
     "timeColumnName": "updated_at",
     "timeType": "MILLISECONDS",
     "replication": "1",
-
     "completionConfig": {
       "completionMode": "DOWNLOAD"
     }
@@ -19,11 +18,6 @@
     "rangeIndexColumns": ["total_events", "total_sessions", "events_7d", "sessions_7d", "first_seen", "last_seen"],
     "sortedColumn": ["first_seen"]
   },
-  "fieldConfigList": [
-    {"name": "canonical_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"},
-    {"name": "user_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"},
-    {"name": "last_page", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"}
-  ],
   "routing": {
     "instanceSelectorType": "strictReplicaGroup"
   },

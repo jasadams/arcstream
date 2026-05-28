@@ -7,14 +7,13 @@
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "90",
     "replication": "1",
-
     "completionConfig": {
       "completionMode": "DOWNLOAD"
     }
   },
   "tableIndexConfig": {
-    "invertedIndexColumns": ["tenant_id", "event_type", "device_type", "country"],
-    "bloomFilterColumns": [],
+    "invertedIndexColumns": ["tenant_id", "event_type", "device_type", "country", "canonical_id"],
+    "bloomFilterColumns": ["canonical_id"],
     "rangeIndexColumns": ["event_time"],
     "sortedColumn": ["event_time"],
     "starTreeIndexConfigs": [{
@@ -29,14 +28,6 @@
       "maxLeafRecords": 10000
     }]
   },
-  "fieldConfigList": [
-    {"name": "event_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"},
-    {"name": "canonical_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"},
-    {"name": "anonymous_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"},
-    {"name": "session_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"},
-    {"name": "user_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"},
-    {"name": "page_url", "encodingType": "DICTIONARY"}
-  ],
   "ingestionConfig": {
     "transformConfigs": [
       {

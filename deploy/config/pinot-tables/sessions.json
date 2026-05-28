@@ -7,13 +7,12 @@
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "90",
     "replication": "1",
-
     "completionConfig": {
       "completionMode": "DOWNLOAD"
     }
   },
   "tableIndexConfig": {
-    "invertedIndexColumns": ["tenant_id", "device_type", "country"],
+    "invertedIndexColumns": ["tenant_id", "canonical_id", "device_type", "country"],
     "rangeIndexColumns": ["start_time", "end_time", "duration_sec", "event_count"],
     "sortedColumn": ["start_time"],
     "starTreeIndexConfigs": [{
@@ -30,10 +29,6 @@
       "maxLeafRecords": 10000
     }]
   },
-  "fieldConfigList": [
-    {"name": "session_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"},
-    {"name": "canonical_id", "encodingType": "RAW", "compressionCodec": "ZSTANDARD"}
-  ],
   "ingestionConfig": {
     "transformConfigs": [
       {
