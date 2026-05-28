@@ -49,6 +49,7 @@ pub async fn run(
             }
             Err(e) => {
                 eprintln!("Kafka consumer error: {e}");
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             }
         }
     }
