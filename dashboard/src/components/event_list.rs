@@ -111,7 +111,32 @@ pub fn EventListPage() -> impl IntoView {
                 <LiveToggle paused />
             </div>
         </div>
-        <Transition fallback=move || view! { <div></div> }>
+        <Suspense fallback=move || view! {
+            <table class="event-table" aria-label="Live events">
+                <thead>
+                    <tr>
+                        <th>"Time"</th>
+                        <th>"Type"</th>
+                        <th>"User"</th>
+                        <th>"Page"</th>
+                        <th class="hide-mobile">"Device"</th>
+                        <th class="hide-mobile">"Country"</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {(0..8).map(|_| view! {
+                        <tr class="skeleton-row">
+                            <td><div class="skel skel-bar w-64"></div></td>
+                            <td><div class="skel skel-bar w-48"></div></td>
+                            <td><div class="skel skel-user"><div class="skel-circle"></div><div class="skel-lines"><div class="skel-bar w-80"></div></div></div></td>
+                            <td><div class="skel skel-bar w-80"></div></td>
+                            <td class="hide-mobile"><div class="skel skel-bar w-48"></div></td>
+                            <td class="hide-mobile"><div class="skel skel-bar w-48"></div></td>
+                        </tr>
+                    }).collect::<Vec<_>>()}
+                </tbody>
+            </table>
+        }>
             {move || {
                 let r = rows.get();
                 if r.is_empty() {
@@ -154,7 +179,7 @@ pub fn EventListPage() -> impl IntoView {
                     </table>
                 }.into_any())
             }}
-        </Transition>
+        </Suspense>
     }
 }
 

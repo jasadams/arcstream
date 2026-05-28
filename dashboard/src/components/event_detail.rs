@@ -43,7 +43,27 @@ pub fn EventDetailPage() -> impl IntoView {
         <Title text=page_title/>
         <A href="/events" attr:class="back-link">"\u{2190} Back to Events"</A>
 
-        <Transition fallback=move || view! { <div class="loading">"Loading event..."</div> }>
+        <Suspense fallback=move || view! {
+            <div class="profile-header">
+                <div class="event-header">
+                    <div class="skel skel-bar w-64" style="height: 24px; margin-bottom: 8px"></div>
+                    <div class="skel skel-bar w-80" style="height: 16px; margin-bottom: 6px"></div>
+                    <div class="skel skel-bar w-full" style="height: 14px"></div>
+                </div>
+                <div class="section-title">"User"</div>
+                <div class="skel skel-user" style="padding: 12px 0">
+                    <div class="skel-circle"></div>
+                    <div class="skel-lines"><div class="skel-bar w-80"></div><div class="skel-bar w-48"></div></div>
+                </div>
+                <div class="section-title">"Event Properties"</div>
+                <div class="event-props">
+                    {(0..6).map(|_| view! {
+                        <div class="prop-label"><div class="skel skel-bar w-48"></div></div>
+                        <div class="prop-value"><div class="skel skel-bar w-80"></div></div>
+                    }).collect::<Vec<_>>()}
+                </div>
+            </div>
+        }>
             {move || {
                 event_resource.get().map(|result| match result {
                     Ok(e) => {
@@ -103,7 +123,7 @@ pub fn EventDetailPage() -> impl IntoView {
                             </div>
 
                             <div class="section-title">"Nearby Events"</div>
-                            <Transition fallback=move || view! { <div class="timeline-placeholder"></div> }>
+                            <Suspense fallback=move || view! { <div class="timeline-placeholder"></div> }>
                                 {move || {
                                     let current_eid = event_id();
                                     nearby_resource.get().map(|result| match result {
@@ -146,12 +166,12 @@ pub fn EventDetailPage() -> impl IntoView {
                                         Err(e) => view! { <div class="loading">{format!("Error: {e}")}</div> }.into_any(),
                                     })
                                 }}
-                            </Transition>
+                            </Suspense>
                         }.into_any()
                     }
                     Err(e) => view! { <div class="loading">{format!("Error: {e}")}</div> }.into_any(),
                 })
             }}
-        </Transition>
+        </Suspense>
     }
 }

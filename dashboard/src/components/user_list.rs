@@ -219,7 +219,7 @@ pub fn UserListPage() -> impl IntoView {
             view! { <UserTable rows=rows page=page total=cache.total /> }.into_any()
         } else {
             view! {
-                <Transition fallback=move || view! { <SkeletonTable /> }>
+                <Suspense fallback=move || view! { <SkeletonTable /> }>
                     {move || {
                         let current_page = page.get();
                         if rows.with_untracked(|r| r.is_empty()) || last_page.get_value() != Some(current_page) {
@@ -253,7 +253,7 @@ pub fn UserListPage() -> impl IntoView {
                         if r.is_empty() { return None; }
                         Some(view! { <UserTable rows=rows page=page total=cache.total /> }.into_any())
                     }}
-                </Transition>
+                </Suspense>
             }.into_any()
         }}
     }
