@@ -38,7 +38,7 @@ public class ProfileUpdaterJob {
                 .setBootstrapServers(brokers)
                 .setTopics(inputTopic)
                 .setGroupId(groupId)
-                .setStartingOffsets(OffsetsInitializer.earliest())
+                .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetsInitializer.earliest()))
                 .setValueOnlyDeserializer(new AbstractDeserializationSchema<UnifiedEvent>() {
                     @Override
                     public UnifiedEvent deserialize(byte[] bytes) throws IOException {
