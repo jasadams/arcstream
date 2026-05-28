@@ -27,7 +27,8 @@ RUN mkdir -p /site/pkg && \
     cp dist/dashboard-*.js /site/pkg/dashboard.js && \
     cp style/main.css /site/pkg/dashboard.css && \
     find /site/pkg -type f \( -name '*.wasm' -o -name '*.js' -o -name '*.css' \) \
-      -exec sh -c 'brotli -q 11 -k -f "$1" && gzip -9 -k -f "$1"' _ {} \;
+      -exec sh -c 'brotli -q 11 -k -f "$1" && gzip -9 -k -f "$1"' _ {} \; && \
+    if [ -d public ] && [ "$(ls -A public 2>/dev/null)" ]; then cp -r public/* /site/; fi
 
 FROM scratch
 COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/dashboard-server /dashboard-server
