@@ -26,7 +26,13 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
                 <meta property="og:description" content="Real-time Customer Data Platform reference architecture. Every piece real, running live."/>
                 <meta property="og:type" content="website"/>
                 <meta property="og:url" content="https://cdp.alytic.com.au"/>
-                <meta name="twitter:card" content="summary"/>
+                <meta property="og:image" content="https://cdp.alytic.com.au/og-image.png"/>
+                <meta property="og:image:width" content="1200"/>
+                <meta property="og:image:height" content="630"/>
+                <meta name="twitter:card" content="summary_large_image"/>
+                <meta name="twitter:title" content="Arcstream CDP"/>
+                <meta name="twitter:description" content="Real-time Customer Data Platform reference architecture. Every piece real, running live."/>
+                <meta name="twitter:image" content="https://cdp.alytic.com.au/og-image.png"/>
                 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23111115'/><circle cx='16' cy='16' r='6' fill='%23D4944C'/></svg>"/>
                 <title>"CDP Dashboard"</title>
                 <link rel="preconnect" href="https://fonts.bunny.net"/>
