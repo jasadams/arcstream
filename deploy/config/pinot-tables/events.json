@@ -6,7 +6,10 @@
     "timeType": "MILLISECONDS",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "90",
-    "replication": "1"
+    "replication": "1",
+    "completionConfig": {
+      "completionMode": "DOWNLOAD"
+    }
   },
   "tableIndexConfig": {
     "invertedIndexColumns": ["tenant_id", "event_type", "device_type", "country", "canonical_id"],
@@ -25,6 +28,14 @@
       "maxLeafRecords": 10000
     }]
   },
+  "fieldConfigList": [
+    {"name": "event_id", "encodingType": "RAW", "compressionCodec": "ZSTD"},
+    {"name": "canonical_id", "encodingType": "RAW", "compressionCodec": "ZSTD"},
+    {"name": "anonymous_id", "encodingType": "RAW", "compressionCodec": "ZSTD"},
+    {"name": "session_id", "encodingType": "RAW", "compressionCodec": "ZSTD"},
+    {"name": "user_id", "encodingType": "RAW", "compressionCodec": "ZSTD"},
+    {"name": "page_url", "encodingType": "RAW", "compressionCodec": "ZSTD"}
+  ],
   "ingestionConfig": {
     "transformConfigs": [
       {
@@ -44,7 +55,9 @@
         "stream.kafka.consumer.type": "lowLevel",
         "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
         "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
-        "stream.kafka.consumer.prop.auto.offset.reset": "smallest"
+        "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
+        "realtime.segment.flush.threshold.rows": "500000",
+        "realtime.segment.flush.threshold.time": "6h"
       }]
     }
   },
