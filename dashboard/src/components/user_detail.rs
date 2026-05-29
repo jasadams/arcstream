@@ -138,12 +138,35 @@ pub fn UserDetailPage() -> impl IntoView {
         <Title text=page_title/>
         <A href="/profiles" attr:class="back-link">"\u{2190} Back to Profiles"</A>
 
-        // CRITICAL: This MUST be <Transition>, not <Suspense>.
-        // Suspense replaces server-rendered HTML with the fallback during hydration,
-        // causing layout shift every time — no skeleton can match the real content height.
-        // Transition preserves existing server-rendered DOM during hydration (no flash).
-        // The fallback only appears on client-side navigation when there's no prior content.
-        <Transition fallback=move || view! { <div class="profile-header profile-placeholder"></div> }>
+        // Layout shift prevention: this skeleton uses the REAL CSS classes (stat-card,
+        // label, value, subtitle, etc.) with &nbsp; content so heights are computed by
+        // the same rules as real content. Do NOT replace with skel-bar elements or a
+        // min-height — those drift when any font/padding/margin changes.
+        <Suspense fallback=move || view! {
+            <div class="profile-header profile-placeholder">
+                <div class="profile-identity">
+                    <span class="profile-avatar"><div class="skel-circle" style="width:48px;height:48px"></div></span>
+                    <div>
+                        <h2>{"\u{00a0}"}</h2>
+                        <div class="subtitle">{"\u{00a0}"}<div class="subtitle-meta">{"\u{00a0}"}</div></div>
+                    </div>
+                </div>
+                <div class="stats-row">
+                    {(0..6).map(|_| view! {
+                        <div class="stat-card"><div class="label">{"\u{00a0}"}</div><div class="value">{"\u{00a0}"}</div></div>
+                    }).collect::<Vec<_>>()}
+                </div>
+                <div class="stats-row">
+                    {(0..4).map(|_| view! {
+                        <div class="stat-card"><div class="label">{"\u{00a0}"}</div><div class="value">{"\u{00a0}"}</div></div>
+                    }).collect::<Vec<_>>()}
+                </div>
+                <div class="section-title">{"\u{00a0}"}</div>
+                <div class="tag-list"><span class="empty-hint">{"\u{00a0}"}</span></div>
+                <div class="section-title">{"\u{00a0}"}</div>
+                <div class="tag-list"><span class="empty-hint">{"\u{00a0}"}</span></div>
+            </div>
+        }>
         {move || { let _ = profile.get(); Some(view! {
         <div class="profile-header">
             <div class="profile-identity">
@@ -287,10 +310,10 @@ pub fn UserDetailPage() -> impl IntoView {
             </div>
         </div>
         }) }}
-        </Transition>
+        </Suspense>
 
         <div class="section-title">"Recent Events"</div>
-        <Transition fallback=move || view! { <div class="timeline-placeholder"></div> }>
+        <Suspense fallback=move || view! { <div class="timeline-placeholder"></div> }>
             {move || {
                 let current = live_events.get();
                 if current.is_empty() {
@@ -311,7 +334,7 @@ pub fn UserDetailPage() -> impl IntoView {
                     </div>
                 }.into_any())
             }}
-        </Transition>
+        </Suspense>
     }
 }
 

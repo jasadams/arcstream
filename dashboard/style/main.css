@@ -564,6 +564,13 @@ tbody tr:last-child td {
 .profile-placeholder {
     animation: none;
 }
+.profile-placeholder .stat-card,
+.profile-placeholder .profile-identity,
+.profile-placeholder .section-title,
+.profile-placeholder .tag-list {
+    animation: shimmer 1.4s ease-in-out infinite;
+    color: transparent;
+}
 
 .timeline {
     animation: content-in 0.25s ease-out 0.05s both;
