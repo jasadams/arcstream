@@ -978,7 +978,7 @@ tr.row-new {
     border-radius: var(--radius);
     padding: 20px;
     box-shadow: var(--shadow-card);
-    min-height: 514px;
+    min-height: 483px;
     overflow: hidden;
 }
 
@@ -991,7 +991,6 @@ tr.row-new {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 472px;
     color: var(--text-muted);
     font-size: 13px;
 }
@@ -1020,7 +1019,6 @@ tr.row-new {
 .chart-panel .chartml-container {
     width: 100%;
     max-width: 100%;
-    min-height: 472px;
 }
 
 .chart-panel .chartml-container svg {
@@ -1035,10 +1033,6 @@ tr.row-new {
     letter-spacing: -0.2px;
     color: var(--text);
     margin-bottom: 12px;
-}
-
-.chart-panel .chartml-svg-host {
-    min-height: 434px;
 }
 
 .chart-panel .chartml-tooltip {
@@ -1056,10 +1050,6 @@ tr.row-new {
 .chart-panel .chartml-spinner {
     border-color: var(--border);
     border-top-color: var(--accent);
-}
-
-.chart-panel .chartml-loading {
-    min-height: 434px;
 }
 
 .chart-panel .chartml-pie-slice {
@@ -1308,9 +1298,8 @@ tr.row-new {
     .metric-cards .metric-card:last-child { grid-column: span 2; }
     .metric-value { font-size: 20px; }
 
-    .chart-panel { min-height: 354px; padding: 16px; }
-    .chart-panel .chartml-container { min-height: 314px; }
-    .chart-panel .chartml-svg-host { min-height: 294px; }
+    .chart-panel { min-height: 406.5px; padding: 16px; }
+
 
     .pulse-bar { flex-direction: column; }
     .compact-stats { display: none; }
