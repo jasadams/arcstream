@@ -15,13 +15,10 @@
     "starTreeIndexConfigs": [{
       "dimensionsSplitOrder": ["tenant_id", "session_date", "session_hour", "country", "device_type", "browser"],
       "skipStarNodeCreationForDimensions": [],
-      "functionColumnPairs": [
-        "COUNT__*",
-        "SUM__duration_sec",
-        "AVG__duration_sec",
-        "DISTINCTCOUNTHLL__canonical_id",
-        "DISTINCTCOUNTHLL__session_id",
-        "SUM__event_count"
+      "aggregationConfigs": [
+        { "columnName": "*", "aggregationFunction": "COUNT" },
+        { "columnName": "duration_sec", "aggregationFunction": "SUM" },
+        { "columnName": "event_count", "aggregationFunction": "SUM" }
       ],
       "maxLeafRecords": 10000
     }]
