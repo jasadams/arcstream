@@ -358,7 +358,7 @@ pub fn StatsPage() -> impl IntoView {
 
         <div class="charts-grid">
             <div class="chart-panel span-2">
-                <Suspense fallback=move || view! { <div class="chart-loading">"Loading..."</div> }>
+                <Suspense fallback=move || view! { <div class="chart-loading"></div> }>
                     {move || {
                         events_data.get().map(|result| {
                             match result {
@@ -374,7 +374,7 @@ pub fn StatsPage() -> impl IntoView {
             </div>
 
             <div class="chart-panel">
-                <Suspense fallback=move || view! { <div class="chart-loading">"Loading..."</div> }>
+                <Suspense fallback=move || view! { <div class="chart-loading"></div> }>
                     {move || {
                         users_data.get().map(|result| {
                             match result {
@@ -390,7 +390,7 @@ pub fn StatsPage() -> impl IntoView {
             </div>
 
             <div class="chart-panel">
-                <Suspense fallback=move || view! { <div class="chart-loading">"Loading..."</div> }>
+                <Suspense fallback=move || view! { <div class="chart-loading"></div> }>
                     {move || {
                         sessions_data.get().map(|result| {
                             match result {
@@ -406,7 +406,7 @@ pub fn StatsPage() -> impl IntoView {
             </div>
 
             <div class="chart-panel">
-                <Suspense fallback=move || view! { <div class="chart-loading">"Loading..."</div> }>
+                <Suspense fallback=move || view! { <div class="chart-loading"></div> }>
                     {move || {
                         duration_data.get().map(|result| {
                             match result {
@@ -422,7 +422,7 @@ pub fn StatsPage() -> impl IntoView {
             </div>
 
             <div class="chart-panel">
-                <Suspense fallback=move || view! { <div class="chart-loading">"Loading..."</div> }>
+                <Suspense fallback=move || view! { <div class="chart-loading"></div> }>
                     {move || {
                         devices_data.get().map(|result| {
                             match result {
@@ -438,7 +438,7 @@ pub fn StatsPage() -> impl IntoView {
             </div>
 
             <div class="chart-panel span-2">
-                <Suspense fallback=move || view! { <div class="chart-loading">"Loading..."</div> }>
+                <Suspense fallback=move || view! { <div class="chart-loading"></div> }>
                     {move || {
                         pages_data.get().map(|result| {
                             match result {
@@ -454,7 +454,7 @@ pub fn StatsPage() -> impl IntoView {
             </div>
 
             <div class="chart-panel">
-                <Suspense fallback=move || view! { <div class="chart-loading">"Loading..."</div> }>
+                <Suspense fallback=move || view! { <div class="chart-loading"></div> }>
                     {move || {
                         browsers_data.get().map(|result| {
                             match result {
@@ -470,7 +470,7 @@ pub fn StatsPage() -> impl IntoView {
             </div>
 
             <div class="chart-panel">
-                <Suspense fallback=move || view! { <div class="chart-loading">"Loading..."</div> }>
+                <Suspense fallback=move || view! { <div class="chart-loading"></div> }>
                     {move || {
                         countries_data.get().map(|result| {
                             match result {
