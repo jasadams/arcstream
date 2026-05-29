@@ -146,8 +146,8 @@ pub fn UserListPage() -> impl IntoView {
     if has_cache {
         last_page.set_value(None);
         Effect::new(move || {
-            let current_page = page.get();
             let Some(Ok(fetched)) = users.get() else { return };
+            let current_page = page.get_untracked();
             if last_page.get_value() == Some(current_page) {
                 for user in &fetched {
                     if let Some(sig) = lookup.with_value(|m| m.get(&user.canonical_id).copied()) {
