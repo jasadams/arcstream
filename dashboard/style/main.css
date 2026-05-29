@@ -445,6 +445,7 @@ tbody tr:last-child td {
     padding: 24px;
     margin-bottom: 24px;
     box-shadow: var(--shadow-card);
+    min-height: 567px;
 }
 
 .profile-header h2 {
@@ -1070,6 +1071,7 @@ tr.row-new {
 
 .pulse-metric {
     flex: 1;
+    min-height: 68px;
     background: var(--surface);
     border-radius: var(--radius);
     padding: 16px 20px;
