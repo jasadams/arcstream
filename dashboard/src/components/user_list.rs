@@ -266,13 +266,13 @@ fn SkeletonTable() -> impl IntoView {
         <table class="skeleton-table" aria-label="User profiles">
             <thead>
                 <tr>
-                    <th>"User"</th>
-                    <th class="hide-mobile">"Joined"</th>
-                    <th>"Last Active"</th>
-                    <th>"Events"</th>
-                    <th class="hide-mobile">"Sessions"</th>
-                    <th>"Country"</th>
-                    <th class="hide-mobile">"Devices"</th>
+                    <th>{"\u{00a0}"}</th>
+                    <th class="hide-mobile">{"\u{00a0}"}</th>
+                    <th>{"\u{00a0}"}</th>
+                    <th>{"\u{00a0}"}</th>
+                    <th class="hide-mobile">{"\u{00a0}"}</th>
+                    <th>{"\u{00a0}"}</th>
+                    <th class="hide-mobile">{"\u{00a0}"}</th>
                 </tr>
             </thead>
             <tbody>

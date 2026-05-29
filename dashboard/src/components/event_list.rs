@@ -115,12 +115,12 @@ pub fn EventListPage() -> impl IntoView {
             <table class="event-table skeleton-table" aria-label="Live events">
                 <thead>
                     <tr>
-                        <th>"Time"</th>
-                        <th>"Type"</th>
-                        <th>"User"</th>
-                        <th>"Page"</th>
-                        <th class="hide-mobile">"Device"</th>
-                        <th class="hide-mobile">"Country"</th>
+                        <th>{"\u{00a0}"}</th>
+                        <th>{"\u{00a0}"}</th>
+                        <th>{"\u{00a0}"}</th>
+                        <th>{"\u{00a0}"}</th>
+                        <th class="hide-mobile">{"\u{00a0}"}</th>
+                        <th class="hide-mobile">{"\u{00a0}"}</th>
                     </tr>
                 </thead>
                 <tbody>
