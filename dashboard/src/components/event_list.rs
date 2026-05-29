@@ -112,7 +112,7 @@ pub fn EventListPage() -> impl IntoView {
             </div>
         </div>
         <Suspense fallback=move || view! {
-            <table class="event-table" aria-label="Live events">
+            <table class="event-table skeleton-table" aria-label="Live events">
                 <thead>
                     <tr>
                         <th>"Time"</th>
@@ -126,12 +126,23 @@ pub fn EventListPage() -> impl IntoView {
                 <tbody>
                     {(0..8).map(|_| view! {
                         <tr class="skeleton-row">
-                            <td><div class="skel skel-bar w-64"></div></td>
-                            <td><div class="skel skel-bar w-48"></div></td>
-                            <td><div class="skel skel-user"><div class="skel-circle"></div><div class="skel-lines"><div class="skel-bar w-80"></div></div></div></td>
-                            <td><div class="skel skel-bar w-80"></div></td>
-                            <td class="hide-mobile"><div class="skel skel-bar w-48"></div></td>
-                            <td class="hide-mobile"><div class="skel skel-bar w-48"></div></td>
+                            <td>{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</td>
+                            <td><span class="badge-event badge-default">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</span></td>
+                            <td>
+                                <div class="user-identity compact">
+                                    <span class="user-avatar"><div class="skel-circle" style="width:22px;height:22px"></div></span>
+                                    <span class="user-petname">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</span>
+                                </div>
+                            </td>
+                            <td class="page-url">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</td>
+                            <td class="hide-mobile">
+                                <span class="device-inline">{"\u{00a0}\u{00a0}"}</span>
+                                {"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}
+                            </td>
+                            <td class="hide-mobile">
+                                <span class="flag">{"\u{00a0}"}</span>
+                                {" \u{00a0}\u{00a0}\u{00a0}\u{00a0}"}
+                            </td>
                         </tr>
                     }).collect::<Vec<_>>()}
                 </tbody>

@@ -572,6 +572,17 @@ tbody tr:last-child td {
     color: transparent;
 }
 
+.skeleton-table .skeleton-row td {
+    animation: shimmer 1.4s ease-in-out infinite;
+    color: transparent;
+}
+.skeleton-table .skeleton-row .badge-event,
+.skeleton-table .skeleton-row .user-petname,
+.skeleton-table .skeleton-row .user-id-short,
+.skeleton-table .skeleton-row .flag {
+    color: transparent;
+}
+
 .timeline {
     animation: content-in 0.25s ease-out 0.05s both;
 }

@@ -262,7 +262,7 @@ pub fn UserListPage() -> impl IntoView {
 #[component]
 fn SkeletonTable() -> impl IntoView {
     view! {
-        <table aria-label="User profiles">
+        <table class="skeleton-table" aria-label="User profiles">
             <thead>
                 <tr>
                     <th>"User"</th>
@@ -277,13 +277,24 @@ fn SkeletonTable() -> impl IntoView {
             <tbody>
                 {(0..8).map(|_| view! {
                     <tr class="skeleton-row">
-                        <td><div class="skel skel-user"><div class="skel-circle"></div><div class="skel-lines"><div class="skel-bar w-80"></div><div class="skel-bar w-48"></div></div></div></td>
-                        <td class="hide-mobile"><div class="skel-bar w-64"></div></td>
-                        <td><div class="skel-bar w-64"></div></td>
-                        <td><div class="skel-bar w-32"></div></td>
-                        <td class="hide-mobile"><div class="skel-bar w-32"></div></td>
-                        <td><div class="skel-bar w-48"></div></td>
-                        <td class="hide-mobile"><div class="skel-bar w-32"></div></td>
+                        <td>
+                            <div class="user-identity">
+                                <span class="user-avatar"><div class="skel-circle"></div></span>
+                                <div class="user-names">
+                                    <span class="user-petname">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</span>
+                                    <span class="user-id-short">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="hide-mobile">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</td>
+                        <td>{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</td>
+                        <td>{"\u{00a0}\u{00a0}\u{00a0}"}</td>
+                        <td class="hide-mobile">{"\u{00a0}\u{00a0}\u{00a0}"}</td>
+                        <td>
+                            <span class="flag">{"\u{00a0}"}</span>
+                            {" \u{00a0}\u{00a0}\u{00a0}\u{00a0}"}
+                        </td>
+                        <td class="hide-mobile">{"\u{00a0}\u{00a0}\u{00a0}"}</td>
                     </tr>
                 }).collect::<Vec<_>>()}
             </tbody>

@@ -37,6 +37,7 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
                 <title>"CDP Dashboard"</title>
                 <link rel="preconnect" href="https://fonts.bunny.net"/>
                 <link href="https://fonts.bunny.net/css?family=satoshi:400,500,600,700|dm-sans:400,500,600|geist-mono:400,500&display=swap" rel="stylesheet"/>
+                <script defer data-key="eyJzIjoiZjE0ZDNiYmM0MDFmZWZhNSIsInciOiJ3b3Jrc3BhY2UtOTlmMjRkMDUtNjczZDI1YjgiLCJkIjpbImNkcC5hbHl0aWMuY29tLmF1IiwibG9jYWxob3N0Il19.Y1cUg_xGMFvQ2IpMn4iesVBke9ODdaD11geqGMf2UYU" src="https://analytics.kyomi.ai/k.js"></script>
                 <AutoReload options=options.clone()/>
                 <HydrationScripts options/>
                 <leptos_meta::Stylesheet id="leptos" href="/pkg/dashboard.css"/>

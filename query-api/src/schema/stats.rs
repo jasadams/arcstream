@@ -290,18 +290,15 @@ impl StatsQuery {
         range: TimeRange,
     ) -> async_graphql::Result<Vec<TimeSeriesPoint>> {
         let pinot = ctx.data::<Arc<dyn PinotQuerier>>()?;
-        let filter = range.profiles_filter();
+        let filter = range.events_filter();
         let granularity = range.bucket_granularity();
+        let time_col = range.events_time_column();
 
         let limit = range.query_limit();
-        let time_expr = match range {
-            TimeRange::Day => "DATETIMECONVERT(last_seen, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '1:HOURS')".to_string(),
-            _ => "DATETIMECONVERT(last_seen, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '1:DAYS')".to_string(),
-        };
         let sql = format!(
-            "SELECT {time_expr} AS time_bucket, \
-             COUNT(*) AS value \
-             FROM profiles \
+            "SELECT {time_col} AS time_bucket, \
+             DISTINCTCOUNTHLL(canonical_id) AS value \
+             FROM events \
              WHERE {filter} \
              GROUP BY time_bucket \
              ORDER BY time_bucket ASC \
