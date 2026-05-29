@@ -1,5 +1,6 @@
 use leptos::prelude::*;
 use leptos_meta::Title;
+use leptos_router::hooks::use_query_map;
 use crate::app::Tick;
 use crate::server::stats_api::*;
 use crate::components::stats_bar::RollingCounter;
@@ -189,7 +190,15 @@ style:
 
 #[component]
 pub fn StatsPage() -> impl IntoView {
-    let range = RwSignal::new(TimeRange::Week);
+    let query = use_query_map();
+    let initial_range = query.read().get("range").and_then(|r| match r.as_str() {
+        "24h" => Some(TimeRange::Day),
+        "7d" => Some(TimeRange::Week),
+        "30d" => Some(TimeRange::Month),
+        "90d" => Some(TimeRange::Quarter),
+        _ => None,
+    }).unwrap_or(TimeRange::Week);
+    let range = RwSignal::new(initial_range);
 
     let tick = use_context::<Tick>();
 
@@ -252,7 +261,20 @@ pub fn StatsPage() -> impl IntoView {
                             class:active=move || range.get() == r_clone
                             on:click={
                                 let r = r.clone();
-                                move |_| range.set(r.clone())
+                                move |_| {
+                                    range.set(r.clone());
+                                    #[cfg(feature = "hydrate")]
+                                    {
+                                        let param = match r {
+                                            TimeRange::Day => "24h",
+                                            TimeRange::Week => "7d",
+                                            TimeRange::Month => "30d",
+                                            TimeRange::Quarter => "90d",
+                                        };
+                                        let nav = leptos_router::hooks::use_navigate();
+                                        nav(&format!("/analytics?range={param}"), Default::default());
+                                    }
+                                }
                             }
                         >
                             {label}
