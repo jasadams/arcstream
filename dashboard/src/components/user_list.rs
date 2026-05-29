@@ -221,9 +221,10 @@ pub fn UserListPage() -> impl IntoView {
             view! {
                 <Transition fallback=move || view! { <SkeletonTable /> }>
                     {move || {
-                        let current_page = page.get();
+                        let fetched = users.get();
+                        let current_page = page.get_untracked();
                         if rows.with_untracked(|r| r.is_empty()) || last_page.get_value() != Some(current_page) {
-                            match users.get() {
+                            match fetched {
                                 Some(Ok(fetched)) => {
                                     last_page.set_value(Some(current_page));
                                     cache.owner.with_value(|owner| {
