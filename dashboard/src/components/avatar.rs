@@ -23,7 +23,7 @@ fn get_digit(number: u32, ntn: u32) -> u32 {
 fn get_unit(number: u32, range: i32, index: Option<u32>) -> i32 {
     let value = (number % range as u32) as i32;
     match index {
-        Some(i) if get_digit(number, i) % 2 == 0 => -value,
+        Some(i) if get_digit(number, i).is_multiple_of(2) => -value,
         _ => value,
     }
 }

@@ -135,7 +135,7 @@ fn RollingDigit(value: Signal<u64>, position: usize) -> impl IntoView {
                 style=move || format!("transform: translateY(-{}em)", pos.get())
                 on:transitionend=move |_| {
                     let current = pos.get_untracked();
-                    if current < 10 || current >= 20 {
+                    if !(10..20).contains(&current) {
                         let home = 10 + extract_digit(value.get_untracked()) as i32;
                         animate.set(false);
                         pos.set(home);

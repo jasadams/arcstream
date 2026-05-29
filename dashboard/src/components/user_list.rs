@@ -305,7 +305,7 @@ fn SkeletonTable() -> impl IntoView {
 
 #[component]
 fn UserTable(
-    rows: RwSignal<Vec<(String, RwSignal<UserProfile>, RwSignal<bool>)>>,
+    rows: RwSignal<Vec<crate::app::UserRow>>,
     page: RwSignal<u32>,
     total: RwSignal<Option<u64>>,
 ) -> impl IntoView {

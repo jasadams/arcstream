@@ -6,7 +6,7 @@ use crate::components::avatar::marble_avatar_svg;
 use crate::components::petname::petname;
 use crate::components::event_list::{event_type_label, event_type_class};
 use crate::components::relative_time::RelativeTime;
-use crate::server::api::{get_event, get_events, EventRow};
+use crate::server::api::{get_event, get_events};
 use crate::util::*;
 
 #[component]

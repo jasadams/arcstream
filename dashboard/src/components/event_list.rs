@@ -7,7 +7,6 @@ use crate::components::live_toggle::LiveToggle;
 use crate::server::api::{get_all_events, EventRow};
 use crate::util::*;
 use leptos::reactive::owner::Owner;
-use leptos_router::components::A;
 
 #[cfg(feature = "hydrate")]
 const MAX_EVENTS: usize = 200;
@@ -203,7 +202,6 @@ fn EventRowView(
     let avatar_svg = marble_avatar_svg(&e.canonical_id, 22);
     let display_name = petname(&e.canonical_id);
     let nav_path = format!("/events/{}/{}/{}", e.tenant_id, e.canonical_id, e.event_id);
-    let profile_path = format!("/profiles/{}/{}", e.tenant_id, e.canonical_id);
     let event_time = e.event_time.clone();
     let badge_class = format!("badge-event {}", event_type_class(&e.event_type));
     let label = event_type_label(&e.event_type);
@@ -222,11 +220,11 @@ fn EventRowView(
         >
             <td><RelativeTime timestamp=event_time /></td>
             <td><span class=badge_class>{label}</span></td>
-            <td on:click=move |ev| { ev.stop_propagation(); }>
-                <A href=profile_path attr:class="user-identity compact" attr:style="text-decoration: none; color: inherit;">
+            <td>
+                <span class="user-identity compact">
                     <span class="user-avatar" inner_html=avatar_svg></span>
                     <span class="user-petname">{display_name}</span>
-                </A>
+                </span>
             </td>
             <td class="page-url">{e.page_url}</td>
             <td class="hide-mobile">
