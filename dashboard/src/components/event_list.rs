@@ -124,7 +124,7 @@ pub fn EventListPage() -> impl IntoView {
                     </tr>
                 </thead>
                 <tbody>
-                    {(0..8).map(|_| view! {
+                    {(0..25).map(|_| view! {
                         <tr class="skeleton-row">
                             <td>{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</td>
                             <td><span class="badge-event badge-default">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</span></td>

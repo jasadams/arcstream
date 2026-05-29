@@ -276,7 +276,7 @@ fn SkeletonTable() -> impl IntoView {
                 </tr>
             </thead>
             <tbody>
-                {(0..8).map(|_| view! {
+                {(0..25).map(|_| view! {
                     <tr class="skeleton-row">
                         <td>
                             <div class="user-identity">
