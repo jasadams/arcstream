@@ -18,8 +18,8 @@
       "skipStarNodeCreationForDimensions": [],
       "aggregationConfigs": [
         { "columnName": "*", "aggregationFunction": "COUNT" },
-        { "columnName": "canonical_id", "aggregationFunction": "DISTINCTCOUNTHLL", "functionParameters": { "log2m": "14" } },
-        { "columnName": "session_id", "aggregationFunction": "DISTINCTCOUNTHLL" },
+        { "columnName": "session_id", "aggregationFunction": "DISTINCTCOUNTHLL", "functionParameters": { "log2m": "8" } },
+        { "columnName": "canonical_id", "aggregationFunction": "DISTINCTCOUNTHLL", "functionParameters": { "log2m": "8" } },
         { "columnName": "event_count", "aggregationFunction": "SUM" }
       ],
       "maxLeafRecords": 10000
