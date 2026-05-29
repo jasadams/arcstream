@@ -516,7 +516,8 @@ tbody tr:last-child td {
 .timeline-item-new {
     animation: timeline-expand 0.35s ease-out forwards,
                timeline-highlight 1.5s ease-out 0.35s forwards;
-    overflow: hidden;
+    overflow-x: visible;
+    overflow-y: clip;
     background: var(--accent-dim);
 }
 
