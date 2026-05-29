@@ -148,7 +148,16 @@ pub fn UserDetailPage() -> impl IntoView {
                     <span class="profile-avatar"><div class="skel-circle" style="width:48px;height:48px"></div></span>
                     <div>
                         <h2>{"\u{00a0}"}</h2>
-                        <div class="subtitle">{"\u{00a0}"}<div class="subtitle-meta">{"\u{00a0}"}</div></div>
+                        <div class="subtitle">
+                            // Real subtitle has two lines: canonical_id · User · tenant
+                            // then subtitle-meta with First seen · Last seen · device · page
+                            <span class="mono">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</span>
+                            " \u{00b7} "
+                            {"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}
+                            <div class="subtitle-meta">
+                                {"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0} \u{00b7} \u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="stats-row">
@@ -162,9 +171,17 @@ pub fn UserDetailPage() -> impl IntoView {
                     }).collect::<Vec<_>>()}
                 </div>
                 <div class="section-title">{"\u{00a0}"}</div>
-                <div class="tag-list"><span class="empty-hint">{"\u{00a0}"}</span></div>
+                <div class="tag-list">
+                    <span class="badge badge-event">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</span>
+                    <span class="badge badge-event">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</span>
+                    <span class="badge badge-event">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</span>
+                </div>
                 <div class="section-title">{"\u{00a0}"}</div>
-                <div class="tag-list"><span class="empty-hint">{"\u{00a0}"}</span></div>
+                <div class="tag-list">
+                    <span class="badge badge-active">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</span>
+                    <span class="badge badge-active">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</span>
+                    <span class="badge badge-active">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</span>
+                </div>
             </div>
         }>
         {move || { let _ = profile.get(); Some(view! {

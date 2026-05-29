@@ -17,7 +17,7 @@ use crate::schema::live_profile::LiveProfile;
 use crate::schema::user_profile::{UserConnection, UserProfile, UserProfileRow};
 use stats::StatsQuery;
 use subscription::SubscriptionRoot;
-use tenant::{Tenant, TenantRow};
+use tenant::Tenant;
 
 #[derive(MergedObject, Default)]
 pub struct QueryRoot(TenantQuery, StatsQuery, GlobalQuery);
@@ -83,9 +83,12 @@ impl TenantQuery {
             pinot.query(&users_sql),
         ).map_err(async_graphql::Error::new)?;
 
-        let events: Vec<TenantRow> = parse_jsonl(&events_body);
+        #[derive(Deserialize)]
+        struct EventsRow { tenant_id: String, total_events: u64 }
         #[derive(Deserialize)]
         struct UsersRow { unique_users: u64 }
+
+        let events: Vec<EventsRow> = parse_jsonl(&events_body);
         let users: Vec<UsersRow> = parse_jsonl(&users_body);
 
         Ok(events.into_iter().next().map(|r| Tenant {
