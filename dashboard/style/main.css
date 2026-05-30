@@ -194,6 +194,69 @@ header a[aria-current="page"] { color: var(--text); }
     background: rgba(212, 148, 76, 0.12);
 }
 
+.dev-stats-log {
+    margin-top: 12px;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.dev-stat-entry {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+}
+
+.dev-stat-entry:last-child {
+    border-bottom: none;
+}
+
+.dev-stat-sql {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+}
+
+.dev-stat-meta {
+    display: flex;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.dev-path {
+    color: var(--text-muted);
+}
+
+.dev-path.star-tree {
+    color: var(--green);
+}
+
+.dev-path.partial {
+    color: var(--orange);
+}
+
+.dev-path.full-scan {
+    color: var(--red);
+}
+
+.dev-backend-label {
+    color: var(--accent);
+}
+
+.dev-elapsed {
+    color: var(--text-muted);
+}
+
+.dev-segments {
+    color: var(--text-muted);
+}
+
 .github-link {
     display: inline-flex;
     align-items: center;

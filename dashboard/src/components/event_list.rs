@@ -1,5 +1,6 @@
 use leptos::prelude::*;
 use leptos_meta::Title;
+use crate::app::DevMode;
 use crate::components::avatar::marble_avatar_svg;
 use crate::components::petname::petname;
 use crate::components::relative_time::RelativeTime;
@@ -37,6 +38,10 @@ type EventEntry = (String, RwSignal<EventRow>, RwSignal<bool>);
 
 #[component]
 pub fn EventListPage() -> impl IntoView {
+    let dev = expect_context::<DevMode>();
+    Effect::new(move || {
+        dev.query_stats.set(Vec::new());
+    });
     let events = Resource::new(
         || (),
         |_| get_all_events(None, None),
@@ -49,9 +54,10 @@ pub fn EventListPage() -> impl IntoView {
     {
         let owner = owner.clone();
         Effect::new(move || {
-            if let Some(Ok(fetched)) = events.get() {
+            if let Some(Ok(result)) = events.get() {
+                dev.query_stats.update(|s| s.extend(result.stats));
                 let new_rows: Vec<EventEntry> = owner.with(|| {
-                    fetched
+                    result.data
                         .into_iter()
                         .map(|e| {
                             let eid = e.event_id.clone();

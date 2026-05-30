@@ -18,10 +18,10 @@ pub fn StatsBar() -> impl IntoView {
     let loaded = RwSignal::new(false);
 
     Effect::new(move || {
-        if let Some(Ok(s)) = stats.get() {
-            total_users.set(s.total_users);
-            total_events.set(s.total_events);
-            active_sessions.set(s.active_sessions);
+        if let Some(Ok(result)) = stats.get() {
+            total_users.set(result.data.total_users);
+            total_events.set(result.data.total_events);
+            active_sessions.set(result.data.active_sessions);
             if !loaded.get_untracked() {
                 loaded.set(true);
             }

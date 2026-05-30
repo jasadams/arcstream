@@ -1,5 +1,6 @@
 use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
+use crate::server::WithStats;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TimeRange {
@@ -51,9 +52,9 @@ pub struct AnalyticsSummary {
 }
 
 #[server(GetAnalyticsSummary)]
-pub async fn get_analytics_summary(range: TimeRange) -> Result<AnalyticsSummary, ServerFnError> {
+pub async fn get_analytics_summary(range: TimeRange) -> Result<WithStats<AnalyticsSummary>, ServerFnError> {
     use crate::server::AppState;
-    use crate::server::query_api::graphql_query;
+    use crate::server::query_api::graphql_query_with_stats;
 
     let state = expect_context::<AppState>();
 
@@ -64,7 +65,7 @@ pub async fn get_analytics_summary(range: TimeRange) -> Result<AnalyticsSummary,
     }
 
     let vars = serde_json::json!({ "range": range.to_graphql_enum() });
-    let data: Response = graphql_query(
+    let (data, stats): (Response, Vec<crate::server::QueryStatEntry>) = graphql_query_with_stats(
         &state,
         "query($range: TimeRange!) { analyticsSummary(range: $range) { users sessions events avgDurationSec eventsPerSession } }",
         vars,
@@ -72,13 +73,13 @@ pub async fn get_analytics_summary(range: TimeRange) -> Result<AnalyticsSummary,
     .await
     .map_err(ServerFnError::new)?;
 
-    Ok(data.analytics_summary)
+    Ok(WithStats { data: data.analytics_summary, stats })
 }
 
 #[server(GetEventsOverTime)]
-pub async fn get_events_over_time(range: TimeRange) -> Result<Vec<GroupedTimeSeriesPoint>, ServerFnError> {
+pub async fn get_events_over_time(range: TimeRange) -> Result<WithStats<Vec<GroupedTimeSeriesPoint>>, ServerFnError> {
     use crate::server::AppState;
-    use crate::server::query_api::graphql_query;
+    use crate::server::query_api::graphql_query_with_stats;
 
     let state = expect_context::<AppState>();
 
@@ -89,7 +90,7 @@ pub async fn get_events_over_time(range: TimeRange) -> Result<Vec<GroupedTimeSer
     }
 
     let vars = serde_json::json!({ "range": range.to_graphql_enum() });
-    let data: Response = graphql_query(
+    let (data, stats): (Response, Vec<crate::server::QueryStatEntry>) = graphql_query_with_stats(
         &state,
         "query($range: TimeRange!) { eventsOverTime(range: $range) { bucket group value } }",
         vars,
@@ -97,13 +98,13 @@ pub async fn get_events_over_time(range: TimeRange) -> Result<Vec<GroupedTimeSer
     .await
     .map_err(ServerFnError::new)?;
 
-    Ok(data.events_over_time)
+    Ok(WithStats { data: data.events_over_time, stats })
 }
 
 #[server(GetUsersOverTime)]
-pub async fn get_users_over_time(range: TimeRange) -> Result<Vec<TimeSeriesPoint>, ServerFnError> {
+pub async fn get_users_over_time(range: TimeRange) -> Result<WithStats<Vec<TimeSeriesPoint>>, ServerFnError> {
     use crate::server::AppState;
-    use crate::server::query_api::graphql_query;
+    use crate::server::query_api::graphql_query_with_stats;
 
     let state = expect_context::<AppState>();
 
@@ -114,7 +115,7 @@ pub async fn get_users_over_time(range: TimeRange) -> Result<Vec<TimeSeriesPoint
     }
 
     let vars = serde_json::json!({ "range": range.to_graphql_enum() });
-    let data: Response = graphql_query(
+    let (data, stats): (Response, Vec<crate::server::QueryStatEntry>) = graphql_query_with_stats(
         &state,
         "query($range: TimeRange!) { usersOverTime(range: $range) { bucket value } }",
         vars,
@@ -122,13 +123,13 @@ pub async fn get_users_over_time(range: TimeRange) -> Result<Vec<TimeSeriesPoint
     .await
     .map_err(ServerFnError::new)?;
 
-    Ok(data.users_over_time)
+    Ok(WithStats { data: data.users_over_time, stats })
 }
 
 #[server(GetSessionsOverTime)]
-pub async fn get_sessions_over_time(range: TimeRange) -> Result<Vec<TimeSeriesPoint>, ServerFnError> {
+pub async fn get_sessions_over_time(range: TimeRange) -> Result<WithStats<Vec<TimeSeriesPoint>>, ServerFnError> {
     use crate::server::AppState;
-    use crate::server::query_api::graphql_query;
+    use crate::server::query_api::graphql_query_with_stats;
 
     let state = expect_context::<AppState>();
 
@@ -139,7 +140,7 @@ pub async fn get_sessions_over_time(range: TimeRange) -> Result<Vec<TimeSeriesPo
     }
 
     let vars = serde_json::json!({ "range": range.to_graphql_enum() });
-    let data: Response = graphql_query(
+    let (data, stats): (Response, Vec<crate::server::QueryStatEntry>) = graphql_query_with_stats(
         &state,
         "query($range: TimeRange!) { sessionsOverTime(range: $range) { bucket value } }",
         vars,
@@ -147,13 +148,13 @@ pub async fn get_sessions_over_time(range: TimeRange) -> Result<Vec<TimeSeriesPo
     .await
     .map_err(ServerFnError::new)?;
 
-    Ok(data.sessions_over_time)
+    Ok(WithStats { data: data.sessions_over_time, stats })
 }
 
 #[server(GetAvgSessionDuration)]
-pub async fn get_avg_session_duration(range: TimeRange) -> Result<Vec<TimeSeriesPoint>, ServerFnError> {
+pub async fn get_avg_session_duration(range: TimeRange) -> Result<WithStats<Vec<TimeSeriesPoint>>, ServerFnError> {
     use crate::server::AppState;
-    use crate::server::query_api::graphql_query;
+    use crate::server::query_api::graphql_query_with_stats;
 
     let state = expect_context::<AppState>();
 
@@ -164,7 +165,7 @@ pub async fn get_avg_session_duration(range: TimeRange) -> Result<Vec<TimeSeries
     }
 
     let vars = serde_json::json!({ "range": range.to_graphql_enum() });
-    let data: Response = graphql_query(
+    let (data, stats): (Response, Vec<crate::server::QueryStatEntry>) = graphql_query_with_stats(
         &state,
         "query($range: TimeRange!) { avgSessionDuration(range: $range) { bucket value } }",
         vars,
@@ -172,13 +173,13 @@ pub async fn get_avg_session_duration(range: TimeRange) -> Result<Vec<TimeSeries
     .await
     .map_err(ServerFnError::new)?;
 
-    Ok(data.avg_session_duration)
+    Ok(WithStats { data: data.avg_session_duration, stats })
 }
 
 #[server(GetTopPages)]
-pub async fn get_top_pages(range: TimeRange) -> Result<Vec<BreakdownRow>, ServerFnError> {
+pub async fn get_top_pages(range: TimeRange) -> Result<WithStats<Vec<BreakdownRow>>, ServerFnError> {
     use crate::server::AppState;
-    use crate::server::query_api::graphql_query;
+    use crate::server::query_api::graphql_query_with_stats;
 
     let state = expect_context::<AppState>();
 
@@ -189,7 +190,7 @@ pub async fn get_top_pages(range: TimeRange) -> Result<Vec<BreakdownRow>, Server
     }
 
     let vars = serde_json::json!({ "range": range.to_graphql_enum() });
-    let data: Response = graphql_query(
+    let (data, stats): (Response, Vec<crate::server::QueryStatEntry>) = graphql_query_with_stats(
         &state,
         "query($range: TimeRange!) { topPages(range: $range) { label value } }",
         vars,
@@ -197,13 +198,13 @@ pub async fn get_top_pages(range: TimeRange) -> Result<Vec<BreakdownRow>, Server
     .await
     .map_err(ServerFnError::new)?;
 
-    Ok(data.top_pages)
+    Ok(WithStats { data: data.top_pages, stats })
 }
 
 #[server(GetDeviceBreakdown)]
-pub async fn get_device_breakdown(range: TimeRange) -> Result<Vec<BreakdownRow>, ServerFnError> {
+pub async fn get_device_breakdown(range: TimeRange) -> Result<WithStats<Vec<BreakdownRow>>, ServerFnError> {
     use crate::server::AppState;
-    use crate::server::query_api::graphql_query;
+    use crate::server::query_api::graphql_query_with_stats;
 
     let state = expect_context::<AppState>();
 
@@ -214,7 +215,7 @@ pub async fn get_device_breakdown(range: TimeRange) -> Result<Vec<BreakdownRow>,
     }
 
     let vars = serde_json::json!({ "range": range.to_graphql_enum() });
-    let data: Response = graphql_query(
+    let (data, stats): (Response, Vec<crate::server::QueryStatEntry>) = graphql_query_with_stats(
         &state,
         "query($range: TimeRange!) { deviceBreakdown(range: $range) { label value } }",
         vars,
@@ -222,13 +223,13 @@ pub async fn get_device_breakdown(range: TimeRange) -> Result<Vec<BreakdownRow>,
     .await
     .map_err(ServerFnError::new)?;
 
-    Ok(data.device_breakdown)
+    Ok(WithStats { data: data.device_breakdown, stats })
 }
 
 #[server(GetBrowserBreakdown)]
-pub async fn get_browser_breakdown(range: TimeRange) -> Result<Vec<BreakdownRow>, ServerFnError> {
+pub async fn get_browser_breakdown(range: TimeRange) -> Result<WithStats<Vec<BreakdownRow>>, ServerFnError> {
     use crate::server::AppState;
-    use crate::server::query_api::graphql_query;
+    use crate::server::query_api::graphql_query_with_stats;
 
     let state = expect_context::<AppState>();
 
@@ -239,7 +240,7 @@ pub async fn get_browser_breakdown(range: TimeRange) -> Result<Vec<BreakdownRow>
     }
 
     let vars = serde_json::json!({ "range": range.to_graphql_enum() });
-    let data: Response = graphql_query(
+    let (data, stats): (Response, Vec<crate::server::QueryStatEntry>) = graphql_query_with_stats(
         &state,
         "query($range: TimeRange!) { browserBreakdown(range: $range) { label value } }",
         vars,
@@ -247,13 +248,13 @@ pub async fn get_browser_breakdown(range: TimeRange) -> Result<Vec<BreakdownRow>
     .await
     .map_err(ServerFnError::new)?;
 
-    Ok(data.browser_breakdown)
+    Ok(WithStats { data: data.browser_breakdown, stats })
 }
 
 #[server(GetCountryBreakdown)]
-pub async fn get_country_breakdown(range: TimeRange) -> Result<Vec<BreakdownRow>, ServerFnError> {
+pub async fn get_country_breakdown(range: TimeRange) -> Result<WithStats<Vec<BreakdownRow>>, ServerFnError> {
     use crate::server::AppState;
-    use crate::server::query_api::graphql_query;
+    use crate::server::query_api::graphql_query_with_stats;
 
     let state = expect_context::<AppState>();
 
@@ -264,7 +265,7 @@ pub async fn get_country_breakdown(range: TimeRange) -> Result<Vec<BreakdownRow>
     }
 
     let vars = serde_json::json!({ "range": range.to_graphql_enum() });
-    let data: Response = graphql_query(
+    let (data, stats): (Response, Vec<crate::server::QueryStatEntry>) = graphql_query_with_stats(
         &state,
         "query($range: TimeRange!) { countryBreakdown(range: $range) { label value } }",
         vars,
@@ -272,5 +273,5 @@ pub async fn get_country_breakdown(range: TimeRange) -> Result<Vec<BreakdownRow>
     .await
     .map_err(ServerFnError::new)?;
 
-    Ok(data.country_breakdown)
+    Ok(WithStats { data: data.country_breakdown, stats })
 }

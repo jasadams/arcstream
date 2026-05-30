@@ -59,6 +59,7 @@ pub type UserRow = (String, RwSignal<UserProfile>, RwSignal<bool>);
 pub struct DevMode {
     pub enabled: RwSignal<bool>,
     pub backend: RwSignal<String>,
+    pub query_stats: RwSignal<Vec<crate::server::QueryStatEntry>>,
 }
 
 #[derive(Clone, Copy)]
@@ -92,6 +93,7 @@ pub fn App() -> impl IntoView {
     let dev_mode = DevMode {
         enabled: RwSignal::new(false),
         backend: RwSignal::new(String::new()),
+        query_stats: RwSignal::new(Vec::new()),
     };
     provide_context(dev_mode);
 
@@ -256,6 +258,38 @@ fn DevPanel() -> impl IntoView {
                     >
                         "FlareDB"
                     </button>
+                </div>
+                <div class="dev-stats-log">
+                    <div class="dev-label">"Query Log"</div>
+                    {move || {
+                        dev.query_stats.get().into_iter().map(|entry| {
+                            let sql_preview = entry.sql.char_indices()
+                                .nth(60)
+                                .map(|(i, _)| format!("{}...", &entry.sql[..i]))
+                                .unwrap_or_else(|| entry.sql.clone());
+                            let path_class = match entry.path.as_deref() {
+                                Some("STAR_TREE") => "dev-path star-tree",
+                                Some("PARTIAL") => "dev-path partial",
+                                Some("FULL_SCAN") => "dev-path full-scan",
+                                _ => "dev-path",
+                            };
+                            let path_label = entry.path.clone().unwrap_or_else(|| "\u{2014}".to_string());
+                            let elapsed = entry.elapsed_ms.map(|ms| format!("{ms}ms"));
+                            let segments = entry.segments_indexed.zip(entry.segments_total)
+                                .map(|(i, t)| format!("{i}/{t} idx"));
+                            view! {
+                                <div class="dev-stat-entry">
+                                    <div class="dev-stat-sql">{sql_preview}</div>
+                                    <div class="dev-stat-meta">
+                                        <span class=path_class>{path_label}</span>
+                                        <span class="dev-backend-label">{entry.backend.clone()}</span>
+                                        {elapsed.map(|e| view! { <span class="dev-elapsed">{e}</span> })}
+                                        {segments.map(|s| view! { <span class="dev-segments">{s}</span> })}
+                                    </div>
+                                </div>
+                            }
+                        }).collect_view()
+                    }}
                 </div>
             </div>
         </Show>

@@ -210,7 +210,8 @@ pub fn AboutPage() -> impl IntoView {
     let pulse_loaded = RwSignal::new(false);
 
     Effect::new(move || {
-        if let Some(Ok(s)) = stats.get() {
+        if let Some(Ok(result)) = stats.get() {
+            let s = &result.data;
             total_users.set(s.total_users);
             active_sessions.set(s.active_sessions);
 

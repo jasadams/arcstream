@@ -1,5 +1,6 @@
 use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
+use crate::server::WithStats;
 #[cfg(feature = "ssr")]
 use crate::util::PAGE_SIZE;
 
@@ -151,9 +152,9 @@ pub struct DashboardStats {
 }
 
 #[server(GetUsers)]
-pub async fn get_users(page: u32) -> Result<Vec<UserProfile>, ServerFnError> {
+pub async fn get_users(page: u32) -> Result<WithStats<Vec<UserProfile>>, ServerFnError> {
     use crate::server::AppState;
-    use crate::server::query_api::graphql_query;
+    use crate::server::query_api::graphql_query_with_stats;
 
     let state = expect_context::<AppState>();
     let limit = PAGE_SIZE as i32;
@@ -170,7 +171,7 @@ pub async fn get_users(page: u32) -> Result<Vec<UserProfile>, ServerFnError> {
     }
 
     let vars = serde_json::json!({ "limit": limit, "offset": offset });
-    let data: Response = graphql_query(
+    let (data, stats): (Response, Vec<crate::server::QueryStatEntry>) = graphql_query_with_stats(
         &state,
         "query($limit: Int!, $offset: Int!) { users(limit: $limit, offset: $offset) { nodes { \
             tenantId canonicalId firstSeen lastSeen \
@@ -185,7 +186,7 @@ pub async fn get_users(page: u32) -> Result<Vec<UserProfile>, ServerFnError> {
     .await
     .map_err(ServerFnError::new)?;
 
-    Ok(data.users.nodes)
+    Ok(WithStats { data: data.users.nodes, stats })
 }
 
 #[server(GetUserCount)]
@@ -218,9 +219,9 @@ pub async fn get_user_count() -> Result<UserCount, ServerFnError> {
 }
 
 #[server(GetDashboardStats)]
-pub async fn get_dashboard_stats() -> Result<DashboardStats, ServerFnError> {
+pub async fn get_dashboard_stats() -> Result<WithStats<DashboardStats>, ServerFnError> {
     use crate::server::AppState;
-    use crate::server::query_api::graphql_query;
+    use crate::server::query_api::graphql_query_with_stats;
 
     let state = expect_context::<AppState>();
 
@@ -230,7 +231,7 @@ pub async fn get_dashboard_stats() -> Result<DashboardStats, ServerFnError> {
         dashboard_stats: DashboardStats,
     }
 
-    let data: Response = graphql_query(
+    let (data, stats): (Response, Vec<crate::server::QueryStatEntry>) = graphql_query_with_stats(
         &state,
         "{ dashboardStats { totalUsers totalEvents activeSessions } }",
         serde_json::json!({}),
@@ -238,7 +239,7 @@ pub async fn get_dashboard_stats() -> Result<DashboardStats, ServerFnError> {
     .await
     .map_err(ServerFnError::new)?;
 
-    Ok(data.dashboard_stats)
+    Ok(WithStats { data: data.dashboard_stats, stats })
 }
 
 #[server(GetLiveProfile)]
@@ -322,9 +323,9 @@ pub async fn get_events(tenant_id: String, canonical_id: String) -> Result<Vec<E
 pub async fn get_all_events(
     event_type: Option<String>,
     device_type: Option<String>,
-) -> Result<Vec<EventRow>, ServerFnError> {
+) -> Result<WithStats<Vec<EventRow>>, ServerFnError> {
     use crate::server::AppState;
-    use crate::server::query_api::graphql_query;
+    use crate::server::query_api::graphql_query_with_stats;
 
     let state = expect_context::<AppState>();
 
@@ -337,7 +338,7 @@ pub async fn get_all_events(
         "eventType": event_type,
         "deviceType": device_type,
     });
-    let data: Response = graphql_query(
+    let (data, stats): (Response, Vec<crate::server::QueryStatEntry>) = graphql_query_with_stats(
         &state,
         "query($eventType: String, $deviceType: String) { \
             events(eventType: $eventType, deviceType: $deviceType) { \
@@ -350,7 +351,7 @@ pub async fn get_all_events(
     .await
     .map_err(ServerFnError::new)?;
 
-    Ok(data.events)
+    Ok(WithStats { data: data.events, stats })
 }
 
 #[server(GetEvent)]
