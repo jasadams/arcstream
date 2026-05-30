@@ -186,14 +186,8 @@ fn DevModeToggle() -> impl IntoView {
             {
                 let _ = s.set_item("dev-mode", &enabled.to_string());
             }
-            if !enabled {
-                if let Some(doc) = web_sys::window().and_then(|w| w.document()) {
-                    use wasm_bindgen::JsCast;
-                    if let Some(html_doc) = doc.dyn_ref::<web_sys::HtmlDocument>() {
-                        let _ = html_doc.set_cookie("dev-backend=; path=/; max-age=0");
-                    }
-                }
-            }
+            // Keep the backend cookie even when the panel is hidden —
+            // only clearing it would revert all queries to the default.
         }
     };
     view! {
