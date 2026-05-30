@@ -59,9 +59,9 @@ fn BackendToggle() -> impl IntoView {
     #[cfg(feature = "ssr")]
     let current = {
         use crate::server::AppState;
-        use leptos::prelude::expect_context;
-        let state = expect_context::<AppState>();
-        state.backend.read().map(|b| b.clone()).unwrap_or_else(|_| "pinot".into())
+        leptos::prelude::use_context::<AppState>()
+            .and_then(|s| s.backend.read().ok().map(|b| b.clone()))
+            .unwrap_or_else(|| "pinot".into())
     };
     #[cfg(not(feature = "ssr"))]
     let current = "pinot".to_string();
