@@ -113,25 +113,85 @@ header a {
 header a:hover { color: var(--text); }
 header a[aria-current="page"] { color: var(--text); }
 
-.backend-toggle {
+/* Dev mode toggle button in nav */
+.dev-toggle {
     display: inline-flex;
     align-items: center;
     padding: 3px 10px;
     margin-left: auto;
     border: 1px solid var(--border);
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    opacity: 0.8;
-    transition: opacity 150ms, border-color 150ms;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 150ms, border-color 150ms;
 }
 
-.backend-toggle:hover {
-    opacity: 1;
+.dev-toggle:hover {
+    color: var(--accent);
     border-color: var(--accent);
-    color: var(--accent) !important;
+}
+
+/* Dev panel below header */
+.dev-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 0 0 1px var(--border);
+}
+
+.dev-panel-header {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.dev-backend-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dev-label {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.dev-backend-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 150ms, border-color 150ms, background 150ms;
+}
+
+.dev-backend-btn:hover {
+    color: var(--text);
+    border-color: var(--text-muted);
+}
+
+.dev-backend-btn.active {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(212, 148, 76, 0.12);
 }
 
 .github-link {

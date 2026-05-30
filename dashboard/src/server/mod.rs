@@ -8,5 +8,5 @@ pub mod stats_api;
 pub struct AppState {
     pub query_api_url: String,
     pub http: reqwest::Client,
-    pub backend: std::sync::Arc<std::sync::RwLock<String>>,
+    pub default_backend: String,
 }

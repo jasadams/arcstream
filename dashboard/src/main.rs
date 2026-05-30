@@ -3,14 +3,11 @@
 async fn main() {
     use axum::Router;
     use axum::routing::get;
-    use axum::extract::Query;
-    use axum::response::Redirect;
     use leptos::prelude::*;
     use leptos_axum::{generate_route_list, LeptosRoutes};
     use tower_http::services::ServeDir;
     use dashboard::app::{App, shell};
     use dashboard::server::AppState;
-    use std::sync::{Arc, RwLock};
 
     let default_backend = std::env::var("DEFAULT_BACKEND").unwrap_or_else(|_| "pinot".into());
 
@@ -18,7 +15,7 @@ async fn main() {
         query_api_url: std::env::var("QUERY_API_URL")
             .unwrap_or_else(|_| "http://query-api.data-pipeline.svc.cluster.local:8080/graphql".into()),
         http: reqwest::Client::new(),
-        backend: Arc::new(RwLock::new(default_backend)),
+        default_backend,
     };
 
     let conf = get_configuration(None).unwrap();
@@ -31,26 +28,8 @@ async fn main() {
         .precompressed_br()
         .precompressed_gzip();
 
-    let backend_toggle = {
-        let state = app_state.clone();
-        move |Query(params): Query<std::collections::HashMap<String, String>>| {
-            let state = state.clone();
-            async move {
-                if let Some(b) = params.get("backend") {
-                    if let Ok(mut current) = state.backend.write() {
-                        *current = b.clone();
-                        eprintln!("Backend switched to: {b}");
-                    }
-                }
-                let current = state.backend.read().map(|b| b.clone()).unwrap_or_default();
-                Redirect::to(&format!("/?backend={current}"))
-            }
-        }
-    };
-
     let app = Router::new()
         .route("/health", get(|| async { "ok" }))
-        .route("/set-backend", get(backend_toggle))
         .nest_service("/pkg", pkg_service)
         .leptos_routes_with_context(
             &leptos_options,

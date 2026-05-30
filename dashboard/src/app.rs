@@ -54,32 +54,11 @@ pub struct Tick(pub ReadSignal<u64>);
 
 pub type UserRow = (String, RwSignal<UserProfile>, RwSignal<bool>);
 
-#[component]
-fn BackendToggle() -> impl IntoView {
-    #[cfg(feature = "ssr")]
-    let current = {
-        use crate::server::AppState;
-        leptos::prelude::use_context::<AppState>()
-            .and_then(|s| s.backend.read().ok().map(|b| b.clone()))
-            .unwrap_or_else(|| "pinot".into())
-    };
-    #[cfg(not(feature = "ssr"))]
-    let current = "pinot".to_string();
-
-    let is_flare = current == "flare" || current == "flaredb";
-    let next = if is_flare { "pinot" } else { "flare" };
-    let label = if is_flare { "FlareDB" } else { "Pinot" };
-
-    view! {
-        <a
-            href={format!("/set-backend?backend={next}")}
-            rel="external"
-            class="backend-toggle"
-            title={format!("Switch to {}", if is_flare { "Pinot" } else { "FlareDB" })}
-        >
-            {label}
-        </a>
-    }
+/// Client-side dev mode state. Persisted to localStorage and cookies.
+#[derive(Clone, Copy)]
+pub struct DevMode {
+    pub enabled: RwSignal<bool>,
+    pub backend: RwSignal<String>,
 }
 
 #[derive(Clone, Copy)]
@@ -109,10 +88,29 @@ pub fn App() -> impl IntoView {
         owner: StoredValue::new(app_owner),
     });
 
+    // Initialize DevMode with defaults; WASM side restores from localStorage
+    let dev_mode = DevMode {
+        enabled: RwSignal::new(false),
+        backend: RwSignal::new(String::new()),
+    };
+    provide_context(dev_mode);
+
     #[cfg(feature = "hydrate")]
     {
         use wasm_bindgen::prelude::*;
         use crate::websocket;
+
+        // Restore dev mode state from localStorage
+        let window = web_sys::window().expect("no window");
+        let storage = window.local_storage().ok().flatten();
+        if let Some(s) = &storage {
+            if let Ok(Some(b)) = s.get_item("dev-backend") {
+                dev_mode.backend.set(b);
+            }
+            if let Ok(Some(v)) = s.get_item("dev-mode") {
+                dev_mode.enabled.set(v == "true");
+            }
+        }
 
         let (profile_sig, event_sig) = websocket::provide_stream_contexts();
 
@@ -150,11 +148,12 @@ pub fn App() -> impl IntoView {
                     <A href="/profiles">"Profiles"</A>
                     <A href="/events">"Events"</A>
                     <A href="/analytics">"Analytics"</A>
-                    <BackendToggle />
+                    <DevModeToggle />
                     <a href="https://github.com/jasadams/arcstream" target="_blank" rel="noopener" class="github-link" inner_html=SVG_GITHUB></a>
                 </nav>
             </header>
             <main id="main" class="container">
+                <DevPanel />
                 <Routes fallback=|| view! { <p>"Not found"</p> }>
                     <Route path=path!("/") view=AboutPage ssr=SsrMode::Async />
                     <Route path=path!("/profiles") view=UserListPage ssr=SsrMode::Async />
@@ -165,5 +164,100 @@ pub fn App() -> impl IntoView {
                 </Routes>
             </main>
         </Router>
+    }
+}
+
+/// Gear icon button in the nav that toggles the dev panel visibility.
+#[component]
+fn DevModeToggle() -> impl IntoView {
+    let dev = expect_context::<DevMode>();
+    let toggle = move |_| {
+        dev.enabled.update(|e| *e = !*e);
+        #[cfg(feature = "hydrate")]
+        {
+            let enabled = dev.enabled.get();
+            if let Some(s) = web_sys::window()
+                .and_then(|w| w.local_storage().ok().flatten())
+            {
+                let _ = s.set_item("dev-mode", &enabled.to_string());
+            }
+            if !enabled {
+                if let Some(doc) = web_sys::window().and_then(|w| w.document()) {
+                    use wasm_bindgen::JsCast;
+                    if let Some(html_doc) = doc.dyn_ref::<web_sys::HtmlDocument>() {
+                        let _ = html_doc.set_cookie("dev-backend=; path=/; max-age=0");
+                    }
+                }
+            }
+        }
+    };
+    view! {
+        <button class="dev-toggle" on:click=toggle title="Toggle dev panel">
+            "\u{2699} Dev"
+        </button>
+    }
+}
+
+/// Collapsible dev panel shown below the header when dev mode is enabled.
+#[component]
+fn DevPanel() -> impl IntoView {
+    let dev = expect_context::<DevMode>();
+    let backend = dev.backend;
+
+    let set_backend = move |name: &str| {
+        let name = name.to_owned();
+        backend.set(name.clone());
+        #[cfg(feature = "hydrate")]
+        {
+            // Persist to localStorage
+            if let Some(s) = web_sys::window()
+                .and_then(|w| w.local_storage().ok().flatten())
+            {
+                let _ = s.set_item("dev-backend", &name);
+            }
+            // Set cookie so SSR server functions can read the backend choice
+            if let Some(doc) = web_sys::window().and_then(|w| w.document()) {
+                use wasm_bindgen::JsCast;
+                if let Some(html_doc) = doc.dyn_ref::<web_sys::HtmlDocument>() {
+                    let _ = html_doc.set_cookie(&format!("dev-backend={name}; path=/; max-age=86400"));
+                }
+            }
+        }
+    };
+
+    let is_pinot = move || {
+        let b = backend.get();
+        b == "pinot" || b.is_empty()
+    };
+    let is_flare = move || {
+        let b = backend.get();
+        b == "flare" || b == "flaredb"
+    };
+
+    view! {
+        <Show when=move || dev.enabled.get()>
+            <div class="dev-panel">
+                <div class="dev-panel-header">
+                    "Dev Panel"
+                </div>
+                <div class="dev-backend-switch">
+                    <span class="dev-label">"Backend:"</span>
+                    <button
+                        class="dev-backend-btn"
+                        class:active=is_pinot
+                        on:click=move |_| set_backend("pinot")
+                    >
+                        "Pinot"
+                    </button>
+                    <button
+                        class="dev-backend-btn"
+                        class:active=is_flare
+                        on:click=move |_| set_backend("flare")
+                    >
+                        "FlareDB"
+                    </button>
+                </div>
+            </div>
+        </Show>
     }
 }
