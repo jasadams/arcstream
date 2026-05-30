@@ -16,5 +16,6 @@ async-graphql = "7"
 async-graphql-axum = "7"
 async-trait = "0.1"
 rdkafka = { version = "0.39", features = ["cmake-build"] }
+regex = "1"
 futures-util = "0.3"
 tokio-stream = { version = "0.1", features = ["sync"] }

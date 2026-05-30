@@ -54,6 +54,33 @@ pub struct Tick(pub ReadSignal<u64>);
 
 pub type UserRow = (String, RwSignal<UserProfile>, RwSignal<bool>);
 
+#[component]
+fn BackendToggle() -> impl IntoView {
+    #[cfg(feature = "ssr")]
+    let current = {
+        use crate::server::AppState;
+        use leptos::prelude::expect_context;
+        let state = expect_context::<AppState>();
+        state.backend.read().map(|b| b.clone()).unwrap_or_else(|_| "pinot".into())
+    };
+    #[cfg(not(feature = "ssr"))]
+    let current = "pinot".to_string();
+
+    let is_flare = current == "flare" || current == "flaredb";
+    let next = if is_flare { "pinot" } else { "flare" };
+    let label = if is_flare { "FlareDB" } else { "Pinot" };
+
+    view! {
+        <a
+            href={format!("/set-backend?backend={next}")}
+            class="backend-toggle"
+            title={format!("Switch to {}", if is_flare { "Pinot" } else { "FlareDB" })}
+        >
+            {label}
+        </a>
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct UserListCache {
     pub page: RwSignal<u32>,
@@ -122,6 +149,7 @@ pub fn App() -> impl IntoView {
                     <A href="/profiles">"Profiles"</A>
                     <A href="/events">"Events"</A>
                     <A href="/analytics">"Analytics"</A>
+                    <BackendToggle />
                     <a href="https://github.com/jasadams/arcstream" target="_blank" rel="noopener" class="github-link" inner_html=SVG_GITHUB></a>
                 </nav>
             </header>

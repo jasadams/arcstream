@@ -26,9 +26,16 @@ pub async fn graphql_query<T: DeserializeOwned>(
 ) -> Result<T, String> {
     let req = GraphQLRequest { query, variables };
 
+    let backend = state
+        .backend
+        .read()
+        .map(|b| b.clone())
+        .unwrap_or_else(|_| "pinot".to_string());
+
     let resp = state
         .http
         .post(&state.query_api_url)
+        .header("X-Backend", &backend)
         .json(&req)
         .send()
         .await

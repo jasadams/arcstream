@@ -382,12 +382,13 @@ services:
     restart: unless-stopped
 
   query-api:
-    image: ghcr.io/jasadams/arcstream/query-api:latest
+    image: arcstream-query-api:flaredb
     platform: linux/amd64
     ports:
       - "8080:8080"
     environment:
       PINOT_BROKER_URL: http://pinot-broker:8099/query/sql
+      FLAREDB_URL: http://host.containers.internal:8090/query/sql
       SCYLLA_CONTACT_POINTS: scylladb:9042
       KAFKA_BROKERS: redpanda:9092
       ENABLE_PLAYGROUND: "true"
@@ -405,12 +406,13 @@ services:
     restart: unless-stopped
 
   dashboard:
-    image: ghcr.io/jasadams/arcstream/dashboard:latest
+    image: arcstream-dashboard:flaredb
     platform: linux/amd64
     ports:
       - "3000:3000"
     environment:
       QUERY_API_URL: http://query-api:8080/graphql
+      DEFAULT_BACKEND: pinot
       LEPTOS_SITE_ROOT: /site
       LEPTOS_SITE_PKG_DIR: pkg
       LEPTOS_SITE_ADDR: 0.0.0.0:3000

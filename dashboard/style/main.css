@@ -113,6 +113,27 @@ header a {
 header a:hover { color: var(--text); }
 header a[aria-current="page"] { color: var(--text); }
 
+.backend-toggle {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    margin-left: auto;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    opacity: 0.8;
+    transition: opacity 150ms, border-color 150ms;
+}
+
+.backend-toggle:hover {
+    opacity: 1;
+    border-color: var(--accent);
+    color: var(--accent) !important;
+}
+
 .github-link {
     display: inline-flex;
     align-items: center;

@@ -12,8 +12,8 @@
     {"name": "session_hour", "dataType": "STRING"}
   ],
   "dateTimeFieldSpecs": [
-    {"name": "start_time", "dataType": "TIMESTAMP", "format": "1:MILLISECONDS:EPOCH", "granularity": "1:MILLISECONDS"},
-    {"name": "end_time", "dataType": "TIMESTAMP", "format": "1:MILLISECONDS:EPOCH", "granularity": "1:MILLISECONDS"}
+    {"name": "start_time", "dataType": "TIMESTAMP", "format": "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS", "granularity": "1:MILLISECONDS"},
+    {"name": "end_time", "dataType": "TIMESTAMP", "format": "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS", "granularity": "1:MILLISECONDS"}
   ],
   "metricFieldSpecs": [
     {"name": "duration_sec", "dataType": "LONG"},
