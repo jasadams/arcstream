@@ -73,6 +73,7 @@ fn BackendToggle() -> impl IntoView {
     view! {
         <a
             href={format!("/set-backend?backend={next}")}
+            rel="external"
             class="backend-toggle"
             title={format!("Switch to {}", if is_flare { "Pinot" } else { "FlareDB" })}
         >
