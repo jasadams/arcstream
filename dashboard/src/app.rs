@@ -102,19 +102,22 @@ pub fn App() -> impl IntoView {
         use wasm_bindgen::prelude::*;
         use crate::websocket;
 
-        // Restore dev mode state from localStorage
-        let window = web_sys::window().expect("no window");
-        let storage = window.local_storage().ok().flatten();
-        if let Some(s) = &storage {
-            if let Ok(Some(b)) = s.get_item("dev-backend") {
-                dev_mode.backend.set(b);
-            }
-            if let Ok(Some(v)) = s.get_item("dev-mode") {
-                dev_mode.enabled.set(v == "true");
-            }
-        }
-
         let (profile_sig, event_sig) = websocket::provide_stream_contexts();
+
+        // Restore dev mode state from localStorage AFTER hydration
+        // to avoid SSR/WASM mismatch (SSR renders enabled=false).
+        Effect::new(move || {
+            if let Some(s) = web_sys::window()
+                .and_then(|w| w.local_storage().ok().flatten())
+            {
+                if let Ok(Some(b)) = s.get_item("dev-backend") {
+                    dev_mode.backend.set(b);
+                }
+                if let Ok(Some(v)) = s.get_item("dev-mode") {
+                    dev_mode.enabled.set(v == "true");
+                }
+            }
+        });
 
         Effect::new(move || {
             let window = web_sys::window().expect("no window");
