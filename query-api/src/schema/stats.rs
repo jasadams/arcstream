@@ -4,6 +4,7 @@ use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::db::pinot::{parse_jsonl, PinotQuerier};
+use crate::schema::query_stats::QueryStatsCollector;
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum TimeRange {
@@ -134,12 +135,18 @@ impl StatsQuery {
         let sessions_sql =
             "SELECT DISTINCTCOUNTHLL(session_id) AS active_sessions FROM events WHERE event_time > ago('PT30M')";
 
-        let (users_body, events_body, sessions_body) = tokio::try_join!(
-            pinot.query(users_sql),
-            pinot.query(events_sql),
-            pinot.query(sessions_sql),
+        let (users_result, events_result, sessions_result) = tokio::try_join!(
+            pinot.query_with_stats(users_sql),
+            pinot.query_with_stats(events_sql),
+            pinot.query_with_stats(sessions_sql),
         )
         .map_err(async_graphql::Error::new)?;
+
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&users_result);
+            collector.push(&events_result);
+            collector.push(&sessions_result);
+        }
 
         #[derive(Deserialize)]
         struct UsersRow {
@@ -154,9 +161,9 @@ impl StatsQuery {
             active_sessions: u64,
         }
 
-        let users: Vec<UsersRow> = parse_jsonl(&users_body);
-        let events: Vec<EventsRow> = parse_jsonl(&events_body);
-        let sessions: Vec<SessionsRow> = parse_jsonl(&sessions_body);
+        let users: Vec<UsersRow> = parse_jsonl(&users_result.body);
+        let events: Vec<EventsRow> = parse_jsonl(&events_result.body);
+        let sessions: Vec<SessionsRow> = parse_jsonl(&sessions_result.body);
 
         Ok(DashboardStats {
             total_users: users.first().map(|r| r.total_users).unwrap_or(0),
@@ -188,13 +195,20 @@ impl StatsQuery {
             "SELECT AVG(duration_sec) AS avg_duration_sec FROM sessions WHERE {sf} AND duration_sec > 0"
         );
 
-        let (users_body, sessions_body, events_body, avg_duration_body) = tokio::try_join!(
-            pinot.query(&users_sql),
-            pinot.query(&sessions_sql),
-            pinot.query(&events_sql),
-            pinot.query(&avg_duration_sql),
+        let (users_result, sessions_result, events_result, avg_duration_result) = tokio::try_join!(
+            pinot.query_with_stats(&users_sql),
+            pinot.query_with_stats(&sessions_sql),
+            pinot.query_with_stats(&events_sql),
+            pinot.query_with_stats(&avg_duration_sql),
         )
         .map_err(async_graphql::Error::new)?;
+
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&users_result);
+            collector.push(&sessions_result);
+            collector.push(&events_result);
+            collector.push(&avg_duration_result);
+        }
 
         #[derive(Deserialize)]
         struct UsersRow {
@@ -213,10 +227,10 @@ impl StatsQuery {
             avg_duration_sec: f64,
         }
 
-        let users: Vec<UsersRow> = parse_jsonl(&users_body);
-        let sessions: Vec<SessionsRow> = parse_jsonl(&sessions_body);
-        let events: Vec<EventsRow> = parse_jsonl(&events_body);
-        let avg_duration: Vec<AvgDurationRow> = parse_jsonl(&avg_duration_body);
+        let users: Vec<UsersRow> = parse_jsonl(&users_result.body);
+        let sessions: Vec<SessionsRow> = parse_jsonl(&sessions_result.body);
+        let events: Vec<EventsRow> = parse_jsonl(&events_result.body);
+        let avg_duration: Vec<AvgDurationRow> = parse_jsonl(&avg_duration_result.body);
 
         let users_val = users.first().map(|r| r.users).unwrap_or(0);
         let sessions_val = sessions.first().map(|r| r.sessions).unwrap_or(0);
@@ -259,7 +273,10 @@ impl StatsQuery {
              LIMIT {limit}"
         );
 
-        let body = pinot.query(&sql).await.map_err(async_graphql::Error::new)?;
+        let result = pinot.query_with_stats(&sql).await.map_err(async_graphql::Error::new)?;
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&result);
+        }
 
         #[derive(Deserialize)]
         struct Row {
@@ -267,7 +284,7 @@ impl StatsQuery {
             event_type: String,
             value: f64,
         }
-        let rows: Vec<Row> = parse_jsonl(&body);
+        let rows: Vec<Row> = parse_jsonl(&result.body);
         let points: Vec<GroupedTimeSeriesPoint> = rows
             .into_iter()
             .map(|r| GroupedTimeSeriesPoint {
@@ -305,14 +322,17 @@ impl StatsQuery {
              LIMIT {limit}"
         );
 
-        let body = pinot.query(&sql).await.map_err(async_graphql::Error::new)?;
+        let result = pinot.query_with_stats(&sql).await.map_err(async_graphql::Error::new)?;
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&result);
+        }
 
         #[derive(Deserialize)]
         struct Row {
             time_bucket: String,
             value: f64,
         }
-        let rows: Vec<Row> = parse_jsonl(&body);
+        let rows: Vec<Row> = parse_jsonl(&result.body);
         let points: Vec<TimeSeriesPoint> = rows
             .into_iter()
             .map(|r| TimeSeriesPoint {
@@ -349,14 +369,17 @@ impl StatsQuery {
              LIMIT {limit}"
         );
 
-        let body = pinot.query(&sql).await.map_err(async_graphql::Error::new)?;
+        let result = pinot.query_with_stats(&sql).await.map_err(async_graphql::Error::new)?;
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&result);
+        }
 
         #[derive(Deserialize)]
         struct Row {
             time_bucket: String,
             value: f64,
         }
-        let rows: Vec<Row> = parse_jsonl(&body);
+        let rows: Vec<Row> = parse_jsonl(&result.body);
         let points: Vec<TimeSeriesPoint> = rows
             .into_iter()
             .map(|r| TimeSeriesPoint {
@@ -393,14 +416,17 @@ impl StatsQuery {
              LIMIT {limit}"
         );
 
-        let body = pinot.query(&sql).await.map_err(async_graphql::Error::new)?;
+        let result = pinot.query_with_stats(&sql).await.map_err(async_graphql::Error::new)?;
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&result);
+        }
 
         #[derive(Deserialize)]
         struct Row {
             time_bucket: String,
             value: f64,
         }
-        let rows: Vec<Row> = parse_jsonl(&body);
+        let rows: Vec<Row> = parse_jsonl(&result.body);
         let points: Vec<TimeSeriesPoint> = rows
             .into_iter()
             .map(|r| TimeSeriesPoint {
@@ -433,8 +459,11 @@ impl StatsQuery {
              LIMIT 10"
         );
 
-        let body = pinot.query(&sql).await.map_err(async_graphql::Error::new)?;
-        Ok(parse_jsonl(&body))
+        let result = pinot.query_with_stats(&sql).await.map_err(async_graphql::Error::new)?;
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&result);
+        }
+        Ok(parse_jsonl(&result.body))
     }
 
     async fn device_breakdown(
@@ -453,8 +482,11 @@ impl StatsQuery {
              ORDER BY value DESC"
         );
 
-        let body = pinot.query(&sql).await.map_err(async_graphql::Error::new)?;
-        Ok(parse_jsonl(&body))
+        let result = pinot.query_with_stats(&sql).await.map_err(async_graphql::Error::new)?;
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&result);
+        }
+        Ok(parse_jsonl(&result.body))
     }
 
     async fn browser_breakdown(
@@ -474,8 +506,11 @@ impl StatsQuery {
              LIMIT 10"
         );
 
-        let body = pinot.query(&sql).await.map_err(async_graphql::Error::new)?;
-        Ok(parse_jsonl(&body))
+        let result = pinot.query_with_stats(&sql).await.map_err(async_graphql::Error::new)?;
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&result);
+        }
+        Ok(parse_jsonl(&result.body))
     }
 
     async fn country_breakdown(
@@ -495,8 +530,11 @@ impl StatsQuery {
              LIMIT 10"
         );
 
-        let body = pinot.query(&sql).await.map_err(async_graphql::Error::new)?;
-        Ok(parse_jsonl(&body))
+        let result = pinot.query_with_stats(&sql).await.map_err(async_graphql::Error::new)?;
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&result);
+        }
+        Ok(parse_jsonl(&result.body))
     }
 }
 

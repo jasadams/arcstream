@@ -2,9 +2,36 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::Deserialize;
 
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct QueryStats {
+    pub elapsed_ms: Option<u64>,
+    pub path: Option<String>,
+    pub segments_total: Option<usize>,
+    pub segments_indexed: Option<usize>,
+    pub rows_scanned: Option<usize>,
+    pub backend: String,
+}
+
+pub struct QueryResult {
+    pub body: String,
+    pub stats: Option<QueryStats>,
+    pub sql: String,
+    pub backend: String,
+}
+
 #[async_trait]
 pub trait PinotQuerier: Send + Sync {
     async fn query(&self, sql: &str) -> Result<String, String>;
+
+    async fn query_with_stats(&self, sql: &str) -> Result<QueryResult, String> {
+        let body = self.query(sql).await?;
+        Ok(QueryResult {
+            body,
+            stats: None,
+            sql: sql.to_owned(),
+            backend: "pinot".to_owned(),
+        })
+    }
 }
 
 pub struct PinotClient {

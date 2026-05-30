@@ -16,6 +16,7 @@ use tower_http::cors::CorsLayer;
 use db::flaredb::FlareDBClient;
 use db::pinot::{PinotClient, PinotQuerier};
 use db::scylla::{LiveProfileProvider, ScyllaClient};
+use schema::query_stats::QueryStatsCollector;
 use schema::{AppSchema, QueryRoot};
 use schema::subscription::SubscriptionRoot;
 use streaming::types::{LiveEventMessage, ProfileUpdateMessage};
@@ -54,9 +55,22 @@ async fn graphql_handler(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("pinot");
     let client = state.backends.select(backend_name);
+    let collector = Arc::new(QueryStatsCollector::new());
     let mut gql_req = req.into_inner();
+    gql_req = gql_req.data(Arc::clone(&collector));
     gql_req = gql_req.data(client);
-    state.schema.execute(gql_req).await.into()
+    let mut response = state.schema.execute(gql_req).await;
+
+    let entries = collector.take();
+    if !entries.is_empty() {
+        if let Ok(json_val) = serde_json::to_value(&entries) {
+            if let Ok(gql_val) = async_graphql::Value::from_json(json_val) {
+                response.extensions.insert("queryStats".to_owned(), gql_val);
+            }
+        }
+    }
+
+    response.into()
 }
 
 async fn graphql_playground() -> Html<String> {

@@ -4,7 +4,7 @@ use reqwest::Client;
 use serde::Deserialize;
 use std::sync::OnceLock;
 
-use super::pinot::PinotQuerier;
+use super::pinot::{PinotQuerier, QueryResult, QueryStats};
 
 pub struct FlareDBClient {
     pub url: String,
@@ -15,6 +15,16 @@ pub struct FlareDBClient {
 struct FlareResponse {
     result_table: Option<FlareResultTable>,
     error: Option<String>,
+    query_stats: Option<FlareQueryStats>,
+}
+
+#[derive(Deserialize)]
+struct FlareQueryStats {
+    elapsed_ms: u64,
+    path: String,
+    segments_total: usize,
+    segments_indexed: usize,
+    rows_scanned: usize,
 }
 
 #[derive(Deserialize)]
@@ -28,16 +38,17 @@ struct FlareDataSchema {
     column_names: Vec<String>,
 }
 
-#[async_trait]
-impl PinotQuerier for FlareDBClient {
-    async fn query(&self, sql: &str) -> Result<String, String> {
+impl FlareDBClient {
+    async fn execute_request(&self, sql: &str, include_stats: bool) -> Result<FlareResponse, String> {
         let translated = translate_sql(sql);
-
         let body = serde_json::json!({"sql": translated});
 
-        let resp = self
-            .http
-            .post(&self.url)
+        let mut req = self.http.post(&self.url);
+        if include_stats {
+            req = req.header("X-Include-Stats", "true");
+        }
+
+        let resp = req
             .json(&body)
             .send()
             .await
@@ -57,22 +68,54 @@ impl PinotQuerier for FlareDBClient {
             return Err(format!("FlareDB query error: {err}"));
         }
 
-        let table = flare_resp
-            .result_table
+        Ok(flare_resp)
+    }
+}
+
+fn rows_to_jsonl(table: &FlareResultTable) -> String {
+    let mut lines = Vec::with_capacity(table.rows.len());
+    for row in &table.rows {
+        let mut obj = serde_json::Map::new();
+        for (i, col_name) in table.data_schema.column_names.iter().enumerate() {
+            if let Some(val) = row.get(i) {
+                obj.insert(col_name.clone(), val.clone());
+            }
+        }
+        lines.push(serde_json::to_string(&obj).unwrap_or_default());
+    }
+    lines.join("\n")
+}
+
+#[async_trait]
+impl PinotQuerier for FlareDBClient {
+    async fn query(&self, sql: &str) -> Result<String, String> {
+        let resp = self.execute_request(sql, false).await?;
+        let table = resp.result_table
+            .ok_or_else(|| "FlareDB response missing result_table".to_string())?;
+        Ok(rows_to_jsonl(&table))
+    }
+
+    async fn query_with_stats(&self, sql: &str) -> Result<QueryResult, String> {
+        let resp = self.execute_request(sql, true).await?;
+
+        let stats = resp.query_stats.map(|qs| QueryStats {
+            elapsed_ms: Some(qs.elapsed_ms),
+            path: Some(qs.path),
+            segments_total: Some(qs.segments_total),
+            segments_indexed: Some(qs.segments_indexed),
+            rows_scanned: Some(qs.rows_scanned),
+            backend: "flaredb".to_owned(),
+        });
+
+        let table = resp.result_table
             .ok_or_else(|| "FlareDB response missing result_table".to_string())?;
 
-        let mut lines = Vec::with_capacity(table.rows.len());
-        for row in &table.rows {
-            let mut obj = serde_json::Map::new();
-            for (i, col_name) in table.data_schema.column_names.iter().enumerate() {
-                if let Some(val) = row.get(i) {
-                    obj.insert(col_name.clone(), val.clone());
-                }
-            }
-            lines.push(serde_json::to_string(&obj).unwrap_or_default());
-        }
-
-        Ok(lines.join("\n"))
+        Ok(QueryResult {
+            body: rows_to_jsonl(&table),
+            stats,
+            sql: sql.to_owned(),
+            backend: "flaredb".to_owned(),
+        })
     }
 }
 

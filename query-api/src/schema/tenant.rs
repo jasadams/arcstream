@@ -7,6 +7,7 @@ use crate::schema::aggregation::{
     Dimension, EventTypeSummary, GroupCount, Metric, SortOrder, UserSort,
 };
 use crate::schema::event::Event;
+use crate::schema::query_stats::QueryStatsCollector;
 use crate::schema::user_profile::{UserConnection, UserProfile, UserProfileRow};
 
 #[derive(Deserialize)]
@@ -52,8 +53,11 @@ impl Tenant {
              AND event_time > ago('PT30M')"
         );
 
-        let body = pinot.query(&sql).await.map_err(async_graphql::Error::new)?;
-        let rows: Vec<ActiveSessionsRow> = parse_jsonl(&body);
+        let result = pinot.query_with_stats(&sql).await.map_err(async_graphql::Error::new)?;
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&result);
+        }
+        let rows: Vec<ActiveSessionsRow> = parse_jsonl(&result.body);
         Ok(rows.first().map(|r| r.active_sessions).unwrap_or(0))
     }
 
@@ -93,18 +97,23 @@ impl Tenant {
              WHERE tenant_id = '{safe_tenant}'"
         );
 
-        let (data_body, count_body) =
-            tokio::try_join!(pinot.query(&data_sql), pinot.query(&count_sql),)
+        let (data_result, count_result) =
+            tokio::try_join!(pinot.query_with_stats(&data_sql), pinot.query_with_stats(&count_sql))
                 .map_err(async_graphql::Error::new)?;
 
-        let rows: Vec<UserProfileRow> = parse_jsonl(&data_body);
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&data_result);
+            collector.push(&count_result);
+        }
+
+        let rows: Vec<UserProfileRow> = parse_jsonl(&data_result.body);
         let nodes: Vec<UserProfile> = rows.into_iter().map(UserProfile::from).collect();
 
         #[derive(Deserialize)]
         struct CountRow {
             total: u64,
         }
-        let count_rows: Vec<CountRow> = parse_jsonl(&count_body);
+        let count_rows: Vec<CountRow> = parse_jsonl(&count_result.body);
         let total_count = count_rows.first().map(|r| r.total).unwrap_or(0);
 
         Ok(UserConnection { nodes, total_count })
@@ -150,8 +159,11 @@ impl Tenant {
             conditions.join(" AND ")
         );
 
-        let body = pinot.query(&sql).await.map_err(async_graphql::Error::new)?;
-        Ok(parse_jsonl(&body))
+        let result = pinot.query_with_stats(&sql).await.map_err(async_graphql::Error::new)?;
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&result);
+        }
+        Ok(parse_jsonl(&result.body))
     }
 
     async fn summary(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<EventTypeSummary>> {
@@ -165,8 +177,11 @@ impl Tenant {
              GROUP BY event_type ORDER BY total_events DESC"
         );
 
-        let body = pinot.query(&sql).await.map_err(async_graphql::Error::new)?;
-        Ok(parse_jsonl(&body))
+        let result = pinot.query_with_stats(&sql).await.map_err(async_graphql::Error::new)?;
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&result);
+        }
+        Ok(parse_jsonl(&result.body))
     }
 
     async fn aggregate(
@@ -187,7 +202,10 @@ impl Tenant {
              GROUP BY key ORDER BY count DESC LIMIT 100"
         );
 
-        let body = pinot.query(&sql).await.map_err(async_graphql::Error::new)?;
-        Ok(parse_jsonl(&body))
+        let result = pinot.query_with_stats(&sql).await.map_err(async_graphql::Error::new)?;
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&result);
+        }
+        Ok(parse_jsonl(&result.body))
     }
 }
