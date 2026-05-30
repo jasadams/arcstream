@@ -45,6 +45,14 @@ struct PinotResponse {
     exceptions: Vec<PinotException>,
     #[serde(rename = "resultTable")]
     result_table: Option<ResultTable>,
+    #[serde(rename = "timeUsedMs")]
+    time_used_ms: Option<u64>,
+    #[serde(rename = "numSegmentsQueried")]
+    num_segments_queried: Option<usize>,
+    #[serde(rename = "numSegmentsProcessed")]
+    num_segments_processed: Option<usize>,
+    #[serde(rename = "numDocsScanned")]
+    num_docs_scanned: Option<usize>,
 }
 
 #[derive(Deserialize)]
@@ -65,9 +73,22 @@ struct DataSchema {
     column_names: Vec<String>,
 }
 
-#[async_trait]
-impl PinotQuerier for PinotClient {
-    async fn query(&self, sql: &str) -> Result<String, String> {
+fn pinot_table_to_jsonl(table: &ResultTable) -> String {
+    let mut lines = Vec::with_capacity(table.rows.len());
+    for row in &table.rows {
+        let mut obj = serde_json::Map::new();
+        for (i, col_name) in table.data_schema.column_names.iter().enumerate() {
+            if let Some(val) = row.get(i) {
+                obj.insert(col_name.clone(), val.clone());
+            }
+        }
+        lines.push(serde_json::to_string(&obj).unwrap_or_default());
+    }
+    lines.join("\n")
+}
+
+impl PinotClient {
+    async fn execute_request(&self, sql: &str) -> Result<PinotResponse, String> {
         let body = serde_json::json!({"sql": sql});
 
         let resp = self
@@ -93,22 +114,42 @@ impl PinotQuerier for PinotClient {
             return Err(format!("Pinot query error: {}", exc.message));
         }
 
-        let table = pinot_resp
+        Ok(pinot_resp)
+    }
+}
+
+#[async_trait]
+impl PinotQuerier for PinotClient {
+    async fn query(&self, sql: &str) -> Result<String, String> {
+        let resp = self.execute_request(sql).await?;
+        let table = resp
+            .result_table
+            .ok_or_else(|| "Pinot response missing resultTable".to_string())?;
+        Ok(pinot_table_to_jsonl(&table))
+    }
+
+    async fn query_with_stats(&self, sql: &str) -> Result<QueryResult, String> {
+        let resp = self.execute_request(sql).await?;
+        let table = resp
             .result_table
             .ok_or_else(|| "Pinot response missing resultTable".to_string())?;
 
-        let mut lines = Vec::with_capacity(table.rows.len());
-        for row in &table.rows {
-            let mut obj = serde_json::Map::new();
-            for (i, col_name) in table.data_schema.column_names.iter().enumerate() {
-                if let Some(val) = row.get(i) {
-                    obj.insert(col_name.clone(), val.clone());
-                }
-            }
-            lines.push(serde_json::to_string(&obj).unwrap_or_default());
-        }
+        let stats = Some(QueryStats {
+            elapsed_ms: resp.time_used_ms,
+            // Pinot does not expose an execution path
+            path: None,
+            segments_total: resp.num_segments_queried,
+            segments_indexed: resp.num_segments_processed,
+            rows_scanned: resp.num_docs_scanned,
+            backend: "pinot".to_owned(),
+        });
 
-        Ok(lines.join("\n"))
+        Ok(QueryResult {
+            body: pinot_table_to_jsonl(&table),
+            stats,
+            sql: sql.to_owned(),
+            backend: "pinot".to_owned(),
+        })
     }
 }
 
