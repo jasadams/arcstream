@@ -15,13 +15,23 @@ pub enum TimeRange {
 }
 
 impl TimeRange {
-    fn ago_duration(self) -> &'static str {
-        match self {
-            TimeRange::Day => "P1D",
-            TimeRange::Week => "P7D",
-            TimeRange::Month => "P30D",
-            TimeRange::Quarter => "P90D",
-        }
+    fn cutoff_timestamp(self) -> String {
+        let seconds: i64 = match self {
+            TimeRange::Day => 86_400,
+            TimeRange::Week => 7 * 86_400,
+            TimeRange::Month => 30 * 86_400,
+            TimeRange::Quarter => 90 * 86_400,
+        };
+        let raw = Utc::now() - chrono::Duration::seconds(seconds);
+        let floored = match self {
+            TimeRange::Day => raw
+                .duration_trunc(chrono::Duration::hours(1))
+                .unwrap_or(raw),
+            _ => raw
+                .duration_trunc(chrono::Duration::days(1))
+                .unwrap_or(raw),
+        };
+        floored.format("%Y-%m-%d %H:%M:%S%.3f").to_string()
     }
 
     fn bucket_granularity(self) -> &'static str {
@@ -57,32 +67,34 @@ impl TimeRange {
     }
 
     fn profiles_filter(self) -> String {
-        format!("last_seen > ago('{}')", self.ago_duration())
+        format!("last_seen > '{}'", self.cutoff_timestamp())
     }
 
     fn events_filter(self) -> String {
+        let cutoff = self.cutoff_timestamp();
         match self {
             TimeRange::Day => {
-                let start = Utc::now()
-                    .duration_trunc(chrono::Duration::hours(1))
-                    .unwrap()
-                    - chrono::Duration::hours(23);
-                format!("event_time >= {}", start.timestamp_millis())
+                let hour = &cutoff[..13];
+                format!("event_hour >= '{hour}'")
             }
-            _ => format!("event_time > ago('{}')", self.ago_duration()),
+            _ => {
+                let date = &cutoff[..10];
+                format!("event_date >= '{date}'")
+            }
         }
     }
 
     fn sessions_filter(self) -> String {
+        let cutoff = self.cutoff_timestamp();
         match self {
             TimeRange::Day => {
-                let start = Utc::now()
-                    .duration_trunc(chrono::Duration::hours(1))
-                    .unwrap()
-                    - chrono::Duration::hours(23);
-                format!("start_time >= {}", start.timestamp_millis())
+                let hour = &cutoff[..13];
+                format!("session_hour >= '{hour}'")
             }
-            _ => format!("start_time > ago('{}')", self.ago_duration()),
+            _ => {
+                let date = &cutoff[..10];
+                format!("session_date >= '{date}'")
+            }
         }
     }
 }
@@ -132,13 +144,17 @@ impl StatsQuery {
 
         let users_sql = "SELECT COUNT(*) AS total_users FROM profiles";
         let events_sql = "SELECT COUNT(*) AS total_events FROM events";
-        let sessions_sql =
-            "SELECT DISTINCTCOUNTHLL(session_id) AS active_sessions FROM events WHERE event_time > ago('PT30M')";
+        let thirty_min_ago = (Utc::now() - chrono::Duration::seconds(1800))
+            .format("%Y-%m-%d %H:%M:%S%.3f")
+            .to_string();
+        let sessions_sql = format!(
+            "SELECT DISTINCTCOUNTHLL(session_id) AS active_sessions FROM events WHERE event_time > '{thirty_min_ago}'"
+        );
 
         let (users_result, events_result, sessions_result) = tokio::try_join!(
             pinot.query_with_stats(users_sql),
             pinot.query_with_stats(events_sql),
-            pinot.query_with_stats(sessions_sql),
+            pinot.query_with_stats(&sessions_sql),
         )
         .map_err(async_graphql::Error::new)?;
 
@@ -541,9 +557,6 @@ impl StatsQuery {
 fn format_time_bucket(bucket: &str, granularity: &str) -> String {
     use chrono::{DateTime, Utc};
 
-    // Pinot's TIMESTAMP columns may return epoch millis as a string when the
-    // substr transform runs after the JSON decoder converts to epoch. Detect
-    // all-digit strings and parse them as epoch millis.
     if bucket.len() >= 13 && bucket.bytes().all(|b| b.is_ascii_digit()) {
         if let Ok(millis) = bucket.parse::<i64>() {
             if let Some(dt) = DateTime::<Utc>::from_timestamp_millis(millis) {
