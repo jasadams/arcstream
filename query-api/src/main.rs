@@ -15,7 +15,7 @@ use tower_http::cors::CorsLayer;
 
 use db::flaredb::FlareDBClient;
 use db::pinot::{PinotClient, PinotQuerier};
-use db::scylla::{LiveProfileProvider, ScyllaClient};
+use db::LiveProfileProvider;
 use schema::query_stats::QueryStatsCollector;
 use schema::{AppSchema, QueryRoot};
 use schema::subscription::SubscriptionRoot;
@@ -82,9 +82,6 @@ async fn graphql_playground() -> Html<String> {
 
 #[tokio::main]
 async fn main() {
-    let scylla_contact_points = std::env::var("SCYLLA_CONTACT_POINTS")
-        .unwrap_or_else(|_| "scylladb.data-pipeline.svc.cluster.local:9042".into());
-
     let kafka_brokers = std::env::var("KAFKA_BROKERS")
         .unwrap_or_else(|_| "redpanda.data-pipeline.svc.cluster.local:9092".into());
 
@@ -94,36 +91,18 @@ async fn main() {
         http: reqwest::Client::new(),
     });
 
-    let flaredb: Option<Arc<dyn PinotQuerier>> = std::env::var("FLAREDB_URL").ok().map(|url| {
-        eprintln!("FlareDB backend enabled at {url}");
-        Arc::new(FlareDBClient {
-            url,
-            http: reqwest::Client::new(),
-        }) as Arc<dyn PinotQuerier>
+    let flaredb_url = std::env::var("FLAREDB_URL")
+        .unwrap_or_else(|_| "http://flaredb.data-pipeline.svc.cluster.local:8090/query/sql".into());
+    eprintln!("FlareDB backend at {flaredb_url}");
+    let flaredb = Arc::new(FlareDBClient {
+        url: flaredb_url,
+        http: reqwest::Client::new(),
     });
 
     let backends = BackendSelector {
         pinot: pinot.clone(),
-        flaredb,
+        flaredb: Some(flaredb.clone() as Arc<dyn PinotQuerier>),
     };
-
-    let scylla_session = loop {
-        match scylla::SessionBuilder::new()
-            .known_node(&scylla_contact_points)
-            .build()
-            .await
-        {
-            Ok(session) => break session,
-            Err(e) => {
-                eprintln!("ScyllaDB not ready, retrying in 5s: {e}");
-                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            }
-        }
-    };
-
-    let scylla_client = Arc::new(ScyllaClient {
-        session: Arc::new(scylla_session),
-    });
 
     let (profile_tx, _) = broadcast::channel::<ProfileUpdateMessage>(1024);
     let (event_tx, _) = broadcast::channel::<LiveEventMessage>(2048);
@@ -158,7 +137,7 @@ async fn main() {
         SubscriptionRoot,
     )
     .data(pinot as Arc<dyn PinotQuerier>)
-    .data(scylla_client as Arc<dyn LiveProfileProvider>)
+    .data(flaredb as Arc<dyn LiveProfileProvider>)
     .data(profile_tx)
     .data(event_tx)
     .limit_depth(5)

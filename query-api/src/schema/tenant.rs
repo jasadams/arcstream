@@ -46,11 +46,14 @@ impl Tenant {
         let pinot = ctx.data::<Arc<dyn PinotQuerier>>()?;
         let safe_tenant = sanitize_input(&self.id).map_err(async_graphql::Error::new)?;
 
+        let thirty_min_ago = (chrono::Utc::now() - chrono::Duration::seconds(1800))
+            .format("%Y-%m-%d %H:%M:%S%.3f")
+            .to_string();
         let sql = format!(
             "SELECT DISTINCTCOUNTHLL(session_id) AS active_sessions \
              FROM events \
              WHERE tenant_id = '{safe_tenant}' \
-             AND event_time > ago('PT30M')"
+             AND event_time > '{thirty_min_ago}'"
         );
 
         let result = pinot.query_with_stats(&sql).await.map_err(async_graphql::Error::new)?;

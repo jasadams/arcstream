@@ -20,7 +20,7 @@ serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
 console_error_panic_hook = "0.1"
 chartml-core = "5"
-chartml-leptos = "5.1"
+chartml-leptos = "5.1.4"
 chartml-chart-cartesian = "5"
 chartml-chart-pie = "5"
 chartml-chart-metric = "5"

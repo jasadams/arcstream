@@ -12,7 +12,7 @@ use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::db::pinot::{parse_jsonl, sanitize_input, PinotQuerier};
-use crate::db::scylla::LiveProfileProvider;
+use crate::db::LiveProfileProvider;
 use crate::schema::event::Event;
 use crate::schema::live_profile::LiveProfile;
 use crate::schema::query_stats::QueryStatsCollector;
