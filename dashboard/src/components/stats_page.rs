@@ -1,7 +1,7 @@
 use leptos::prelude::*;
 use leptos_meta::Title;
 use leptos_router::hooks::use_query_map;
-use crate::app::Tick;
+use crate::app::{DevMode, Tick};
 use crate::server::stats_api::*;
 use crate::components::stats_bar::RollingCounter;
 use chartml_core::ChartML;
@@ -220,6 +220,56 @@ pub fn StatsPage() -> impl IntoView {
         |(_tick, range)| get_analytics_summary(range),
     );
 
+    let dev = expect_context::<DevMode>();
+
+    // Clear stats when time range changes
+    Effect::new(move || {
+        let _ = range.get();
+        dev.query_stats.set(Vec::new());
+    });
+
+    // Collect stats from all resources
+    Effect::new(move || {
+        if let Some(Ok(result)) = events_data.get() {
+            dev.query_stats.update(|s| s.extend(result.stats));
+        }
+    });
+    Effect::new(move || {
+        if let Some(Ok(result)) = users_data.get() {
+            dev.query_stats.update(|s| s.extend(result.stats));
+        }
+    });
+    Effect::new(move || {
+        if let Some(Ok(result)) = sessions_data.get() {
+            dev.query_stats.update(|s| s.extend(result.stats));
+        }
+    });
+    Effect::new(move || {
+        if let Some(Ok(result)) = duration_data.get() {
+            dev.query_stats.update(|s| s.extend(result.stats));
+        }
+    });
+    Effect::new(move || {
+        if let Some(Ok(result)) = pages_data.get() {
+            dev.query_stats.update(|s| s.extend(result.stats));
+        }
+    });
+    Effect::new(move || {
+        if let Some(Ok(result)) = devices_data.get() {
+            dev.query_stats.update(|s| s.extend(result.stats));
+        }
+    });
+    Effect::new(move || {
+        if let Some(Ok(result)) = browsers_data.get() {
+            dev.query_stats.update(|s| s.extend(result.stats));
+        }
+    });
+    Effect::new(move || {
+        if let Some(Ok(result)) = countries_data.get() {
+            dev.query_stats.update(|s| s.extend(result.stats));
+        }
+    });
+
     let summary_users = RwSignal::new(0u64);
     let summary_sessions = RwSignal::new(0u64);
     let summary_events = RwSignal::new(0u64);
@@ -230,7 +280,9 @@ pub fn StatsPage() -> impl IntoView {
     let summary_loaded = RwSignal::new(false);
 
     Effect::new(move || {
-        if let Some(Ok(s)) = summary_data.get() {
+        if let Some(Ok(result)) = summary_data.get() {
+            dev.query_stats.update(|s| s.extend(result.stats.clone()));
+            let s = &result.data;
             summary_users.set(s.users);
             summary_sessions.set(s.sessions);
             summary_events.set(s.events);
@@ -362,8 +414,8 @@ pub fn StatsPage() -> impl IntoView {
                     {move || {
                         events_data.get().map(|result| {
                             match result {
-                                Ok(data) if !data.is_empty() => {
-                                    let spec = build_stacked_bar_spec(&data);
+                                Ok(ws) if !ws.data.is_empty() => {
+                                    let spec = build_stacked_bar_spec(&ws.data);
                                     view! { <ChartPanel title="Events" spec /> }.into_any()
                                 }
                                 _ => view! { <div class="chart-empty">"No data"</div> }.into_any(),
@@ -378,8 +430,8 @@ pub fn StatsPage() -> impl IntoView {
                     {move || {
                         users_data.get().map(|result| {
                             match result {
-                                Ok(data) if !data.is_empty() => {
-                                    let spec = build_line_spec(&data, "");
+                                Ok(ws) if !ws.data.is_empty() => {
+                                    let spec = build_line_spec(&ws.data, "");
                                     view! { <ChartPanel title="Active Users" spec /> }.into_any()
                                 }
                                 _ => view! { <div class="chart-empty">"No data"</div> }.into_any(),
@@ -394,8 +446,8 @@ pub fn StatsPage() -> impl IntoView {
                     {move || {
                         sessions_data.get().map(|result| {
                             match result {
-                                Ok(data) if !data.is_empty() => {
-                                    let spec = build_line_spec(&data, "");
+                                Ok(ws) if !ws.data.is_empty() => {
+                                    let spec = build_line_spec(&ws.data, "");
                                     view! { <ChartPanel title="Sessions" spec /> }.into_any()
                                 }
                                 _ => view! { <div class="chart-empty">"No data"</div> }.into_any(),
@@ -410,8 +462,8 @@ pub fn StatsPage() -> impl IntoView {
                     {move || {
                         duration_data.get().map(|result| {
                             match result {
-                                Ok(data) if !data.is_empty() => {
-                                    let spec = build_line_spec(&data, "seconds");
+                                Ok(ws) if !ws.data.is_empty() => {
+                                    let spec = build_line_spec(&ws.data, "seconds");
                                     view! { <ChartPanel title="Avg Session Duration" spec /> }.into_any()
                                 }
                                 _ => view! { <div class="chart-empty">"No data"</div> }.into_any(),
@@ -426,8 +478,8 @@ pub fn StatsPage() -> impl IntoView {
                     {move || {
                         devices_data.get().map(|result| {
                             match result {
-                                Ok(data) if !data.is_empty() => {
-                                    let spec = build_doughnut_spec(&data);
+                                Ok(ws) if !ws.data.is_empty() => {
+                                    let spec = build_doughnut_spec(&ws.data);
                                     view! { <ChartPanel title="Devices" spec /> }.into_any()
                                 }
                                 _ => view! { <div class="chart-empty">"No data"</div> }.into_any(),
@@ -442,8 +494,8 @@ pub fn StatsPage() -> impl IntoView {
                     {move || {
                         pages_data.get().map(|result| {
                             match result {
-                                Ok(data) if !data.is_empty() => {
-                                    let spec = build_bar_spec(&data);
+                                Ok(ws) if !ws.data.is_empty() => {
+                                    let spec = build_bar_spec(&ws.data);
                                     view! { <ChartPanel title="Top Pages" spec /> }.into_any()
                                 }
                                 _ => view! { <div class="chart-empty">"No data"</div> }.into_any(),
@@ -458,8 +510,8 @@ pub fn StatsPage() -> impl IntoView {
                     {move || {
                         browsers_data.get().map(|result| {
                             match result {
-                                Ok(data) if !data.is_empty() => {
-                                    let spec = build_doughnut_spec(&data);
+                                Ok(ws) if !ws.data.is_empty() => {
+                                    let spec = build_doughnut_spec(&ws.data);
                                     view! { <ChartPanel title="Browsers" spec /> }.into_any()
                                 }
                                 _ => view! { <div class="chart-empty">"No data"</div> }.into_any(),
@@ -474,8 +526,8 @@ pub fn StatsPage() -> impl IntoView {
                     {move || {
                         countries_data.get().map(|result| {
                             match result {
-                                Ok(data) if !data.is_empty() => {
-                                    let spec = build_bar_spec(&data);
+                                Ok(ws) if !ws.data.is_empty() => {
+                                    let spec = build_bar_spec(&ws.data);
                                     view! { <ChartPanel title="Top Countries" spec /> }.into_any()
                                 }
                                 _ => view! { <div class="chart-empty">"No data"</div> }.into_any(),

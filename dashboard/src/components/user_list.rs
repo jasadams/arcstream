@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use leptos::prelude::*;
 use leptos_meta::Title;
-use crate::app::UserListCache;
+use crate::app::{DevMode, UserListCache};
 use crate::components::avatar::marble_avatar_svg;
 use crate::components::device_icons::DeviceIcons;
 use crate::components::petname::petname;
@@ -22,6 +22,7 @@ pub fn UserListPage() -> impl IntoView {
     let lookup = cache.lookup;
     let last_page = cache.last_fetched_page;
 
+    let dev = expect_context::<DevMode>();
     let users = Resource::new(move || page.get(), get_users);
 
     let paused = RwSignal::new(false);
@@ -33,6 +34,12 @@ pub fn UserListPage() -> impl IntoView {
         move || gated_tick.get(),
         |_| get_user_count(),
     );
+
+    // Clear stats when page changes
+    Effect::new(move || {
+        let _ = page.get();
+        dev.query_stats.set(Vec::new());
+    });
 
     Effect::new(move || {
         if let Some(Ok(count)) = total_count.get() {
@@ -131,10 +138,11 @@ pub fn UserListPage() -> impl IntoView {
     let stats_loaded = RwSignal::new(false);
 
     Effect::new(move || {
-        if let Some(Ok(s)) = stats.get() {
-            total_users_stat.set(s.total_users);
-            total_events_stat.set(s.total_events);
-            active_sessions_stat.set(s.active_sessions);
+        if let Some(Ok(result)) = stats.get() {
+            dev.query_stats.update(|s| s.extend(result.stats.clone()));
+            total_users_stat.set(result.data.total_users);
+            total_events_stat.set(result.data.total_events);
+            active_sessions_stat.set(result.data.active_sessions);
             if !stats_loaded.get_untracked() {
                 stats_loaded.set(true);
             }
@@ -146,7 +154,9 @@ pub fn UserListPage() -> impl IntoView {
     if has_cache {
         last_page.set_value(None);
         Effect::new(move || {
-            let Some(Ok(fetched)) = users.get() else { return };
+            let Some(Ok(result)) = users.get() else { return };
+            dev.query_stats.update(|s| s.extend(result.stats));
+            let fetched = result.data;
             let current_page = page.get_untracked();
             if last_page.get_value() == Some(current_page) {
                 for user in &fetched {
@@ -221,11 +231,13 @@ pub fn UserListPage() -> impl IntoView {
             view! {
                 <Transition fallback=move || view! { <SkeletonTable /> }>
                     {move || {
-                        let fetched = users.get();
+                        let raw = users.get();
                         let current_page = page.get_untracked();
                         if rows.with_untracked(|r| r.is_empty()) || last_page.get_value() != Some(current_page) {
-                            match fetched {
-                                Some(Ok(fetched)) => {
+                            match raw {
+                                Some(Ok(result)) => {
+                                    dev.query_stats.update(|s| s.extend(result.stats));
+                                    let fetched = result.data;
                                     last_page.set_value(Some(current_page));
                                     cache.owner.with_value(|owner| {
                                         owner.with(|| {

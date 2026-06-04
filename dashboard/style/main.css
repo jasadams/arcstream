@@ -113,6 +113,150 @@ header a {
 header a:hover { color: var(--text); }
 header a[aria-current="page"] { color: var(--text); }
 
+/* Dev mode toggle button in nav */
+.dev-toggle {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    margin-left: auto;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 150ms, border-color 150ms;
+}
+
+.dev-toggle:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+/* Dev panel below header */
+.dev-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 0 0 1px var(--border);
+}
+
+.dev-panel-header {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.dev-backend-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dev-label {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.dev-backend-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 150ms, border-color 150ms, background 150ms;
+}
+
+.dev-backend-btn:hover {
+    color: var(--text);
+    border-color: var(--text-muted);
+}
+
+.dev-backend-btn.active {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(212, 148, 76, 0.12);
+}
+
+.dev-stats-log {
+    margin-top: 12px;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.dev-stat-entry {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+}
+
+.dev-stat-entry:last-child {
+    border-bottom: none;
+}
+
+.dev-stat-sql {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+}
+
+.dev-stat-meta {
+    display: flex;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.dev-path {
+    color: var(--text-muted);
+}
+
+.dev-path.star-tree {
+    color: var(--green);
+}
+
+.dev-path.partial {
+    color: var(--orange);
+}
+
+.dev-path.full-scan {
+    color: var(--red);
+}
+
+.dev-backend-label {
+    color: var(--accent);
+}
+
+.dev-elapsed {
+    color: var(--text-muted);
+}
+
+.dev-segments {
+    color: var(--text-muted);
+}
+
 .github-link {
     display: inline-flex;
     align-items: center;

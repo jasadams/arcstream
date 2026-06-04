@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use query_api::db::pinot::{
     parse_jsonl, sanitize_input, sanitize_timestamp, PinotQuerier,
 };
-use query_api::db::scylla::LiveProfileProvider;
+use query_api::db::LiveProfileProvider;
 use query_api::schema::subscription::SubscriptionRoot;
 use query_api::schema::QueryRoot;
 use query_api::streaming::types::ProfileUpdateMessage;
@@ -22,12 +22,12 @@ impl PinotQuerier for TestPinot {
     }
 }
 
-struct TestScylla {
+struct TestProfileProvider {
     handler: Box<dyn Fn(&str, &str) -> Result<Option<String>, String> + Send + Sync>,
 }
 
 #[async_trait]
-impl LiveProfileProvider for TestScylla {
+impl LiveProfileProvider for TestProfileProvider {
     async fn get_live_profile(
         &self,
         tenant_id: &str,
@@ -39,26 +39,26 @@ impl LiveProfileProvider for TestScylla {
 
 fn build_schema(
     pinot: impl Fn(&str) -> Result<String, String> + Send + Sync + 'static,
-    scylla: impl Fn(&str, &str) -> Result<Option<String>, String> + Send + Sync + 'static,
+    profile_provider: impl Fn(&str, &str) -> Result<Option<String>, String> + Send + Sync + 'static,
 ) -> Schema<QueryRoot, EmptyMutation, SubscriptionRoot> {
     let pinot: Arc<dyn PinotQuerier> = Arc::new(TestPinot {
         handler: Box::new(pinot),
     });
-    let scylla: Arc<dyn LiveProfileProvider> = Arc::new(TestScylla {
-        handler: Box::new(scylla),
+    let profiles: Arc<dyn LiveProfileProvider> = Arc::new(TestProfileProvider {
+        handler: Box::new(profile_provider),
     });
     let (tx, _) = broadcast::channel::<ProfileUpdateMessage>(16);
 
     Schema::build(QueryRoot::default(), EmptyMutation, SubscriptionRoot)
         .data(pinot)
-        .data(scylla)
+        .data(profiles)
         .data(tx)
         .limit_depth(5)
         .limit_complexity(1000)
         .finish()
 }
 
-fn no_scylla(_tenant: &str, _id: &str) -> Result<Option<String>, String> {
+fn no_profile(_tenant: &str, _id: &str) -> Result<Option<String>, String> {
     Ok(None)
 }
 
@@ -224,7 +224,6 @@ mod enums {
     #[test]
     fn metric_to_sql_mappings() {
         assert_eq!(Metric::Count.to_sql(), "COUNT(*)");
-        assert_eq!(Metric::UniqueUsers.to_sql(), "DISTINCTCOUNTHLL(user_id)");
         assert_eq!(Metric::UniqueSessions.to_sql(), "DISTINCTCOUNTHLL(session_id)");
     }
 
@@ -254,13 +253,18 @@ mod schema_tests {
     async fn query_tenants() {
         let schema = build_schema(
             |sql| {
+                if sql.contains("FROM profiles") {
+                    return Ok(r#"{"tenant_id":"acme-corp","unique_users":42}
+{"tenant_id":"widgets-inc","unique_users":15}"#
+                        .into());
+                }
                 assert!(sql.contains("FROM events"));
                 assert!(sql.contains("GROUP BY tenant_id"));
-                Ok(r#"{"tenant_id":"acme-corp","total_events":1500,"unique_users":42}
-{"tenant_id":"widgets-inc","total_events":800,"unique_users":15}"#
+                Ok(r#"{"tenant_id":"acme-corp","total_events":1500}
+{"tenant_id":"widgets-inc","total_events":800}"#
                     .into())
             },
-            no_scylla,
+            no_profile,
         );
 
         let resp = schema
@@ -282,9 +286,12 @@ mod schema_tests {
         let schema = build_schema(
             |sql| {
                 assert!(sql.contains("tenant_id = 'acme-corp'"));
-                Ok(r#"{"tenant_id":"acme-corp","total_events":1500,"unique_users":42}"#.into())
+                if sql.contains("unique_users") {
+                    return Ok(r#"{"unique_users":42}"#.into());
+                }
+                Ok(r#"{"tenant_id":"acme-corp","total_events":1500}"#.into())
             },
-            no_scylla,
+            no_profile,
         );
 
         let resp = schema
@@ -299,7 +306,7 @@ mod schema_tests {
 
     #[tokio::test]
     async fn query_tenant_not_found() {
-        let schema = build_schema(|_| Ok("".into()), no_scylla);
+        let schema = build_schema(|_sql| Ok("".into()), no_profile);
 
         let resp = schema
             .execute(r#"{ tenant(id: "nonexistent") { id } }"#)
@@ -314,9 +321,12 @@ mod schema_tests {
     async fn query_tenant_events() {
         let schema = build_schema(
             |sql| {
+                if sql.contains("unique_users") {
+                    return Ok(r#"{"unique_users":10}"#.into());
+                }
                 if sql.contains("GROUP BY tenant_id") {
                     return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100,"unique_users":10}"#.into(),
+                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
                     );
                 }
                 assert!(sql.contains("tenant_id = 'acme-corp'"));
@@ -325,7 +335,7 @@ mod schema_tests {
                 Ok(r#"{"event_id":"e1","event_type":"page_view","tenant_id":"acme-corp","event_time":"2026-05-23 12:00:00Z","canonical_id":"u1","anonymous_id":"a1","user_id":"alice","page_url":"/home","device_type":"desktop","browser":"Chrome","country":"US"}
 {"event_id":"e2","event_type":"click","tenant_id":"acme-corp","event_time":"2026-05-23 12:01:00Z","canonical_id":"u1","anonymous_id":"a1","user_id":"alice","page_url":"/about","device_type":"desktop","browser":"Chrome","country":"US"}"#.into())
             },
-            no_scylla,
+            no_profile,
         );
 
         let resp = schema
@@ -346,9 +356,12 @@ mod schema_tests {
     async fn query_tenant_events_with_filters() {
         let schema = build_schema(
             |sql| {
+                if sql.contains("unique_users") {
+                    return Ok(r#"{"unique_users":10}"#.into());
+                }
                 if sql.contains("GROUP BY tenant_id") {
                     return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100,"unique_users":10}"#.into(),
+                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
                     );
                 }
                 assert!(
@@ -361,7 +374,7 @@ mod schema_tests {
                 );
                 Ok("".into())
             },
-            no_scylla,
+            no_profile,
         );
 
         let resp = schema
@@ -377,9 +390,12 @@ mod schema_tests {
     async fn query_tenant_events_with_time_range() {
         let schema = build_schema(
             |sql| {
+                if sql.contains("unique_users") {
+                    return Ok(r#"{"unique_users":10}"#.into());
+                }
                 if sql.contains("GROUP BY tenant_id") {
                     return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100,"unique_users":10}"#.into(),
+                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
                     );
                 }
                 assert!(
@@ -392,7 +408,7 @@ mod schema_tests {
                 );
                 Ok("".into())
             },
-            no_scylla,
+            no_profile,
         );
 
         let resp = schema
@@ -408,21 +424,24 @@ mod schema_tests {
     async fn query_tenant_summary() {
         let schema = build_schema(
             |sql| {
+                if sql.contains("unique_users") {
+                    return Ok(r#"{"unique_users":10}"#.into());
+                }
                 if sql.contains("GROUP BY tenant_id") {
                     return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100,"unique_users":10}"#.into(),
+                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
                     );
                 }
                 assert!(sql.contains("GROUP BY event_type"));
-                Ok(r#"{"event_type":"page_view","total_events":500,"unique_users":30}
-{"event_type":"click","total_events":200,"unique_users":25}"#
+                Ok(r#"{"event_type":"page_view","total_events":500}
+{"event_type":"click","total_events":200}"#
                     .into())
             },
-            no_scylla,
+            no_profile,
         );
 
         let resp = schema
-            .execute(r#"{ tenant(id: "acme-corp") { summary { eventType totalEvents uniqueUsers } } }"#)
+            .execute(r#"{ tenant(id: "acme-corp") { summary { eventType totalEvents } } }"#)
             .await;
 
         assert!(resp.errors.is_empty(), "errors: {:?}", resp.errors);
@@ -437,9 +456,12 @@ mod schema_tests {
     async fn query_aggregate_by_country() {
         let schema = build_schema(
             |sql| {
+                if sql.contains("unique_users") {
+                    return Ok(r#"{"unique_users":10}"#.into());
+                }
                 if sql.contains("GROUP BY tenant_id") {
                     return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100,"unique_users":10}"#.into(),
+                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
                     );
                 }
                 assert!(
@@ -454,7 +476,7 @@ mod schema_tests {
 {"key":"GB","count":200}"#
                     .into())
             },
-            no_scylla,
+            no_profile,
         );
 
         let resp = schema
@@ -471,12 +493,15 @@ mod schema_tests {
     }
 
     #[tokio::test]
-    async fn query_aggregate_unique_users_by_device() {
+    async fn query_aggregate_unique_sessions_by_device() {
         let schema = build_schema(
             |sql| {
+                if sql.contains("unique_users") {
+                    return Ok(r#"{"unique_users":10}"#.into());
+                }
                 if sql.contains("GROUP BY tenant_id") {
                     return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100,"unique_users":10}"#.into(),
+                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
                     );
                 }
                 assert!(
@@ -484,19 +509,19 @@ mod schema_tests {
                     "expected device_type dimension, got: {sql}"
                 );
                 assert!(
-                    sql.contains("DISTINCTCOUNTHLL(user_id) as count"),
-                    "expected unique_users metric, got: {sql}"
+                    sql.contains("DISTINCTCOUNTHLL(session_id) as count"),
+                    "expected unique_sessions metric, got: {sql}"
                 );
                 Ok(r#"{"key":"desktop","count":30}
 {"key":"mobile","count":12}"#
                     .into())
             },
-            no_scylla,
+            no_profile,
         );
 
         let resp = schema
             .execute(
-                r#"{ tenant(id: "acme-corp") { aggregate(groupBy: DEVICE_TYPE, metric: UNIQUE_USERS) { key count } } }"#,
+                r#"{ tenant(id: "acme-corp") { aggregate(groupBy: DEVICE_TYPE, metric: UNIQUE_SESSIONS) { key count } } }"#,
             )
             .await;
 
@@ -509,9 +534,12 @@ mod schema_tests {
     async fn query_multiple_aggregations_with_aliases() {
         let schema = build_schema(
             |sql| {
+                if sql.contains("unique_users") {
+                    return Ok(r#"{"unique_users":10}"#.into());
+                }
                 if sql.contains("GROUP BY tenant_id") {
                     return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100,"unique_users":10}"#.into(),
+                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
                     );
                 }
                 if sql.contains("country as key") {
@@ -522,7 +550,7 @@ mod schema_tests {
                 }
                 Ok("".into())
             },
-            no_scylla,
+            no_profile,
         );
 
         let resp = schema
@@ -546,9 +574,12 @@ mod schema_tests {
     async fn query_users_with_pagination() {
         let schema = build_schema(
             |sql| {
+                if sql.contains("unique_users") {
+                    return Ok(r#"{"unique_users":10}"#.into());
+                }
                 if sql.contains("GROUP BY tenant_id") {
                     return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100,"unique_users":10}"#.into(),
+                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
                     );
                 }
                 if sql.contains("COUNT(*) AS total") {
@@ -564,7 +595,7 @@ mod schema_tests {
                 );
                 Ok(r#"{"tenant_id":"acme-corp","canonical_id":"u1","first_seen":"2026-01-01 00:00:00Z","last_seen":"2026-05-23 12:00:00Z","total_events":50,"total_sessions":5,"page_views":30,"clicks":10,"signups":1,"logins":3,"feature_uses":6,"last_country":"US","last_device":"desktop","last_browser":"Chrome"}"#.into())
             },
-            no_scylla,
+            no_profile,
         );
 
         let resp = schema
@@ -584,9 +615,12 @@ mod schema_tests {
     async fn query_user_live_profile() {
         let schema = build_schema(
             |sql| {
+                if sql.contains("unique_users") {
+                    return Ok(r#"{"unique_users":10}"#.into());
+                }
                 if sql.contains("GROUP BY tenant_id") {
                     return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100,"unique_users":10}"#.into(),
+                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
                     );
                 }
                 if sql.contains("COUNT(*) AS total") {
@@ -619,12 +653,15 @@ mod schema_tests {
     }
 
     #[tokio::test]
-    async fn query_user_live_profile_not_in_scylla() {
+    async fn query_user_live_profile_not_found() {
         let schema = build_schema(
             |sql| {
+                if sql.contains("unique_users") {
+                    return Ok(r#"{"unique_users":10}"#.into());
+                }
                 if sql.contains("GROUP BY tenant_id") {
                     return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100,"unique_users":10}"#.into(),
+                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
                     );
                 }
                 if sql.contains("COUNT(*) AS total") {
@@ -632,7 +669,7 @@ mod schema_tests {
                 }
                 Ok(r#"{"tenant_id":"acme-corp","canonical_id":"u1","first_seen":"2026-01-01 00:00:00Z","last_seen":"2026-05-23 12:00:00Z","total_events":50,"total_sessions":5,"page_views":30,"clicks":10,"signups":1,"logins":3,"feature_uses":6,"last_country":"US","last_device":"desktop","last_browser":"Chrome"}"#.into())
             },
-            no_scylla,
+            no_profile,
         );
 
         let resp = schema
@@ -650,9 +687,12 @@ mod schema_tests {
     async fn query_user_recent_events() {
         let schema = build_schema(
             |sql| {
+                if sql.contains("unique_users") {
+                    return Ok(r#"{"unique_users":10}"#.into());
+                }
                 if sql.contains("GROUP BY tenant_id") {
                     return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100,"unique_users":10}"#.into(),
+                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
                     );
                 }
                 if sql.contains("COUNT(*) AS total") {
@@ -671,7 +711,7 @@ mod schema_tests {
                 );
                 Ok(r#"{"event_id":"e1","event_type":"page_view","tenant_id":"acme-corp","event_time":"2026-05-23 12:00:00Z","canonical_id":"u1","anonymous_id":"a1","user_id":"alice","page_url":"/home","device_type":"desktop","browser":"Chrome","country":"US"}"#.into())
             },
-            no_scylla,
+            no_profile,
         );
 
         let resp = schema
@@ -691,25 +731,28 @@ mod schema_tests {
     async fn query_tenant_active_sessions() {
         let schema = build_schema(
             |sql| {
+                if sql.contains("unique_users") {
+                    return Ok(r#"{"unique_users":10}"#.into());
+                }
                 if sql.contains("GROUP BY tenant_id") {
                     return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100,"unique_users":10}"#.into(),
+                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
                     );
                 }
-                if sql.contains("ago('PT30M')") {
-                    assert!(
-                        sql.contains("DISTINCTCOUNTHLL(session_id)"),
-                        "expected session_id count, got: {sql}"
-                    );
+                if sql.contains("DISTINCTCOUNTHLL(session_id)") {
                     assert!(
                         sql.contains("tenant_id = 'acme-corp'"),
                         "expected tenant filter, got: {sql}"
+                    );
+                    assert!(
+                        sql.contains("event_time >"),
+                        "expected time filter, got: {sql}"
                     );
                     return Ok(r#"{"active_sessions":7}"#.into());
                 }
                 Ok("".into())
             },
-            no_scylla,
+            no_profile,
         );
 
         let resp = schema
@@ -724,7 +767,7 @@ mod schema_tests {
 
     #[tokio::test]
     async fn rejects_invalid_tenant_id() {
-        let schema = build_schema(|_| panic!("should not reach db"), no_scylla);
+        let schema = build_schema(|_| panic!("should not reach db"), no_profile);
 
         let resp = schema
             .execute(r#"{ tenant(id: "'; DROP TABLE--") { id } }"#)
@@ -740,7 +783,7 @@ mod schema_tests {
     async fn pinot_error_propagates() {
         let schema = build_schema(
             |_| Err("Pinot error: connection refused".into()),
-            no_scylla,
+            no_profile,
         );
 
         let resp = schema.execute("{ tenants { id } }").await;
@@ -755,7 +798,7 @@ mod schema_tests {
 
     #[tokio::test]
     async fn query_depth_limit_enforced() {
-        let schema = build_schema(|_| Ok("".into()), no_scylla);
+        let schema = build_schema(|_| Ok("".into()), no_profile);
 
         let resp = schema
             .execute(
@@ -778,7 +821,7 @@ mod schema_tests {
 
     #[tokio::test]
     async fn invalid_query_returns_error() {
-        let schema = build_schema(|_| Ok("".into()), no_scylla);
+        let schema = build_schema(|_| Ok("".into()), no_profile);
 
         let resp = schema.execute("{ nonexistentField }").await;
 
@@ -789,9 +832,12 @@ mod schema_tests {
     async fn user_profile_rolling_windows() {
         let schema = build_schema(
             |sql| {
+                if sql.contains("unique_users") {
+                    return Ok(r#"{"unique_users":10}"#.into());
+                }
                 if sql.contains("GROUP BY tenant_id") {
                     return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100,"unique_users":10}"#.into(),
+                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
                     );
                 }
                 if sql.contains("COUNT(*) AS total") {
@@ -799,7 +845,7 @@ mod schema_tests {
                 }
                 Ok(r#"{"tenant_id":"acme-corp","canonical_id":"u1","first_seen":"2026-01-01 00:00:00Z","last_seen":"2026-05-23 12:00:00Z","total_events":100,"total_sessions":10,"page_views":60,"clicks":20,"signups":1,"logins":5,"feature_uses":14,"last_country":"US","last_device":"desktop","last_browser":"Chrome","events_1d":5,"events_7d":30,"events_30d":70,"events_90d":100,"sessions_1d":2,"sessions_7d":6,"sessions_30d":8,"sessions_90d":10,"total_closed_sessions":9,"avg_session_duration_sec":180}"#.into())
             },
-            no_scylla,
+            no_profile,
         );
 
         let resp = schema
@@ -835,7 +881,7 @@ mod schema_tests {
                 }
                 Ok("".into())
             },
-            no_scylla,
+            no_profile,
         );
 
         let resp = schema
@@ -861,7 +907,7 @@ mod schema_tests {
                 }
                 Ok("".into())
             },
-            no_scylla,
+            no_profile,
         );
 
         let resp = schema

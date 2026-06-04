@@ -1,6 +1,7 @@
 pub mod aggregation;
 pub mod event;
 pub mod live_profile;
+pub mod query_stats;
 pub mod stats;
 pub mod subscription;
 pub mod tenant;
@@ -11,9 +12,10 @@ use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::db::pinot::{parse_jsonl, sanitize_input, PinotQuerier};
-use crate::db::scylla::LiveProfileProvider;
+use crate::db::LiveProfileProvider;
 use crate::schema::event::Event;
 use crate::schema::live_profile::LiveProfile;
+use crate::schema::query_stats::QueryStatsCollector;
 use crate::schema::user_profile::{UserConnection, UserProfile, UserProfileRow};
 use stats::StatsQuery;
 use subscription::SubscriptionRoot;
@@ -37,18 +39,23 @@ impl TenantQuery {
         let users_sql = "SELECT tenant_id, COUNT(*) as unique_users \
                          FROM profiles GROUP BY tenant_id";
 
-        let (events_body, users_body) = tokio::try_join!(
-            pinot.query(events_sql),
-            pinot.query(users_sql),
+        let (events_result, users_result) = tokio::try_join!(
+            pinot.query_with_stats(events_sql),
+            pinot.query_with_stats(users_sql),
         ).map_err(async_graphql::Error::new)?;
+
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&events_result);
+            collector.push(&users_result);
+        }
 
         #[derive(Deserialize)]
         struct EventsRow { tenant_id: String, total_events: u64 }
         #[derive(Deserialize)]
         struct UsersRow { tenant_id: String, unique_users: u64 }
 
-        let events: Vec<EventsRow> = parse_jsonl(&events_body);
-        let users: Vec<UsersRow> = parse_jsonl(&users_body);
+        let events: Vec<EventsRow> = parse_jsonl(&events_result.body);
+        let users: Vec<UsersRow> = parse_jsonl(&users_result.body);
         let user_map: std::collections::HashMap<String, u64> = users.into_iter().map(|r| (r.tenant_id, r.unique_users)).collect();
 
         Ok(events
@@ -78,18 +85,23 @@ impl TenantQuery {
              FROM profiles WHERE tenant_id = '{safe_id}'"
         );
 
-        let (events_body, users_body) = tokio::try_join!(
-            pinot.query(&events_sql),
-            pinot.query(&users_sql),
+        let (events_result, users_result) = tokio::try_join!(
+            pinot.query_with_stats(&events_sql),
+            pinot.query_with_stats(&users_sql),
         ).map_err(async_graphql::Error::new)?;
+
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&events_result);
+            collector.push(&users_result);
+        }
 
         #[derive(Deserialize)]
         struct EventsRow { tenant_id: String, total_events: u64 }
         #[derive(Deserialize)]
         struct UsersRow { unique_users: u64 }
 
-        let events: Vec<EventsRow> = parse_jsonl(&events_body);
-        let users: Vec<UsersRow> = parse_jsonl(&users_body);
+        let events: Vec<EventsRow> = parse_jsonl(&events_result.body);
+        let users: Vec<UsersRow> = parse_jsonl(&users_result.body);
 
         Ok(events.into_iter().next().map(|r| Tenant {
             id: r.tenant_id,
@@ -133,18 +145,23 @@ impl GlobalQuery {
         );
         let count_sql = "SELECT COUNT(*) AS total FROM profiles";
 
-        let (data_body, count_body) =
-            tokio::try_join!(pinot.query(&data_sql), pinot.query(count_sql))
+        let (data_result, count_result) =
+            tokio::try_join!(pinot.query_with_stats(&data_sql), pinot.query_with_stats(count_sql))
                 .map_err(async_graphql::Error::new)?;
 
-        let rows: Vec<UserProfileRow> = parse_jsonl(&data_body);
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&data_result);
+            collector.push(&count_result);
+        }
+
+        let rows: Vec<UserProfileRow> = parse_jsonl(&data_result.body);
         let nodes: Vec<UserProfile> = rows.into_iter().map(UserProfile::from).collect();
 
         #[derive(Deserialize)]
         struct CountRow {
             total: u64,
         }
-        let count_rows: Vec<CountRow> = parse_jsonl(&count_body);
+        let count_rows: Vec<CountRow> = parse_jsonl(&count_result.body);
         let total_count = count_rows.first().map(|r| r.total).unwrap_or(0);
 
         Ok(UserConnection { nodes, total_count })
@@ -189,8 +206,11 @@ impl GlobalQuery {
              ORDER BY event_time DESC LIMIT {limit}"
         );
 
-        let body = pinot.query(&sql).await.map_err(async_graphql::Error::new)?;
-        Ok(parse_jsonl(&body))
+        let result = pinot.query_with_stats(&sql).await.map_err(async_graphql::Error::new)?;
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&result);
+        }
+        Ok(parse_jsonl(&result.body))
     }
 
     async fn event(
@@ -211,8 +231,11 @@ impl GlobalQuery {
              LIMIT 1"
         );
 
-        let body = pinot.query(&sql).await.map_err(async_graphql::Error::new)?;
-        let events: Vec<Event> = parse_jsonl(&body);
+        let result = pinot.query_with_stats(&sql).await.map_err(async_graphql::Error::new)?;
+        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
+            collector.push(&result);
+        }
+        let events: Vec<Event> = parse_jsonl(&result.body);
         Ok(events.into_iter().next())
     }
 

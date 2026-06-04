@@ -18,7 +18,7 @@
   "dateTimeFieldSpecs": [{
     "name": "event_time",
     "dataType": "TIMESTAMP",
-    "format": "1:MILLISECONDS:EPOCH",
+    "format": "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS",
     "granularity": "1:MILLISECONDS"
   }],
   "metricFieldSpecs": [

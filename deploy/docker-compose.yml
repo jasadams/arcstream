@@ -43,20 +43,6 @@ services:
       timeout: 3s
       retries: 20
 
-  scylladb:
-    image: scylladb/scylla:6.2
-    command: --smp=1 --memory=512M --overprovisioned=1
-    ports:
-      - "9042:9042"
-    volumes:
-      - scylladb-data:/var/lib/scylla
-    healthcheck:
-      test: ["CMD-SHELL", "cqlsh -e 'SELECT now() FROM system.local'"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 30s
-
   minio:
     image: minio/minio:latest
     command: server /data --console-address :9001
@@ -133,29 +119,6 @@ services:
       start_period: 20s
 
   # ── Layer 2: Init containers (one-shot) ────────────────────────────
-
-  init-scylla:
-    image: cassandra:5.0
-    restart: "no"
-    depends_on:
-      scylladb:
-        condition: service_healthy
-    entrypoint: ["/bin/bash", "-c"]
-    command:
-      - |
-        for i in $(seq 1 30); do
-          if cqlsh scylladb 9042 -e "SELECT now() FROM system.local" >/dev/null 2>&1; then
-            echo "ScyllaDB is reachable, applying schema..."
-            cqlsh scylladb 9042 -e "CREATE KEYSPACE IF NOT EXISTS cdp WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}"
-            cqlsh scylladb 9042 -e "CREATE TABLE IF NOT EXISTS cdp.profiles (tenant_id text, canonical_id text, user_id text, first_seen timestamp, last_seen timestamp, total_events bigint, total_sessions bigint, events_1d bigint, events_7d bigint, events_30d bigint, events_90d bigint, sessions_1d bigint, sessions_7d bigint, sessions_30d bigint, sessions_90d bigint, avg_session_duration_sec bigint, current_session_active boolean, current_session_duration_sec bigint, page_views bigint, clicks bigint, logins bigint, feature_uses bigint, last_page text, last_country text, last_device text, last_browser text, top_pages list<text>, top_features list<text>, PRIMARY KEY ((tenant_id, canonical_id)))"
-            echo "ScyllaDB schema applied successfully"
-            exit 0
-          fi
-          echo "Waiting for ScyllaDB... ($$i/30)"
-          sleep 3
-        done
-        echo "Failed to apply ScyllaDB schema"
-        exit 1
 
   init-minio:
     image: minio/mc:latest
@@ -309,7 +272,6 @@ services:
     restart: "no"
     environment:
       KAFKA_BROKERS: redpanda:9092
-      SCYLLA_CONTACT_POINTS: scylladb:9042
       AWS_ACCESS_KEY_ID: minioadmin
       AWS_SECRET_ACCESS_KEY: minioadmin
       MINIO_ROOT_USER: minioadmin
@@ -324,8 +286,6 @@ services:
         condition: service_started
       redpanda:
         condition: service_healthy
-      init-scylla:
-        condition: service_completed_successfully
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
@@ -382,35 +342,33 @@ services:
     restart: unless-stopped
 
   query-api:
-    image: ghcr.io/jasadams/arcstream/query-api:latest
+    image: arcstream-query-api:flaredb
     platform: linux/amd64
     ports:
       - "8080:8080"
     environment:
       PINOT_BROKER_URL: http://pinot-broker:8099/query/sql
-      SCYLLA_CONTACT_POINTS: scylladb:9042
+      FLAREDB_URL: http://host.containers.internal:8090/query/sql
       KAFKA_BROKERS: redpanda:9092
       ENABLE_PLAYGROUND: "true"
     depends_on:
       pinot-broker:
         condition: service_healthy
-      scylladb:
-        condition: service_healthy
       redpanda:
         condition: service_healthy
-      init-scylla:
-        condition: service_completed_successfully
       init-pinot:
         condition: service_completed_successfully
     restart: unless-stopped
 
   dashboard:
-    image: ghcr.io/jasadams/arcstream/dashboard:latest
+    image: arcstream-dashboard:flaredb
     platform: linux/amd64
     ports:
       - "3000:3000"
     environment:
       QUERY_API_URL: http://query-api:8080/graphql
+      DEFAULT_BACKEND: pinot
+      DEV_PANEL: "1"
       LEPTOS_SITE_ROOT: /site
       LEPTOS_SITE_PKG_DIR: pkg
       LEPTOS_SITE_ADDR: 0.0.0.0:3000
@@ -423,7 +381,6 @@ services:
 volumes:
   redpanda-data:
   zookeeper-data:
-  scylladb-data:
   minio-data:
   pinot-controller-data:
   pinot-server-data:

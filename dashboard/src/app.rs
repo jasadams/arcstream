@@ -38,6 +38,11 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
                 <link rel="preconnect" href="https://fonts.bunny.net"/>
                 <link href="https://fonts.bunny.net/css?family=satoshi:400,500,600,700|dm-sans:400,500,600|geist-mono:400,500&display=swap" rel="stylesheet"/>
                 <script defer data-key="eyJzIjoiZjE0ZDNiYmM0MDFmZWZhNSIsInciOiJ3b3Jrc3BhY2UtOTlmMjRkMDUtNjczZDI1YjgiLCJkIjpbImNkcC5hbHl0aWMuY29tLmF1IiwibG9jYWxob3N0Il19.Y1cUg_xGMFvQ2IpMn4iesVBke9ODdaD11geqGMf2UYU" src="https://analytics.kyomi.ai/k.js"></script>
+                {
+                    std::env::var("DEV_PANEL").is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true")).then(|| view! {
+                        <meta name="dev-panel" content="1"/>
+                    })
+                }
                 <AutoReload options=options.clone()/>
                 <HydrationScripts options/>
                 <leptos_meta::Stylesheet id="leptos" href="/pkg/dashboard.css"/>
@@ -53,6 +58,20 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
 pub struct Tick(pub ReadSignal<u64>);
 
 pub type UserRow = (String, RwSignal<UserProfile>, RwSignal<bool>);
+
+/// Whether the dev panel feature is available (controlled by `DEV_PANEL` env var).
+/// Uses a signal so SSR and WASM both start with `false` (no hydration mismatch),
+/// then an Effect sets it from the env var after hydration.
+#[derive(Clone, Copy)]
+pub struct DevPanelAvailable(pub RwSignal<bool>);
+
+/// Client-side dev mode state. Persisted to localStorage and cookies.
+#[derive(Clone, Copy)]
+pub struct DevMode {
+    pub enabled: RwSignal<bool>,
+    pub backend: RwSignal<String>,
+    pub query_stats: RwSignal<Vec<crate::server::QueryStatEntry>>,
+}
 
 #[derive(Clone, Copy)]
 pub struct UserListCache {
@@ -81,12 +100,47 @@ pub fn App() -> impl IntoView {
         owner: StoredValue::new(app_owner),
     });
 
+    let dev_panel_available = RwSignal::new(false);
+    provide_context(DevPanelAvailable(dev_panel_available));
+
+    // Initialize DevMode with defaults; WASM side restores from localStorage
+    let dev_mode = DevMode {
+        enabled: RwSignal::new(false),
+        backend: RwSignal::new(String::new()),
+        query_stats: RwSignal::new(Vec::new()),
+    };
+    provide_context(dev_mode);
+
     #[cfg(feature = "hydrate")]
     {
         use wasm_bindgen::prelude::*;
         use crate::websocket;
 
         let (profile_sig, event_sig) = websocket::provide_stream_contexts();
+
+        // Check if SSR set the dev-panel meta tag
+        Effect::new(move || {
+            let available = web_sys::window()
+                .and_then(|w| w.document())
+                .and_then(|d| d.query_selector("meta[name=dev-panel]").ok().flatten())
+                .is_some();
+            dev_panel_available.set(available);
+        });
+
+        // Restore dev mode state from localStorage AFTER hydration
+        // to avoid SSR/WASM mismatch (SSR renders enabled=false).
+        Effect::new(move || {
+            if let Some(s) = web_sys::window()
+                .and_then(|w| w.local_storage().ok().flatten())
+            {
+                if let Ok(Some(b)) = s.get_item("dev-backend") {
+                    dev_mode.backend.set(b);
+                }
+                if let Ok(Some(v)) = s.get_item("dev-mode") {
+                    dev_mode.enabled.set(v == "true");
+                }
+            }
+        });
 
         Effect::new(move || {
             let window = web_sys::window().expect("no window");
@@ -122,10 +176,12 @@ pub fn App() -> impl IntoView {
                     <A href="/profiles">"Profiles"</A>
                     <A href="/events">"Events"</A>
                     <A href="/analytics">"Analytics"</A>
+                    <DevModeToggle />
                     <a href="https://github.com/jasadams/arcstream" target="_blank" rel="noopener" class="github-link" inner_html=SVG_GITHUB></a>
                 </nav>
             </header>
             <main id="main" class="container">
+                <DevPanel />
                 <Routes fallback=|| view! { <p>"Not found"</p> }>
                     <Route path=path!("/") view=AboutPage ssr=SsrMode::Async />
                     <Route path=path!("/profiles") view=UserListPage ssr=SsrMode::Async />
@@ -136,5 +192,130 @@ pub fn App() -> impl IntoView {
                 </Routes>
             </main>
         </Router>
+    }
+}
+
+/// Gear icon button in the nav that toggles the dev panel visibility.
+/// Only rendered when `DEV_PANEL=1` env var is set.
+#[component]
+fn DevModeToggle() -> impl IntoView {
+    let available = expect_context::<DevPanelAvailable>().0;
+    let dev = expect_context::<DevMode>();
+    let toggle = move |_| {
+        dev.enabled.update(|e| *e = !*e);
+        #[cfg(feature = "hydrate")]
+        {
+            let enabled = dev.enabled.get();
+            if let Some(s) = web_sys::window()
+                .and_then(|w| w.local_storage().ok().flatten())
+            {
+                let _ = s.set_item("dev-mode", &enabled.to_string());
+            }
+        }
+    };
+    view! {
+        <Show when=move || available.get()>
+            <button class="dev-toggle" on:click=toggle title="Toggle dev panel">
+                "\u{2699} Dev"
+            </button>
+        </Show>
+    }
+}
+
+/// Collapsible dev panel shown below the header when dev mode is enabled.
+/// Only rendered when `DEV_PANEL=1` env var is set.
+#[component]
+fn DevPanel() -> impl IntoView {
+    let available = expect_context::<DevPanelAvailable>().0;
+    let dev = expect_context::<DevMode>();
+    let backend = dev.backend;
+
+    let set_backend = move |name: &str| {
+        let name = name.to_owned();
+        backend.set(name.clone());
+        #[cfg(feature = "hydrate")]
+        {
+            // Persist to localStorage
+            if let Some(s) = web_sys::window()
+                .and_then(|w| w.local_storage().ok().flatten())
+            {
+                let _ = s.set_item("dev-backend", &name);
+            }
+            // Set cookie so SSR server functions can read the backend choice
+            if let Some(doc) = web_sys::window().and_then(|w| w.document()) {
+                use wasm_bindgen::JsCast;
+                if let Some(html_doc) = doc.dyn_ref::<web_sys::HtmlDocument>() {
+                    let _ = html_doc.set_cookie(&format!("dev-backend={name}; path=/; max-age=86400"));
+                }
+            }
+        }
+    };
+
+    let is_pinot = move || {
+        let b = backend.get();
+        b == "pinot" || b.is_empty()
+    };
+    let is_flare = move || {
+        let b = backend.get();
+        b == "flare" || b == "flaredb"
+    };
+
+    view! {
+        <Show when=move || available.get() && dev.enabled.get()>
+            <div class="dev-panel">
+                <div class="dev-panel-header">
+                    "Dev Panel"
+                </div>
+                <div class="dev-backend-switch">
+                    <span class="dev-label">"Backend:"</span>
+                    <button
+                        class="dev-backend-btn"
+                        class:active=is_pinot
+                        on:click=move |_| set_backend("pinot")
+                    >
+                        "Pinot"
+                    </button>
+                    <button
+                        class="dev-backend-btn"
+                        class:active=is_flare
+                        on:click=move |_| set_backend("flare")
+                    >
+                        "FlareDB"
+                    </button>
+                </div>
+                <div class="dev-stats-log">
+                    <div class="dev-label">"Query Log"</div>
+                    {move || {
+                        dev.query_stats.get().into_iter().map(|entry| {
+                            let sql_preview = entry.sql.char_indices()
+                                .nth(60)
+                                .map(|(i, _)| format!("{}...", &entry.sql[..i]))
+                                .unwrap_or_else(|| entry.sql.clone());
+                            let path_class = match entry.path.as_deref() {
+                                Some("STAR_TREE") => "dev-path star-tree",
+                                Some("PARTIAL") => "dev-path partial",
+                                Some("FULL_SCAN") => "dev-path full-scan",
+                                _ => "dev-path",
+                            };
+                            let path_label = entry.path.clone().unwrap_or_else(|| "\u{2014}".to_string());
+                            let elapsed = entry.elapsed_ms.map(|ms| format!("{ms}ms"));
+                            let segments = entry.segments_indexed.zip(entry.segments_total)
+                                .map(|(i, t)| format!("{i}/{t} idx"));
+                            view! {
+                                <div class="dev-stat-entry">
+                                    <div class="dev-stat-sql">{sql_preview}</div>
+                                    <div class="dev-stat-meta">
+                                        <span class=path_class>{path_label}</span>
+                                        <span class="dev-backend-label">{entry.backend.clone()}</span>
+                                        {elapsed.map(|e| view! { <span class="dev-elapsed">{e}</span> })}
+                                        {segments.map(|s| view! { <span class="dev-segments">{s}</span> })}
+                                    </div>
+                                </div>
+                            }
+                        }).collect_view()
+                    }}
+                </div>
+            </div>
+        </Show>
     }
 }
