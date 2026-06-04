@@ -47,7 +47,7 @@ impl Tenant {
         let safe_tenant = sanitize_input(&self.id).map_err(async_graphql::Error::new)?;
 
         let thirty_min_ago = (chrono::Utc::now() - chrono::Duration::seconds(1800))
-            .format("%Y-%m-%d %H:%M:%S%.3f")
+            .format("%Y-%m-%dT%H:%M:%SZ")
             .to_string();
         let sql = format!(
             "SELECT DISTINCTCOUNTHLL(session_id) AS active_sessions \

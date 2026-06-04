@@ -31,7 +31,7 @@ impl TimeRange {
                 .duration_trunc(chrono::Duration::days(1))
                 .unwrap_or(raw),
         };
-        floored.format("%Y-%m-%d %H:%M:%S%.3f").to_string()
+        floored.format("%Y-%m-%dT%H:%M:%SZ").to_string()
     }
 
     fn bucket_granularity(self) -> &'static str {
