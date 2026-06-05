@@ -6,12 +6,14 @@
     "timeType": "MILLISECONDS",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "90",
-    "replication": "1"
+    "replication": "1",
+    "completionConfig": {
+      "completionMode": "DOWNLOAD"
+    }
   },
   "tableIndexConfig": {
     "invertedIndexColumns": ["tenant_id", "event_type", "device_type", "country", "canonical_id", "event_id"],
     "bloomFilterColumns": ["canonical_id", "event_id"],
-    "rangeIndexColumns": ["event_time"],
     "sortedColumn": ["event_time"],
     "starTreeIndexConfigs": [{
       "dimensionsSplitOrder": ["tenant_id", "event_date", "event_hour", "country", "event_type", "device_type", "browser", "page_url"],
@@ -26,7 +28,6 @@
     }]
   },
   "ingestionConfig": {
-    "continueOnError": true,
     "transformConfigs": [
       {
         "columnName": "event_date",
@@ -45,7 +46,10 @@
         "stream.kafka.consumer.type": "lowLevel",
         "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
         "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
-        "stream.kafka.consumer.prop.auto.offset.reset": "smallest"
+        "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
+        "realtime.segment.flush.threshold.rows": "0",
+        "realtime.segment.flush.threshold.segment.size": "200M",
+        "realtime.segment.flush.threshold.time": "12h"
       }]
     }
   },

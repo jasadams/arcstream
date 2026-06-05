@@ -13,7 +13,7 @@
   },
   "tableIndexConfig": {
     "invertedIndexColumns": ["tenant_id", "canonical_id", "device_type", "country"],
-    "rangeIndexColumns": ["start_time", "end_time", "duration_sec", "event_count"],
+    "rangeIndexColumns": ["duration_sec", "event_count"],
     "sortedColumn": ["start_time"],
     "starTreeIndexConfigs": [{
       "dimensionsSplitOrder": ["tenant_id", "session_date", "session_hour", "country", "device_type", "browser"],
@@ -46,8 +46,9 @@
         "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
         "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
         "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
-        "realtime.segment.flush.threshold.rows": "500000",
-        "realtime.segment.flush.threshold.time": "6h"
+        "realtime.segment.flush.threshold.rows": "0",
+        "realtime.segment.flush.threshold.segment.size": "200M",
+        "realtime.segment.flush.threshold.time": "12h"
       }]
     }
   },

@@ -12,18 +12,17 @@
     }
   },
   "tableIndexConfig": {
-    "invertedIndexColumns": ["tenant_id", "event_type", "device_type", "country", "canonical_id"],
-    "bloomFilterColumns": ["canonical_id"],
-    "rangeIndexColumns": ["event_time"],
+    "invertedIndexColumns": ["tenant_id", "event_type", "device_type", "country", "canonical_id", "event_id"],
+    "bloomFilterColumns": ["canonical_id", "event_id"],
     "sortedColumn": ["event_time"],
     "starTreeIndexConfigs": [{
       "dimensionsSplitOrder": ["tenant_id", "event_date", "event_hour", "country", "event_type", "device_type", "browser", "page_url"],
       "skipStarNodeCreationForDimensions": [],
       "aggregationConfigs": [
         { "columnName": "*", "aggregationFunction": "COUNT" },
-        { "columnName": "event_count", "aggregationFunction": "SUM" },
         { "columnName": "session_id", "aggregationFunction": "DISTINCTCOUNTHLL", "functionParameters": { "log2m": "8" } },
-        { "columnName": "canonical_id", "aggregationFunction": "DISTINCTCOUNTHLL", "functionParameters": { "log2m": "8" } }
+        { "columnName": "canonical_id", "aggregationFunction": "DISTINCTCOUNTHLL", "functionParameters": { "log2m": "8" } },
+        { "columnName": "event_count", "aggregationFunction": "SUM" }
       ],
       "maxLeafRecords": 10000
     }]
@@ -48,8 +47,9 @@
         "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
         "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
         "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
-        "realtime.segment.flush.threshold.rows": "500000",
-        "realtime.segment.flush.threshold.time": "6h"
+        "realtime.segment.flush.threshold.rows": "0",
+        "realtime.segment.flush.threshold.segment.size": "200M",
+        "realtime.segment.flush.threshold.time": "12h"
       }]
     }
   },
