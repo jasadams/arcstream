@@ -1069,14 +1069,23 @@ async fn main() {
         // === 5. Send events to Kafka ===
         let msg_timestamp = sim_now.timestamp_millis();
         if args.backfill {
+            let mut futures = Vec::with_capacity(events_to_send.len());
             for (tenant_id, json) in &events_to_send {
                 let record = FutureRecord::to(&args.topic)
                     .key(tenant_id.as_str())
                     .payload(json.as_str())
                     .timestamp(msg_timestamp);
-                let _ = producer.send(record, Duration::from_millis(500));
+                match producer.send_result(record) {
+                    Ok(fut) => futures.push(fut),
+                    Err((err, _)) => eprintln!("Kafka queue error: {err}"),
+                }
                 total_events += 1;
                 events_since_last_report += 1;
+            }
+            for fut in futures {
+                if let Err((err, _)) = fut.await {
+                    eprintln!("Kafka send error: {err}");
+                }
             }
         } else {
             for (tenant_id, json) in &events_to_send {
