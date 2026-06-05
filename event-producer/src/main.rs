@@ -788,7 +788,9 @@ async fn main() {
         );
     }
 
+    let mut tick_count = 0u64;
     loop {
+        tick_count += 1;
         // --- Clock management ---
         if !args.backfill {
             sim_now = Utc::now();
@@ -1124,6 +1126,28 @@ async fn main() {
                 }
             }
             sessions.swap_remove(sess_idx);
+        }
+
+        // === 6b. Compact churned users periodically ===
+        if users.len() > 10_000 && tick_count % 1000 == 0 {
+            let old_len = users.len();
+            let mut old_to_new: Vec<usize> = vec![usize::MAX; old_len];
+            let mut write = 0usize;
+            for read in 0..old_len {
+                if !matches!(users[read].state, UserState::Churned) {
+                    old_to_new[read] = write;
+                    if write != read {
+                        users.swap(write, read);
+                    }
+                    write += 1;
+                }
+            }
+            if write < old_len {
+                users.truncate(write);
+                for session in &mut sessions {
+                    session.user_idx = old_to_new[session.user_idx];
+                }
+            }
         }
 
         // === 7. Status report every 10 seconds (real time) ===
