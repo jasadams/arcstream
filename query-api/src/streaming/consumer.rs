@@ -1,10 +1,13 @@
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{CommitMode, Consumer, StreamConsumer};
 use rdkafka::Message;
+use std::collections::HashMap;
 use tokio::sync::broadcast;
 use futures_util::StreamExt;
 
 use super::types::{FlatProfileUpdate, ProfileUpdateMessage};
+
+const FLUSH_INTERVAL_MS: u64 = 100;
 
 pub async fn run(
     sender: broadcast::Sender<ProfileUpdateMessage>,
@@ -31,20 +34,25 @@ pub async fn run(
     eprintln!("Profile update consumer started on topic: {topic}");
 
     let mut stream = consumer.stream();
+    let mut pending: HashMap<String, ProfileUpdateMessage> = HashMap::new();
+    let mut last_flush = tokio::time::Instant::now();
 
     while let Some(result) = stream.next().await {
         match result {
             Ok(msg) => {
                 if sender.receiver_count() > 0 {
                     if let Some(payload) = msg.payload() {
-                        match serde_json::from_slice::<FlatProfileUpdate>(payload) {
-                            Ok(flat) => {
-                                let _ = sender.send(flat.into_message());
-                            }
-                            Err(e) => {
-                                eprintln!("Failed to deserialize profile update: {e}");
-                            }
+                        if let Ok(flat) = serde_json::from_slice::<FlatProfileUpdate>(payload) {
+                            let update = flat.into_message();
+                            pending.insert(update.canonical_id.clone(), update);
                         }
+                    }
+
+                    if last_flush.elapsed().as_millis() >= FLUSH_INTERVAL_MS as u128 {
+                        for (_, update) in pending.drain() {
+                            let _ = sender.send(update);
+                        }
+                        last_flush = tokio::time::Instant::now();
                     }
                 }
                 if let Err(e) = consumer.commit_message(&msg, CommitMode::Async) {
