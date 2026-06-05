@@ -13,7 +13,10 @@ FROM docker.io/library/flink:1.20.1-java17
 ENV HADOOP_VERSION=3.4.1
 
 RUN cd /opt/flink/lib && \
-    # Flink connectors
+    # Flink Kafka connector (DataStream API) + raw kafka-clients for HA recovery classloading
+    curl -LO https://repo1.maven.org/maven2/org/apache/flink/flink-connector-kafka/3.3.0-1.20/flink-connector-kafka-3.3.0-1.20.jar && \
+    curl -LO https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.4.0/kafka-clients-3.4.0.jar && \
+    # Flink SQL Kafka connector (for SQL/Table API)
     curl -LO https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-kafka/3.3.0-1.20/flink-sql-connector-kafka-3.3.0-1.20.jar && \
     curl -LO https://repo1.maven.org/maven2/org/apache/flink/flink-connector-jdbc/3.2.0-1.19/flink-connector-jdbc-3.2.0-1.19.jar && \
     # Iceberg Flink runtime
