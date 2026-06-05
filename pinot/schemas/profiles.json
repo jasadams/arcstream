@@ -11,7 +11,8 @@
     {"name": "last_page", "dataType": "STRING"},
     {"name": "top_pages", "dataType": "STRING", "singleValueField": false},
     {"name": "top_features", "dataType": "STRING", "singleValueField": false},
-    {"name": "action", "dataType": "STRING"}
+    {"name": "action", "dataType": "STRING"},
+    {"name": "current_session_active", "dataType": "BOOLEAN"}
   ],
   "dateTimeFieldSpecs": [
     {"name": "first_seen", "dataType": "TIMESTAMP", "format": "1:MILLISECONDS:EPOCH", "granularity": "1:MILLISECONDS"},
@@ -30,7 +31,6 @@
     {"name": "sessions_30d", "dataType": "LONG"},
     {"name": "sessions_90d", "dataType": "LONG"},
     {"name": "avg_session_duration_sec", "dataType": "LONG"},
-    {"name": "current_session_active", "dataType": "BOOLEAN"},
     {"name": "current_session_duration_sec", "dataType": "LONG"},
     {"name": "page_views", "dataType": "LONG"},
     {"name": "clicks", "dataType": "LONG"},
