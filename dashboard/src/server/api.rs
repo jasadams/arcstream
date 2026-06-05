@@ -355,7 +355,7 @@ pub async fn get_all_events(
 }
 
 #[server(GetEvent)]
-pub async fn get_event(tenant_id: String, event_id: String) -> Result<EventRow, ServerFnError> {
+pub async fn get_event(tenant_id: String, event_id: String, event_date_hint: String) -> Result<EventRow, ServerFnError> {
     use crate::server::AppState;
     use crate::server::query_api::graphql_query;
 
@@ -369,11 +369,12 @@ pub async fn get_event(tenant_id: String, event_id: String) -> Result<EventRow, 
     let vars = serde_json::json!({
         "tenantId": tenant_id,
         "eventId": event_id,
+        "eventDateHint": event_date_hint,
     });
     let data: Response = graphql_query(
         &state,
-        "query($tenantId: String!, $eventId: String!) { \
-            event(tenantId: $tenantId, eventId: $eventId) { \
+        "query($tenantId: String!, $eventId: String!, $eventDateHint: String) { \
+            event(tenantId: $tenantId, eventId: $eventId, eventDateHint: $eventDateHint) { \
                 eventId eventType tenantId eventTime canonicalId \
                 anonymousId userId pageUrl deviceType browser country \
             } \

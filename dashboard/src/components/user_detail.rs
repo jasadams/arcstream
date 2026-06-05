@@ -361,7 +361,7 @@ fn render_timeline(events: Vec<EventRow>) -> impl IntoView {
             {events.into_iter().map(|e| {
                 let event_time = e.event_time.clone();
                 let icon_svg = device_svg(&e.device_type);
-                let event_href = format!("/events/{}/{}/{}", e.tenant_id, e.canonical_id, e.event_id);
+                let event_href = format!("/events/{}/{}/{}?t={}", e.tenant_id, e.canonical_id, e.event_id, &e.event_time[..10.min(e.event_time.len())]);
                 view! {
                     <div class="timeline-item">
                         <A href=event_href>
@@ -392,7 +392,7 @@ fn TimelineItemView(
     let e = event.get_untracked();
     let event_time = e.event_time.clone();
     let icon_svg = device_svg(&e.device_type);
-    let event_href = format!("/events/{}/{}/{}", e.tenant_id, e.canonical_id, e.event_id);
+    let event_href = format!("/events/{}/{}/{}?t={}", e.tenant_id, e.canonical_id, e.event_id, &e.event_time[..10.min(e.event_time.len())]);
 
     view! {
         <div

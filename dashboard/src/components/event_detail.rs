@@ -1,7 +1,7 @@
 use leptos::prelude::*;
 use leptos_meta::Title;
 use leptos_router::components::A;
-use leptos_router::hooks::use_params_map;
+use leptos_router::hooks::{use_params_map, use_query_map};
 use crate::components::avatar::marble_avatar_svg;
 use crate::components::petname::petname;
 use crate::components::event_list::{event_type_label, event_type_class};
@@ -21,10 +21,14 @@ pub fn EventDetailPage() -> impl IntoView {
     let event_id = move || {
         params.read().get("event_id").unwrap_or_default()
     };
+    let query = use_query_map();
+    let event_date_hint = move || {
+        query.read().get("t").unwrap_or_default()
+    };
 
     let event_resource = Resource::new(
-        move || (tenant_id(), event_id()),
-        |(tenant, eid)| get_event(tenant, eid),
+        move || (tenant_id(), event_id(), event_date_hint()),
+        |(tenant, eid, hint)| get_event(tenant, eid, hint),
     );
 
     let nearby_resource = Resource::new(
@@ -137,7 +141,7 @@ pub fn EventDetailPage() -> impl IntoView {
                                                         } else {
                                                             "timeline-item"
                                                         };
-                                                        let href = format!("/events/{}/{}/{}", ev.tenant_id, ev.canonical_id, ev.event_id);
+                                                        let href = format!("/events/{}/{}/{}?t={}", ev.tenant_id, ev.canonical_id, ev.event_id, &ev.event_time[..10.min(ev.event_time.len())]);
                                                         let event_time = ev.event_time.clone();
                                                         let icon_svg = device_svg(&ev.device_type);
                                                         view! {

@@ -207,7 +207,7 @@ fn EventRowView(
     let e = event.get_untracked();
     let avatar_svg = marble_avatar_svg(&e.canonical_id, 22);
     let display_name = petname(&e.canonical_id);
-    let nav_path = format!("/events/{}/{}/{}", e.tenant_id, e.canonical_id, e.event_id);
+    let nav_path = format!("/events/{}/{}/{}?t={}", e.tenant_id, e.canonical_id, e.event_id, &e.event_time[..10.min(e.event_time.len())]);
     let event_time = e.event_time.clone();
     let badge_class = format!("badge-event {}", event_type_class(&e.event_type));
     let label = event_type_label(&e.event_type);

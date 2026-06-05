@@ -218,16 +218,23 @@ impl GlobalQuery {
         ctx: &Context<'_>,
         tenant_id: String,
         event_id: String,
+        event_date_hint: Option<String>,
     ) -> async_graphql::Result<Option<Event>> {
         let pinot = ctx.data::<Arc<dyn PinotQuerier>>()?;
         let safe_tenant = sanitize_input(&tenant_id).map_err(async_graphql::Error::new)?;
         let safe_id = sanitize_input(&event_id).map_err(async_graphql::Error::new)?;
 
+        let date_filter = event_date_hint
+            .filter(|h| !h.is_empty())
+            .and_then(|h| sanitize_input(&h).ok())
+            .map(|d| format!("AND event_date = '{d}'"))
+            .unwrap_or_default();
+
         let sql = format!(
             "SELECT event_id, event_type, tenant_id, event_time, canonical_id, \
              anonymous_id, user_id, page_url, device_type, browser, country \
              FROM events \
-             WHERE tenant_id = '{safe_tenant}' AND event_id = '{safe_id}' \
+             WHERE tenant_id = '{safe_tenant}' AND event_id = '{safe_id}' {date_filter} \
              LIMIT 1"
         );
 
