@@ -23,8 +23,8 @@ pub async fn run(
         .set("enable.auto.commit", "true")
         .set("fetch.wait.max.ms", "500")
         .set("fetch.min.bytes", "1024")
-        .set("queued.max.messages.kbytes", "65536")
-        .set("fetch.message.max.bytes", "1048576")
+        .set("queued.max.messages.kbytes", "4096")
+        .set("fetch.message.max.bytes", "524288")
         .create()
         .expect("failed to create Kafka consumer");
 
