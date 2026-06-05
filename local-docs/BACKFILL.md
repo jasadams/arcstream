@@ -250,7 +250,7 @@ kubectl get statefulset pinot-server -n data-pipeline -o jsonpath='{.spec.templa
 Usually caused by stale HA state referencing classes from a previous image. Fix: delete the HA ConfigMaps (step 2) and restart.
 
 ### Query-api OOM during backfill
-The WebSocket streaming consumers can buffer too many messages. The consumers have `queued.max.messages.kbytes=65536` to cap this. If still OOMing, delete the consumer group offsets so `auto.offset.reset=latest` kicks in:
+The WebSocket streaming consumers skip deserialization when no browsers are connected (`receiver_count() == 0`). They also have `queued.max.messages.kbytes=65536` to cap the internal rdkafka buffer. If still OOMing after both fixes, delete the consumer group offsets so `auto.offset.reset=latest` kicks in:
 ```bash
 RP_POD=$(kubectl get pod -n data-pipeline -l app=redpanda -o jsonpath='{.items[0].metadata.name}')
 kubectl exec $RP_POD -n data-pipeline -- rpk group delete query-api-subscriptions
