@@ -38,32 +38,44 @@ pub async fn run(
     let mut pending: VecDeque<LiveEventMessage> = VecDeque::new();
     let mut last_flush = tokio::time::Instant::now();
 
-    while let Some(result) = stream.next().await {
-        match result {
-            Ok(msg) => {
-                if sender.receiver_count() > 0 {
-                    if let Some(payload) = msg.payload() {
-                        if let Ok(event) = serde_json::from_slice::<LiveEventMessage>(payload) {
-                            if pending.len() < MAX_EVENTS_PER_FLUSH {
-                                pending.push_back(event);
-                            }
-                        }
-                    }
+    loop {
+        if sender.receiver_count() == 0 {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            continue;
+        }
 
-                    if last_flush.elapsed().as_millis() >= FLUSH_INTERVAL_MS as u128 {
-                        for event in pending.drain(..) {
-                            let _ = sender.send(event);
+        match tokio::time::timeout(
+            std::time::Duration::from_millis(FLUSH_INTERVAL_MS),
+            stream.next(),
+        ).await {
+            Ok(Some(Ok(msg))) => {
+                if let Some(payload) = msg.payload() {
+                    if let Ok(event) = serde_json::from_slice::<LiveEventMessage>(payload) {
+                        if pending.len() < MAX_EVENTS_PER_FLUSH {
+                            pending.push_back(event);
                         }
-                        last_flush = tokio::time::Instant::now();
                     }
                 }
-                if let Err(e) = consumer.commit_message(&msg, CommitMode::Async) {
-                    eprintln!("Failed to commit offset: {e}");
+                let _ = consumer.commit_message(&msg, CommitMode::Async);
+
+                if last_flush.elapsed().as_millis() >= FLUSH_INTERVAL_MS as u128 {
+                    for event in pending.drain(..) {
+                        let _ = sender.send(event);
+                    }
+                    last_flush = tokio::time::Instant::now();
+                    tokio::task::yield_now().await;
                 }
             }
-            Err(e) => {
+            Ok(Some(Err(e))) => {
                 eprintln!("Kafka consumer error: {e}");
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            }
+            Ok(None) => break,
+            Err(_) => {
+                for event in pending.drain(..) {
+                    let _ = sender.send(event);
+                }
+                last_flush = tokio::time::Instant::now();
             }
         }
     }
