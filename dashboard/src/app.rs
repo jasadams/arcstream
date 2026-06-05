@@ -112,7 +112,7 @@ pub fn App() -> impl IntoView {
         use wasm_bindgen::prelude::*;
         use crate::websocket;
 
-        let (profile_sig, event_sig) = websocket::provide_stream_contexts();
+        websocket::provide_stream_contexts();
 
         // Check if SSR set the dev-panel meta tag
         Effect::new(move || {
@@ -137,8 +137,6 @@ pub fn App() -> impl IntoView {
             let window = web_sys::window().expect("no window");
 
             let setup = Closure::<dyn FnMut()>::once(move || {
-                websocket::start_websockets(profile_sig, event_sig);
-
                 let tick_cb = Closure::<dyn FnMut()>::new(move || {
                     let _ = _set_tick.try_update(|t| *t += 1);
                 });
