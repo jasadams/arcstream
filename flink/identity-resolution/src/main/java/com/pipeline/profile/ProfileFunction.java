@@ -1,7 +1,5 @@
 package com.pipeline.profile;
 
-import com.datastax.oss.driver.api.core.CqlSession;
-import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.pipeline.identity.UnifiedEvent;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
@@ -9,7 +7,6 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
 
-import java.net.InetSocketAddress;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -26,52 +23,15 @@ public class ProfileFunction
     private static final long MAX_FUTURE_MS = 60 * 1000L;
     private static final int BUCKET_RETENTION_DAYS = 91;
 
-    private final String scyllaContactPoints;
-    private final String scyllaKeyspace;
-
     private transient ValueState<UserProfileState> profileState;
-    private transient CqlSession cqlSession;
-    private transient PreparedStatement insertStatement;
 
-    public ProfileFunction(String scyllaContactPoints, String scyllaKeyspace) {
-        this.scyllaContactPoints = scyllaContactPoints;
-        this.scyllaKeyspace = scyllaKeyspace;
+    public ProfileFunction() {
     }
 
     @Override
     public void open(Configuration parameters) {
         profileState = getRuntimeContext().getState(
                 new ValueStateDescriptor<>("user-profile", UserProfileState.class));
-
-        String[] parts = scyllaContactPoints.split(",");
-        List<InetSocketAddress> contactPoints = new ArrayList<>();
-        for (String part : parts) {
-            String[] hostPort = part.trim().split(":");
-            String host = hostPort[0];
-            int port = hostPort.length > 1 ? Integer.parseInt(hostPort[1]) : 9042;
-            contactPoints.add(new InetSocketAddress(host, port));
-        }
-
-        cqlSession = CqlSession.builder()
-                .addContactPoints(contactPoints)
-                .withLocalDatacenter("datacenter1")
-                .withKeyspace(scyllaKeyspace)
-                .build();
-
-        insertStatement = cqlSession.prepare(
-                "INSERT INTO profiles (tenant_id, canonical_id, user_id, first_seen, last_seen, " +
-                "total_events, total_sessions, events_1d, events_7d, events_30d, events_90d, " +
-                "sessions_1d, sessions_7d, sessions_30d, sessions_90d, avg_session_duration_sec, " +
-                "current_session_active, current_session_duration_sec, page_views, clicks, logins, " +
-                "feature_uses, last_page, last_country, last_device, last_browser, top_pages, top_features) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    }
-
-    @Override
-    public void close() {
-        if (cqlSession != null) {
-            cqlSession.close();
-        }
     }
 
     private long clampEventTime(long eventTimeMs) {
@@ -173,7 +133,6 @@ public class ProfileFunction
         ProfileUpdate before = isNewProfile ? null : buildProfileUpdate(profile, "update", "event", eventDate);
 
         profileState.update(profile);
-        writeToScylla(profile, eventDate);
 
         ProfileUpdate after = buildProfileUpdate(profile, isNewProfile ? "create" : "update", "event", eventDate);
         after.changedFields = computeChangedFields(before, after);
@@ -208,7 +167,6 @@ public class ProfileFunction
             ctx.timerService().registerEventTimeTimer(profile.decayTimer30d);
 
             profileState.update(profile);
-            writeToScylla(profile, timerDate);
             ProfileUpdate after = buildProfileUpdate(profile, "update", "session_timeout", timerDate);
             after.changedFields = computeChangedFields(before, after);
             out.collect(after);
@@ -224,7 +182,6 @@ public class ProfileFunction
             if (timestamp == profile.decayTimer30d) profile.decayTimer30d = 0;
 
             profileState.update(profile);
-            writeToScylla(profile, timerDate);
             ProfileUpdate update = buildProfileUpdate(profile, "update", trigger, timerDate);
             out.collect(update);
         }
@@ -250,6 +207,9 @@ public class ProfileFunction
         update.sessions90d = sumSessions(p.dailySessions, referenceDate, 90);
         update.avgSessionDurationSec = p.closedSessionCount > 0
                 ? p.totalSessionDurationMs / p.closedSessionCount / 1000 : 0;
+        update.currentSessionActive = p.currentSessionId != null;
+        update.currentSessionDurationSec = p.currentSessionId != null && p.currentSessionStartMs > 0
+                ? (System.currentTimeMillis() - p.currentSessionStartMs) / 1000 : 0;
         update.pageViews = p.pageViews;
         update.clicks = p.clicks;
         update.logins = p.logins;
@@ -290,44 +250,6 @@ public class ProfileFunction
         return Instant.ofEpochMilli(epochMs)
                 .atOffset(ZoneOffset.UTC)
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"));
-    }
-
-    private void writeToScylla(UserProfileState p, LocalDate referenceDate) {
-        try {
-            cqlSession.execute(insertStatement.bind(
-                    p.tenantId,
-                    p.canonicalId,
-                    p.userId,
-                    p.firstSeenEpochMs > 0 ? Instant.ofEpochMilli(p.firstSeenEpochMs) : null,
-                    p.lastSeenEpochMs > 0 ? Instant.ofEpochMilli(p.lastSeenEpochMs) : null,
-                    p.totalEvents,
-                    (long) p.allSessionIds.size(),
-                    sumBuckets(p.dailyBuckets, referenceDate, 1),
-                    sumBuckets(p.dailyBuckets, referenceDate, 7),
-                    sumBuckets(p.dailyBuckets, referenceDate, 30),
-                    sumBuckets(p.dailyBuckets, referenceDate, 90),
-                    sumSessions(p.dailySessions, referenceDate, 1),
-                    sumSessions(p.dailySessions, referenceDate, 7),
-                    sumSessions(p.dailySessions, referenceDate, 30),
-                    sumSessions(p.dailySessions, referenceDate, 90),
-                    p.closedSessionCount > 0 ? p.totalSessionDurationMs / p.closedSessionCount / 1000 : 0L,
-                    p.currentSessionId != null,
-                    p.currentSessionId != null && p.currentSessionStartMs > 0
-                            ? (System.currentTimeMillis() - p.currentSessionStartMs) / 1000 : 0L,
-                    p.pageViews,
-                    p.clicks,
-                    p.logins,
-                    p.featureUses,
-                    p.lastPage,
-                    p.lastCountry,
-                    p.lastDevice,
-                    p.lastBrowser,
-                    topK(p.pageCounts, 5),
-                    topK(p.featureCounts, 3)
-            ));
-        } catch (Exception e) {
-            System.err.println("ScyllaDB write failed for " + p.canonicalId + ": " + e.getMessage());
-        }
     }
 
     private long sumBuckets(Map<String, Long> buckets, LocalDate referenceDate, int days) {

@@ -42,11 +42,6 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>com.datastax.oss</groupId>
-            <artifactId>java-driver-core</artifactId>
-            <version>4.17.0</version>
-        </dependency>
-        <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
             <version>${jackson.version}</version>
@@ -78,14 +73,6 @@
                                 <relocation>
                                     <pattern>com.fasterxml.jackson</pattern>
                                     <shadedPattern>com.pipeline.shaded.jackson</shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>com.datastax</pattern>
-                                    <shadedPattern>com.pipeline.shaded.datastax</shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>io.netty</pattern>
-                                    <shadedPattern>com.pipeline.shaded.netty</shadedPattern>
                                 </relocation>
                             </relocations>
                             <transformers>

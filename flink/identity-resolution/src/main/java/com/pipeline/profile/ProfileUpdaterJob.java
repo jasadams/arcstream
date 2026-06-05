@@ -27,9 +27,6 @@ public class ProfileUpdaterJob {
         String inputTopic = envOrDefault("INPUT_TOPIC", "unified-events");
         String outputTopic = envOrDefault("PROFILE_UPDATES_TOPIC", "profile-updates");
         String groupId = envOrDefault("GROUP_ID", "flink-profile-updater");
-        String scyllaContactPoints = envOrDefault("SCYLLA_CONTACT_POINTS",
-                "scylladb.data-pipeline.svc.cluster.local:9042");
-        String scyllaKeyspace = envOrDefault("SCYLLA_KEYSPACE", "cdp");
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(60_000, CheckpointingMode.EXACTLY_ONCE);
@@ -56,7 +53,7 @@ public class ProfileUpdaterJob {
 
         DataStream<ProfileUpdate> profileUpdates = events
                 .keyBy(event -> event.canonicalId)
-                .process(new ProfileFunction(scyllaContactPoints, scyllaKeyspace))
+                .process(new ProfileFunction())
                 .name("profile-updater");
 
         KafkaSink<ProfileUpdate> profileSink = KafkaSink.<ProfileUpdate>builder()

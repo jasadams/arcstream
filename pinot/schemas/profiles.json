@@ -30,6 +30,8 @@
     {"name": "sessions_30d", "dataType": "LONG"},
     {"name": "sessions_90d", "dataType": "LONG"},
     {"name": "avg_session_duration_sec", "dataType": "LONG"},
+    {"name": "current_session_active", "dataType": "BOOLEAN"},
+    {"name": "current_session_duration_sec", "dataType": "LONG"},
     {"name": "page_views", "dataType": "LONG"},
     {"name": "clicks", "dataType": "LONG"},
     {"name": "logins", "dataType": "LONG"},

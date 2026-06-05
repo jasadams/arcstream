@@ -22,6 +22,8 @@ public class ProfileUpdate implements Serializable {
     @JsonProperty("sessions_30d") public long sessions30d;
     @JsonProperty("sessions_90d") public long sessions90d;
     @JsonProperty("avg_session_duration_sec") public long avgSessionDurationSec;
+    @JsonProperty("current_session_active") public boolean currentSessionActive;
+    @JsonProperty("current_session_duration_sec") public long currentSessionDurationSec;
     @JsonProperty("page_views") public long pageViews;
     @JsonProperty("clicks") public long clicks;
     @JsonProperty("logins") public long logins;
