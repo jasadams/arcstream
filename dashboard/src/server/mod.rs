@@ -25,5 +25,4 @@ pub struct WithStats<T: Clone> {
 pub struct AppState {
     pub query_api_url: String,
     pub http: reqwest::Client,
-    pub default_backend: String,
 }

@@ -65,11 +65,9 @@ pub type UserRow = (String, RwSignal<UserProfile>, RwSignal<bool>);
 #[derive(Clone, Copy)]
 pub struct DevPanelAvailable(pub RwSignal<bool>);
 
-/// Client-side dev mode state. Persisted to localStorage and cookies.
 #[derive(Clone, Copy)]
 pub struct DevMode {
     pub enabled: RwSignal<bool>,
-    pub backend: RwSignal<String>,
     pub query_stats: RwSignal<Vec<crate::server::QueryStatEntry>>,
 }
 
@@ -103,10 +101,8 @@ pub fn App() -> impl IntoView {
     let dev_panel_available = RwSignal::new(false);
     provide_context(DevPanelAvailable(dev_panel_available));
 
-    // Initialize DevMode with defaults; WASM side restores from localStorage
     let dev_mode = DevMode {
         enabled: RwSignal::new(false),
-        backend: RwSignal::new(String::new()),
         query_stats: RwSignal::new(Vec::new()),
     };
     provide_context(dev_mode);
@@ -127,15 +123,10 @@ pub fn App() -> impl IntoView {
             dev_panel_available.set(available);
         });
 
-        // Restore dev mode state from localStorage AFTER hydration
-        // to avoid SSR/WASM mismatch (SSR renders enabled=false).
         Effect::new(move || {
             if let Some(s) = web_sys::window()
                 .and_then(|w| w.local_storage().ok().flatten())
             {
-                if let Ok(Some(b)) = s.get_item("dev-backend") {
-                    dev_mode.backend.set(b);
-                }
                 if let Ok(Some(v)) = s.get_item("dev-mode") {
                     dev_mode.enabled.set(v == "true");
                 }
@@ -222,66 +213,16 @@ fn DevModeToggle() -> impl IntoView {
     }
 }
 
-/// Collapsible dev panel shown below the header when dev mode is enabled.
-/// Only rendered when `DEV_PANEL=1` env var is set.
 #[component]
 fn DevPanel() -> impl IntoView {
     let available = expect_context::<DevPanelAvailable>().0;
     let dev = expect_context::<DevMode>();
-    let backend = dev.backend;
-
-    let set_backend = move |name: &str| {
-        let name = name.to_owned();
-        backend.set(name.clone());
-        #[cfg(feature = "hydrate")]
-        {
-            // Persist to localStorage
-            if let Some(s) = web_sys::window()
-                .and_then(|w| w.local_storage().ok().flatten())
-            {
-                let _ = s.set_item("dev-backend", &name);
-            }
-            // Set cookie so SSR server functions can read the backend choice
-            if let Some(doc) = web_sys::window().and_then(|w| w.document()) {
-                use wasm_bindgen::JsCast;
-                if let Some(html_doc) = doc.dyn_ref::<web_sys::HtmlDocument>() {
-                    let _ = html_doc.set_cookie(&format!("dev-backend={name}; path=/; max-age=86400"));
-                }
-            }
-        }
-    };
-
-    let is_pinot = move || {
-        let b = backend.get();
-        b == "pinot" || b.is_empty()
-    };
-    let is_flare = move || {
-        let b = backend.get();
-        b == "flare" || b == "flaredb"
-    };
 
     view! {
         <Show when=move || available.get() && dev.enabled.get()>
             <div class="dev-panel">
                 <div class="dev-panel-header">
                     "Dev Panel"
-                </div>
-                <div class="dev-backend-switch">
-                    <span class="dev-label">"Backend:"</span>
-                    <button
-                        class="dev-backend-btn"
-                        class:active=is_pinot
-                        on:click=move |_| set_backend("pinot")
-                    >
-                        "Pinot"
-                    </button>
-                    <button
-                        class="dev-backend-btn"
-                        class:active=is_flare
-                        on:click=move |_| set_backend("flare")
-                    >
-                        "FlareDB"
-                    </button>
                 </div>
                 <div class="dev-stats-log">
                     <div class="dev-label">"Query Log"</div>
@@ -306,7 +247,6 @@ fn DevPanel() -> impl IntoView {
                                     <div class="dev-stat-sql">{sql_preview}</div>
                                     <div class="dev-stat-meta">
                                         <span class=path_class>{path_label}</span>
-                                        <span class="dev-backend-label">{entry.backend.clone()}</span>
                                         {elapsed.map(|e| view! { <span class="dev-elapsed">{e}</span> })}
                                         {segments.map(|s| view! { <span class="dev-segments">{s}</span> })}
                                     </div>

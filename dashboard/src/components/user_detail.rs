@@ -40,7 +40,7 @@ pub fn UserDetailPage() -> impl IntoView {
         let (live_events, set_live_events) = signal(Vec::<TimelineEntry>::new());
 
         Effect::new(move || {
-            if let Some(Ok(p)) = profile.get() {
+            if let Some(Ok(Some(p))) = profile.get() {
                 set_live_profile.set(Some(p));
             }
         });
@@ -115,7 +115,7 @@ pub fn UserDetailPage() -> impl IntoView {
 
     let profile_data = Memo::new(move |_| {
         live_profile.get()
-            .or_else(|| profile.get().and_then(|r| r.ok()))
+            .or_else(|| profile.get().and_then(|r| r.ok()).flatten())
     });
 
     Effect::new(move || {

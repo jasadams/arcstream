@@ -243,7 +243,7 @@ pub async fn get_dashboard_stats() -> Result<WithStats<DashboardStats>, ServerFn
 }
 
 #[server(GetLiveProfile)]
-pub async fn get_live_profile(tenant_id: String, canonical_id: String) -> Result<LiveProfile, ServerFnError> {
+pub async fn get_live_profile(tenant_id: String, canonical_id: String) -> Result<Option<LiveProfile>, ServerFnError> {
     use crate::server::AppState;
     use crate::server::query_api::graphql_query;
 
@@ -278,7 +278,7 @@ pub async fn get_live_profile(tenant_id: String, canonical_id: String) -> Result
     .await
     .map_err(ServerFnError::new)?;
 
-    data.live_profile.ok_or_else(|| ServerFnError::new("Profile not found"))
+    Ok(data.live_profile)
 }
 
 #[server(GetEvents)]

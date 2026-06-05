@@ -9,13 +9,10 @@ async fn main() {
     use dashboard::app::{App, shell};
     use dashboard::server::AppState;
 
-    let default_backend = std::env::var("DEFAULT_BACKEND").unwrap_or_else(|_| "pinot".into());
-
     let app_state = AppState {
         query_api_url: std::env::var("QUERY_API_URL")
             .unwrap_or_else(|_| "http://query-api.data-pipeline.svc.cluster.local:8080/graphql".into()),
         http: reqwest::Client::new(),
-        default_backend,
     };
 
     let conf = get_configuration(None).unwrap();

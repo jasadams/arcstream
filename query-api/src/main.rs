@@ -4,7 +4,6 @@ mod streaming;
 
 use axum::{
     extract::State,
-    http::HeaderMap,
     response::Html,
     routing::{get, post},
     Router,
@@ -13,7 +12,6 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use tower_http::cors::CorsLayer;
 
-use db::flaredb::FlareDBClient;
 use db::pinot::{PinotClient, PinotQuerier};
 use db::LiveProfileProvider;
 use schema::query_stats::QueryStatsCollector;
@@ -21,24 +19,8 @@ use schema::{AppSchema, QueryRoot};
 use schema::subscription::SubscriptionRoot;
 use streaming::types::{LiveEventMessage, ProfileUpdateMessage};
 
-#[derive(Clone)]
-pub struct BackendSelector {
-    pub pinot: Arc<dyn PinotQuerier>,
-    pub flaredb: Option<Arc<dyn PinotQuerier>>,
-}
-
-impl BackendSelector {
-    fn select(&self, name: &str) -> Arc<dyn PinotQuerier> {
-        match name {
-            "flare" | "flaredb" => self.flaredb.clone().unwrap_or_else(|| self.pinot.clone()),
-            _ => self.pinot.clone(),
-        }
-    }
-}
-
 struct AppState {
     schema: AppSchema,
-    backends: BackendSelector,
 }
 
 async fn health() -> &'static str {
@@ -47,18 +29,11 @@ async fn health() -> &'static str {
 
 async fn graphql_handler(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
     req: async_graphql_axum::GraphQLRequest,
 ) -> async_graphql_axum::GraphQLResponse {
-    let backend_name = headers
-        .get("x-backend")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("pinot");
-    let client = state.backends.select(backend_name);
     let collector = Arc::new(QueryStatsCollector::new());
     let mut gql_req = req.into_inner();
     gql_req = gql_req.data(Arc::clone(&collector));
-    gql_req = gql_req.data(client);
     let mut response = state.schema.execute(gql_req).await;
 
     let entries = collector.take();
@@ -85,24 +60,11 @@ async fn main() {
     let kafka_brokers = std::env::var("KAFKA_BROKERS")
         .unwrap_or_else(|_| "redpanda.data-pipeline.svc.cluster.local:9092".into());
 
-    let pinot: Arc<dyn PinotQuerier> = Arc::new(PinotClient {
+    let pinot = Arc::new(PinotClient {
         broker_url: std::env::var("PINOT_BROKER_URL")
             .unwrap_or_else(|_| "http://pinot-broker.data-pipeline.svc.cluster.local:8099/query/sql".into()),
         http: reqwest::Client::new(),
     });
-
-    let flaredb_url = std::env::var("FLAREDB_URL")
-        .unwrap_or_else(|_| "http://flaredb.data-pipeline.svc.cluster.local:8090/query/sql".into());
-    eprintln!("FlareDB backend at {flaredb_url}");
-    let flaredb = Arc::new(FlareDBClient {
-        url: flaredb_url,
-        http: reqwest::Client::new(),
-    });
-
-    let backends = BackendSelector {
-        pinot: pinot.clone(),
-        flaredb: Some(flaredb.clone() as Arc<dyn PinotQuerier>),
-    };
 
     let (profile_tx, _) = broadcast::channel::<ProfileUpdateMessage>(1024);
     let (event_tx, _) = broadcast::channel::<LiveEventMessage>(2048);
@@ -136,8 +98,8 @@ async fn main() {
         async_graphql::EmptyMutation,
         SubscriptionRoot,
     )
-    .data(pinot as Arc<dyn PinotQuerier>)
-    .data(flaredb as Arc<dyn LiveProfileProvider>)
+    .data(pinot.clone() as Arc<dyn PinotQuerier>)
+    .data(pinot as Arc<dyn LiveProfileProvider>)
     .data(profile_tx)
     .data(event_tx)
     .limit_depth(5)
@@ -146,7 +108,6 @@ async fn main() {
 
     let state = Arc::new(AppState {
         schema: schema.clone(),
-        backends,
     });
 
     let enable_playground = std::env::var("ENABLE_PLAYGROUND")

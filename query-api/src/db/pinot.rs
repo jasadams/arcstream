@@ -171,6 +171,50 @@ pub fn sanitize_input(input: &str) -> Result<String, String> {
     }
 }
 
+#[async_trait]
+impl super::LiveProfileProvider for PinotClient {
+    async fn get_live_profile(
+        &self,
+        tenant_id: &str,
+        canonical_id: &str,
+    ) -> Result<Option<String>, String> {
+        let sql = format!(
+            "SELECT canonical_id, user_id, tenant_id, first_seen, last_seen, \
+             total_events, total_sessions, \
+             events_1d, events_7d, events_30d, events_90d, \
+             sessions_1d, sessions_7d, \
+             avg_session_duration_sec, \
+             page_views, clicks, logins, feature_uses, \
+             last_page, last_country, last_device, last_browser \
+             FROM profiles \
+             WHERE tenant_id = '{tenant_id}' AND canonical_id = '{canonical_id}' \
+             LIMIT 1"
+        );
+
+        let resp = self.execute_request(&sql).await?;
+
+        let table = match resp.result_table {
+            Some(t) => t,
+            None => return Ok(None),
+        };
+
+        if table.rows.is_empty() {
+            return Ok(None);
+        }
+
+        let mut obj = serde_json::Map::new();
+        for (i, col_name) in table.data_schema.column_names.iter().enumerate() {
+            if let Some(val) = table.rows[0].get(i) {
+                obj.insert(col_name.clone(), val.clone());
+            }
+        }
+
+        serde_json::to_string(&obj)
+            .map(Some)
+            .map_err(|e| format!("JSON serialization failed: {e}"))
+    }
+}
+
 pub fn sanitize_timestamp(input: &str) -> Result<String, String> {
     let bytes = input.as_bytes();
     if bytes.len() < 10 || bytes.len() > 30 {

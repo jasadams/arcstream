@@ -1308,7 +1308,6 @@ dependencies = [
  "chrono",
  "futures-util",
  "rdkafka",
- "regex",
  "reqwest",
  "serde",
  "serde_json",

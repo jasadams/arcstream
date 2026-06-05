@@ -27,26 +27,6 @@ struct GraphQLError {
     message: String,
 }
 
-const VALID_BACKENDS: &[&str] = &["pinot", "flare", "flaredb"];
-
-/// Extract the `dev-backend` cookie value from the current SSR request context.
-fn cookie_backend() -> Option<String> {
-    use axum::http::request::Parts;
-    use leptos::prelude::use_context;
-
-    let parts = use_context::<Parts>()?;
-    let cookie_header = parts.headers.get("cookie")?.to_str().ok()?;
-    let value = cookie_header
-        .split(';')
-        .find_map(|c| c.trim().strip_prefix("dev-backend=").map(|v| v.to_owned()))?;
-
-    if VALID_BACKENDS.contains(&value.as_str()) {
-        Some(value)
-    } else {
-        None
-    }
-}
-
 pub async fn graphql_query_with_stats<T: DeserializeOwned>(
     state: &AppState,
     query: &'static str,
@@ -54,12 +34,9 @@ pub async fn graphql_query_with_stats<T: DeserializeOwned>(
 ) -> Result<(T, Vec<QueryStatEntry>), String> {
     let req = GraphQLRequest { query, variables };
 
-    let backend = cookie_backend().unwrap_or_else(|| state.default_backend.clone());
-
     let resp = state
         .http
         .post(&state.query_api_url)
-        .header("X-Backend", &backend)
         .json(&req)
         .send()
         .await

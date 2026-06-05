@@ -1,10 +1,10 @@
-use chrono::{DateTime, Datelike, Timelike, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, Timelike, Utc};
 use clap::Parser;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use rand_distr::{Distribution, LogNormal};
 use rdkafka::config::ClientConfig;
-use rdkafka::producer::{FutureProducer, FutureRecord};
+use rdkafka::producer::{FutureProducer, FutureRecord, Producer};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::time::{Duration, Instant};
@@ -35,6 +35,18 @@ struct Args {
 
     #[arg(long)]
     seed: Option<u64>,
+
+    /// Backfill mode: generate historical events as fast as possible
+    #[arg(long)]
+    backfill: bool,
+
+    /// Backfill start date (YYYY-MM-DD, default: 90 days ago)
+    #[arg(long)]
+    backfill_start: Option<String>,
+
+    /// Backfill end date (YYYY-MM-DD, default: today)
+    #[arg(long)]
+    backfill_end: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +209,7 @@ struct Session {
     events_until_login: Option<u32>,
     current_page: &'static str,
     previous_page: Option<&'static str>,
-    next_event_at: Instant,
+    next_event_at: DateTime<Utc>,
     events_remaining: u32,
     country: &'static str,
 }
@@ -205,7 +217,7 @@ struct Session {
 struct SpikeState {
     active: bool,
     multiplier: f64,
-    ends_at: Instant,
+    ends_at: DateTime<Utc>,
     users_delivered: u32,
 }
 
@@ -461,7 +473,7 @@ fn think_time(rng: &mut impl Rng, persona: Persona) -> Duration {
 // User creation
 // ---------------------------------------------------------------------------
 
-fn create_user(rng: &mut impl Rng, tenant: &str, user_number: u32) -> User {
+fn create_user(rng: &mut impl Rng, tenant: &str, user_number: u32, sim_now: DateTime<Utc>) -> User {
     let roll: u32 = rng.random_range(0..100);
     let persona = if roll < PERSONA_POWER {
         Persona::PowerUser
@@ -512,7 +524,7 @@ fn create_user(rng: &mut impl Rng, tenant: &str, user_number: u32) -> User {
         is_registered: false,
         visit_count: 0,
         state: UserState::Churned,
-        last_active: Utc::now(),
+        last_active: sim_now,
     }
 }
 
@@ -525,6 +537,7 @@ fn start_session(
     user: &mut User,
     user_idx: usize,
     sessions: &mut Vec<Session>,
+    sim_now: DateTime<Utc>,
 ) -> usize {
     user.visit_count += 1;
 
@@ -594,7 +607,7 @@ fn start_session(
         events_until_login,
         current_page,
         previous_page: None,
-        next_event_at: Instant::now(),
+        next_event_at: sim_now,
         events_remaining,
         country,
     };
@@ -609,7 +622,7 @@ fn start_session(
 // Return scheduling
 // ---------------------------------------------------------------------------
 
-fn schedule_return(rng: &mut impl Rng, user: &mut User) {
+fn schedule_return(rng: &mut impl Rng, user: &mut User, sim_now: DateTime<Utc>) {
     let base_rate = match user.persona {
         Persona::PowerUser => RETURN_POWER,
         Persona::Regular => RETURN_REGULAR,
@@ -628,11 +641,31 @@ fn schedule_return(rng: &mut impl Rng, user: &mut User) {
         let dist = LogNormal::new(median_hours.ln(), 0.6).unwrap();
         let hours: f64 = dist.sample(rng);
         let hours = hours.clamp(1.0, 1440.0);
-        let return_at = Utc::now() + chrono::Duration::seconds((hours * 3600.0) as i64);
+        let return_at = sim_now + chrono::Duration::seconds((hours * 3600.0) as i64);
         user.state = UserState::WillReturn(return_at);
     } else {
         user.state = UserState::Churned;
     }
+}
+
+// ---------------------------------------------------------------------------
+// Date parsing helper
+// ---------------------------------------------------------------------------
+
+fn parse_date(s: &str) -> DateTime<Utc> {
+    NaiveDate::parse_from_str(s, "%Y-%m-%d")
+        .unwrap_or_else(|e| panic!("Invalid date '{s}': {e}. Use YYYY-MM-DD format."))
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
+        .and_utc()
+}
+
+// ---------------------------------------------------------------------------
+// Chrono duration helper (converts std Duration to chrono Duration)
+// ---------------------------------------------------------------------------
+
+fn to_chrono(d: Duration) -> chrono::Duration {
+    chrono::Duration::milliseconds(d.as_millis() as i64)
 }
 
 // ---------------------------------------------------------------------------
@@ -643,9 +676,39 @@ fn schedule_return(rng: &mut impl Rng, user: &mut User) {
 async fn main() {
     let args = Args::parse();
 
-    let producer: FutureProducer = ClientConfig::new()
+    // --- Backfill date range ---
+    let backfill_end_dt = if args.backfill {
+        args.backfill_end
+            .as_ref()
+            .map(|s| parse_date(s))
+            .unwrap_or_else(Utc::now)
+    } else {
+        Utc::now()
+    };
+    let backfill_start_dt = if args.backfill {
+        args.backfill_start
+            .as_ref()
+            .map(|s| parse_date(s))
+            .unwrap_or_else(|| backfill_end_dt - chrono::Duration::days(90))
+    } else {
+        Utc::now()
+    };
+
+    // --- Kafka producer (with throughput tuning for backfill) ---
+    let mut producer_config = ClientConfig::new();
+    producer_config
         .set("bootstrap.servers", &args.broker)
-        .set("message.timeout.ms", "5000")
+        .set("message.timeout.ms", "5000");
+
+    if args.backfill {
+        producer_config
+            .set("batch.size", "1000000")
+            .set("linger.ms", "100")
+            .set("queue.buffering.max.messages", "1000000")
+            .set("compression.type", "lz4");
+    }
+
+    let producer: FutureProducer = producer_config
         .create()
         .expect("failed to create Kafka producer");
 
@@ -656,6 +719,13 @@ async fn main() {
         None => StdRng::from_os_rng(),
     };
 
+    // --- Simulated clock ---
+    let mut sim_now: DateTime<Utc> = if args.backfill {
+        backfill_start_dt
+    } else {
+        Utc::now()
+    };
+
     let mut tenant_states: Vec<TenantState> = tenant_slice
         .iter()
         .map(|name| TenantState {
@@ -664,7 +734,7 @@ async fn main() {
             spike: SpikeState {
                 active: false,
                 multiplier: 1.0,
-                ends_at: Instant::now(),
+                ends_at: sim_now,
                 users_delivered: 0,
             },
         })
@@ -675,15 +745,13 @@ async fn main() {
 
     let mut total_events: u64 = 0;
     let mut last_report = Instant::now();
-    let mut last_spike_check = Instant::now();
+    let mut last_report_sim: DateTime<Utc> = sim_now;
+    let mut last_spike_check_sim: DateTime<Utc> = sim_now;
     let mut events_since_last_report: u64 = 0;
     let mut smoothed_rate: f64 = 0.0;
 
-    // Top-down rate control: decide target events/sec, then start enough sessions
-    // to sustain that rate. Sessions still clump events naturally via think times.
     let base_target_per_sec = args.target_daily_events as f64 / 86_400.0;
 
-    // Weighted average think time across personas (used to estimate session throughput)
     let avg_think_secs: f64 = [
         (PERSONA_POWER as f64 / 100.0, THINK_POWER),
         (PERSONA_REGULAR as f64 / 100.0, THINK_REGULAR),
@@ -697,41 +765,69 @@ async fn main() {
     let mut daily_drift = DailyDrift::new(args.daily_variance);
     let mut smoothed_target: f64 = 0.0;
     let mut effective_think_secs: f64 = avg_think_secs;
-    let mut last_new_user = Instant::now();
+    let mut last_new_user_sim: DateTime<Utc> = sim_now;
 
-    eprintln!(
-        "Starting event producer: broker={} topic={} tenants={} target={}/day ({:.1}/s) (±{:.1}x variance)",
-        args.broker, args.topic, tenant_slice.len(), args.target_daily_events, base_target_per_sec, args.daily_variance
-    );
+    let backfill_real_start = Instant::now();
+
+    if args.backfill {
+        let total_days = (backfill_end_dt - backfill_start_dt).num_days();
+        eprintln!(
+            "Starting BACKFILL: {} to {} ({} days) broker={} topic={} tenants={} target={}/day",
+            backfill_start_dt.format("%Y-%m-%d"),
+            backfill_end_dt.format("%Y-%m-%d"),
+            total_days,
+            args.broker,
+            args.topic,
+            tenant_slice.len(),
+            args.target_daily_events,
+        );
+    } else {
+        eprintln!(
+            "Starting event producer: broker={} topic={} tenants={} target={}/day ({:.1}/s) (±{:.1}x variance)",
+            args.broker, args.topic, tenant_slice.len(), args.target_daily_events, base_target_per_sec, args.daily_variance
+        );
+    }
 
     loop {
-        let now_instant = Instant::now();
-        let now_utc = Utc::now();
+        // --- Clock management ---
+        if !args.backfill {
+            sim_now = Utc::now();
+        }
+
+        if args.backfill && sim_now >= backfill_end_dt {
+            break;
+        }
+
+        let real_now = Instant::now();
 
         // === 1. Compute target rate and session budget ===
-        let hour_frac = now_utc.hour() as f64 + now_utc.minute() as f64 / 60.0;
+        let hour_frac = sim_now.hour() as f64 + sim_now.minute() as f64 / 60.0;
         let diurnal = diurnal_multiplier(&mut rng, hour_frac);
-        daily_drift.update(&mut rng, (now_utc.date_naive().num_days_from_ce() as u32).wrapping_mul(24) + now_utc.hour());
+        daily_drift.update(
+            &mut rng,
+            (sim_now.date_naive().num_days_from_ce() as u32).wrapping_mul(24) + sim_now.hour(),
+        );
 
-        // Check for spike triggers (every ~60 seconds)
-        if now_instant.duration_since(last_spike_check) >= Duration::from_secs(60) {
-            last_spike_check = now_instant;
+        // Check for spike triggers (every ~60 simulated seconds)
+        if (sim_now - last_spike_check_sim).num_seconds() >= 60 {
+            last_spike_check_sim = sim_now;
             for tenant_state in &mut tenant_states {
                 if !tenant_state.spike.active
                     && rng.random_bool((SPIKE_CHANCE_PER_HOUR / 60.0).min(1.0))
                 {
-                    let multiplier = rng.random_range(SPIKE_MIN_MULTIPLIER..=SPIKE_MAX_MULTIPLIER);
+                    let multiplier =
+                        rng.random_range(SPIKE_MIN_MULTIPLIER..=SPIKE_MAX_MULTIPLIER);
                     let duration_secs =
                         rng.random_range(SPIKE_MIN_DURATION_SECS..=SPIKE_MAX_DURATION_SECS);
                     tenant_state.spike = SpikeState {
                         active: true,
                         multiplier,
-                        ends_at: now_instant + Duration::from_secs(duration_secs),
+                        ends_at: sim_now + chrono::Duration::seconds(duration_secs as i64),
                         users_delivered: 0,
                     };
                     eprintln!(
                         "[{}] SPIKE: {} {:.0}x for {}min",
-                        Utc::now().format("%H:%M:%S"),
+                        sim_now.format("%H:%M:%S"),
                         tenant_state.name,
                         multiplier,
                         duration_secs / 60
@@ -742,10 +838,10 @@ async fn main() {
 
         // Expire finished spikes
         for tenant_state in &mut tenant_states {
-            if tenant_state.spike.active && now_instant >= tenant_state.spike.ends_at {
+            if tenant_state.spike.active && sim_now >= tenant_state.spike.ends_at {
                 eprintln!(
                     "[{}] SPIKE END: {} (delivered {} new users)",
-                    Utc::now().format("%H:%M:%S"),
+                    sim_now.format("%H:%M:%S"),
                     tenant_state.name,
                     tenant_state.spike.users_delivered
                 );
@@ -753,13 +849,8 @@ async fn main() {
             }
         }
 
-        // Spikes redistribute the session budget — they don't inflate it.
-        // Total target stays fixed; spike tenants get a larger share.
         let target_now = base_target_per_sec * diurnal * daily_drift.multiplier();
 
-        // Smooth the target to prevent per-tick jitter from inflating sessions.
-        // Jitter creates momentary high targets that start sessions which then
-        // persist through low-target ticks, biasing the average upward.
         smoothed_target = if smoothed_target == 0.0 {
             target_now
         } else {
@@ -773,30 +864,39 @@ async fn main() {
         if deficit > 0 {
             let sessions_needed = deficit as usize;
 
-            // First, pull from returning users whose return time has arrived
             let mut started = 0usize;
             for user_idx in 0..users.len() {
                 if started >= sessions_needed {
                     break;
                 }
                 if let UserState::WillReturn(return_at) = users[user_idx].state {
-                    if now_utc >= return_at {
-                        start_session(&mut rng, &mut users[user_idx], user_idx, &mut sessions);
+                    if sim_now >= return_at {
+                        start_session(
+                            &mut rng,
+                            &mut users[user_idx],
+                            user_idx,
+                            &mut sessions,
+                            sim_now,
+                        );
                         started += 1;
                     }
                 }
             }
 
-            // During ramp-up (< half target sessions), fill freely.
-            // At steady state, drip 1 new user every ~3 seconds (~20/min).
             let at_steady_state = sessions.len() >= target_sessions / 2;
             let can_create = !at_steady_state
-                || now_instant.duration_since(last_new_user).as_secs_f64() >= 3.0;
+                || (sim_now - last_new_user_sim).num_seconds() >= 3;
             if started < sessions_needed && can_create {
-                last_new_user = now_instant;
+                last_new_user_sim = sim_now;
                 let total_weight: f64 = tenant_states
                     .iter()
-                    .map(|ts| if ts.spike.active { ts.spike.multiplier } else { 1.0 })
+                    .map(|ts| {
+                        if ts.spike.active {
+                            ts.spike.multiplier
+                        } else {
+                            1.0
+                        }
+                    })
                     .sum();
                 let roll: f64 = rng.random();
                 let mut cumulative = 0.0;
@@ -818,9 +918,16 @@ async fn main() {
                             if tenant_state.spike.active {
                                 tenant_state.spike.users_delivered += 1;
                             }
-                            let mut user = create_user(&mut rng, &tenant_state.name, user_num);
+                            let mut user =
+                                create_user(&mut rng, &tenant_state.name, user_num, sim_now);
                             let user_idx = users.len();
-                            start_session(&mut rng, &mut user, user_idx, &mut sessions);
+                            start_session(
+                                &mut rng,
+                                &mut user,
+                                user_idx,
+                                &mut sessions,
+                                sim_now,
+                            );
                             users.push(user);
                         }
                         break;
@@ -828,48 +935,42 @@ async fn main() {
                 }
             }
         }
-        // When over target, returning users stay queued — they'll get
-        // picked up when capacity opens up in a future tick.
 
         // === 4. Process sessions ready to fire ===
         let mut events_to_send: Vec<(String, String)> = Vec::new();
         let mut sessions_to_remove: Vec<usize> = Vec::new();
 
         for (sess_idx, session) in sessions.iter_mut().enumerate() {
-            if session.next_event_at > now_instant {
+            if session.next_event_at > sim_now {
                 continue;
             }
 
             let user = &users[session.user_idx];
 
-            // Determine event type, user_id, and page_url
             let (event_type, user_id, page_url): (&str, String, &str) = if session.needs_login_event
             {
                 session.needs_login_event = false;
                 session.signed_in = true;
                 let think = think_time(&mut rng, user.persona);
-                session.next_event_at = now_instant + think;
+                session.next_event_at = sim_now + to_chrono(think);
                 (
                     "login",
                     user_id_for(&user.tenant_id, user.user_number),
                     session.current_page,
                 )
             } else if session.events_remaining == 0 {
-                // Session exhausted, mark for removal
                 sessions_to_remove.push(sess_idx);
                 continue;
             } else if let Some(ref mut countdown) = session.events_until_login {
                 if *countdown == 0 {
-                    // Fire signup, schedule login for next tick
                     session.events_until_login = None;
                     session.needs_login_event = true;
                     session.events_remaining -= 1;
                     let think = think_time(&mut rng, user.persona);
-                    session.next_event_at = now_instant + think;
+                    session.next_event_at = sim_now + to_chrono(think);
                     ("signup", String::new(), session.current_page)
                 } else {
                     *countdown -= 1;
-                    // Navigate or stay (anonymous, pre-conversion)
                     let navigated = next_page(&mut rng, session.current_page, session.signed_in);
                     if navigated == BOUNCE {
                         session.events_remaining = 0;
@@ -879,19 +980,18 @@ async fn main() {
                         let et = stay_event_type(&mut rng, session.current_page);
                         session.events_remaining -= 1;
                         let think = think_time(&mut rng, user.persona);
-                        session.next_event_at = now_instant + think;
+                        session.next_event_at = sim_now + to_chrono(think);
                         (et, String::new(), session.current_page)
                     } else {
                         session.previous_page = Some(session.current_page);
                         session.current_page = navigated;
                         session.events_remaining -= 1;
                         let think = think_time(&mut rng, user.persona);
-                        session.next_event_at = now_instant + think;
+                        session.next_event_at = sim_now + to_chrono(think);
                         ("page_view", String::new(), session.current_page)
                     }
                 }
             } else {
-                // Regular event (authenticated or anonymous, no pending conversion)
                 let navigated = next_page(&mut rng, session.current_page, session.signed_in);
                 if navigated == BOUNCE {
                     session.events_remaining = 0;
@@ -906,7 +1006,7 @@ async fn main() {
                     };
                     session.events_remaining -= 1;
                     let think = think_time(&mut rng, user.persona);
-                    session.next_event_at = now_instant + think;
+                    session.next_event_at = sim_now + to_chrono(think);
                     (et, uid, session.current_page)
                 } else {
                     session.previous_page = Some(session.current_page);
@@ -918,12 +1018,11 @@ async fn main() {
                     };
                     session.events_remaining -= 1;
                     let think = think_time(&mut rng, user.persona);
-                    session.next_event_at = now_instant + think;
+                    session.next_event_at = sim_now + to_chrono(think);
                     ("page_view", uid, session.current_page)
                 }
             };
 
-            // Referrer: only meaningful for page_view and login events
             let referrer = if event_type == "page_view" || event_type == "login" {
                 session.previous_page.unwrap_or("").to_string()
             } else {
@@ -935,7 +1034,7 @@ async fn main() {
                 event_id: Uuid::new_v4().to_string(),
                 event_type: event_type.to_string(),
                 tenant_id: user.tenant_id.clone(),
-                event_time: Utc::now().format("%Y-%m-%d %H:%M:%S%.3f").to_string(),
+                event_time: sim_now.format("%Y-%m-%d %H:%M:%S%.3f").to_string(),
                 anonymous_id: session.anonymous_id.clone(),
                 user_id,
                 session_id: session.session_id.clone(),
@@ -962,22 +1061,35 @@ async fn main() {
             let json = serde_json::to_string(&event).unwrap();
             events_to_send.push((tenant_id, json));
 
-            // Mark for removal if session exhausted and no pending login
             if session.events_remaining == 0 && !session.needs_login_event {
                 sessions_to_remove.push(sess_idx);
             }
         }
 
         // === 5. Send events to Kafka ===
-        for (tenant_id, json) in &events_to_send {
-            let record = FutureRecord::to(&args.topic)
-                .key(tenant_id.as_str())
-                .payload(json.as_str());
-            if let Err((err, _)) = producer.send(record, Duration::from_secs(1)).await {
-                eprintln!("Kafka send error: {err}");
+        let msg_timestamp = sim_now.timestamp_millis();
+        if args.backfill {
+            for (tenant_id, json) in &events_to_send {
+                let record = FutureRecord::to(&args.topic)
+                    .key(tenant_id.as_str())
+                    .payload(json.as_str())
+                    .timestamp(msg_timestamp);
+                let _ = producer.send(record, Duration::from_millis(500));
+                total_events += 1;
+                events_since_last_report += 1;
             }
-            total_events += 1;
-            events_since_last_report += 1;
+        } else {
+            for (tenant_id, json) in &events_to_send {
+                let record = FutureRecord::to(&args.topic)
+                    .key(tenant_id.as_str())
+                    .payload(json.as_str())
+                    .timestamp(msg_timestamp);
+                if let Err((err, _)) = producer.send(record, Duration::from_secs(1)).await {
+                    eprintln!("Kafka send error: {err}");
+                }
+                total_events += 1;
+                events_since_last_report += 1;
+            }
         }
 
         // === 6. Clean up ended sessions, schedule returns ===
@@ -989,11 +1101,10 @@ async fn main() {
             if sessions[sess_idx].signed_in {
                 users[user_idx].is_registered = true;
             }
-            users[user_idx].last_active = Utc::now();
+            users[user_idx].last_active = sim_now;
 
-            schedule_return(&mut rng, &mut users[user_idx]);
+            schedule_return(&mut rng, &mut users[user_idx], sim_now);
 
-            // swap_remove: fix the session index for the user whose session moved
             let last_idx = sessions.len() - 1;
             if sess_idx != last_idx {
                 let moved_user_idx = sessions[last_idx].user_idx;
@@ -1004,112 +1115,206 @@ async fn main() {
             sessions.swap_remove(sess_idx);
         }
 
-        // === 7. Status report every 10 seconds ===
-        if now_instant.duration_since(last_report) >= Duration::from_secs(10) {
-            let elapsed = now_instant.duration_since(last_report).as_secs_f64();
-            let instant_rate = events_since_last_report as f64 / elapsed;
-            smoothed_rate = if smoothed_rate == 0.0 {
-                instant_rate
-            } else {
-                0.3 * instant_rate + 0.7 * smoothed_rate
-            };
-            let rate = smoothed_rate;
+        // === 7. Status report every 10 seconds (real time) ===
+        if real_now.duration_since(last_report) >= Duration::from_secs(10) {
+            let real_elapsed = real_now.duration_since(last_report).as_secs_f64();
+            let sim_elapsed = (sim_now - last_report_sim).num_milliseconds() as f64 / 1000.0;
 
-            // Track actual events-per-second per session to calibrate budget
+            // Rate for calibration uses simulated time (correct in both modes)
+            let sim_rate = if sim_elapsed > 0.0 {
+                events_since_last_report as f64 / sim_elapsed
+            } else {
+                0.0
+            };
+            smoothed_rate = if smoothed_rate == 0.0 {
+                sim_rate
+            } else {
+                0.3 * sim_rate + 0.7 * smoothed_rate
+            };
+
+            // Real throughput for display
+            let real_rate = events_since_last_report as f64 / real_elapsed;
+
             if !sessions.is_empty() && smoothed_rate > 0.0 {
                 let measured = sessions.len() as f64 / smoothed_rate;
                 effective_think_secs = 0.1 * measured + 0.9 * effective_think_secs;
             }
 
-            let active_by_tenant: Vec<String> = tenant_states
-                .iter()
-                .map(|ts| {
-                    let active = sessions
-                        .iter()
-                        .filter(|s| users[s.user_idx].tenant_id == ts.name)
-                        .count();
-                    format!(
-                        "{}({})",
-                        ts.name.split('-').next().unwrap_or(&ts.name),
-                        active
-                    )
-                })
-                .collect();
+            if args.backfill {
+                let days_done = (sim_now - backfill_start_dt).num_days();
+                let total_days = (backfill_end_dt - backfill_start_dt).num_days();
+                let pct = if total_days > 0 {
+                    (days_done as f64 / total_days as f64 * 100.0).min(100.0)
+                } else {
+                    100.0
+                };
 
-            let spike_info: Vec<String> = tenant_states
-                .iter()
-                .filter(|ts| ts.spike.active)
-                .map(|ts| {
-                    let remaining = ts.spike.ends_at.duration_since(now_instant).as_secs() / 60;
-                    format!(
-                        "{}({:.0}x, {}min left)",
-                        ts.name.split('-').next().unwrap_or(&ts.name),
-                        ts.spike.multiplier,
-                        remaining
-                    )
-                })
-                .collect();
+                let active_by_tenant: Vec<String> = tenant_states
+                    .iter()
+                    .map(|ts| {
+                        let active = sessions
+                            .iter()
+                            .filter(|s| users[s.user_idx].tenant_id == ts.name)
+                            .count();
+                        format!(
+                            "{}({})",
+                            ts.name.split('-').next().unwrap_or(&ts.name),
+                            active
+                        )
+                    })
+                    .collect();
 
-            let total_users = users.len();
-            let returning = users
-                .iter()
-                .filter(|u| matches!(u.state, UserState::WillReturn(_)))
-                .count();
-            let churned = users
-                .iter()
-                .filter(|u| matches!(u.state, UserState::Churned))
-                .count();
-            let registered = users.iter().filter(|u| u.is_registered).count();
-            let oldest_active = users
-                .iter()
-                .filter(|u| !matches!(u.state, UserState::Churned))
-                .map(|u| u.last_active)
-                .min();
-            let oldest_str = oldest_active
-                .map(|t| {
-                    let ago = now_utc - t;
-                    if ago.num_hours() > 0 {
-                        format!("{}h ago", ago.num_hours())
-                    } else {
-                        format!("{}m ago", ago.num_minutes())
-                    }
-                })
-                .unwrap_or_else(|| "-".to_string());
+                eprint!(
+                    "[BACKFILL Day {}/{} {:.0}%] sim={} | users={} sessions={} events={} sim={:.0}/s real={:.0}/s | {}",
+                    days_done,
+                    total_days,
+                    pct,
+                    sim_now.format("%Y-%m-%d %H:%M"),
+                    users.len(),
+                    sessions.len(),
+                    total_events,
+                    smoothed_rate,
+                    real_rate,
+                    active_by_tenant.join(" "),
+                );
 
-            eprint!(
-                "[{}] users={} (registered={} returning={} churned={}) sessions={} events={} rate={:.1}/s target={:.1}/s diurnal={:.2}x drift={:.2}x oldest={} | {}",
-                Utc::now().format("%H:%M:%S"),
-                total_users,
-                registered,
-                returning,
-                churned,
-                sessions.len(),
-                total_events,
-                rate,
-                target_now,
-                diurnal,
-                daily_drift.multiplier(),
-                oldest_str,
-                active_by_tenant.join(" "),
-            );
-            if !spike_info.is_empty() {
-                eprint!(" | spike: {}", spike_info.join(" "));
+                let spike_info: Vec<String> = tenant_states
+                    .iter()
+                    .filter(|ts| ts.spike.active)
+                    .map(|ts| {
+                        let remaining = (ts.spike.ends_at - sim_now).num_minutes();
+                        format!(
+                            "{}({:.0}x, {}min left)",
+                            ts.name.split('-').next().unwrap_or(&ts.name),
+                            ts.spike.multiplier,
+                            remaining
+                        )
+                    })
+                    .collect();
+                if !spike_info.is_empty() {
+                    eprint!(" | spike: {}", spike_info.join(" "));
+                }
+                eprintln!();
+            } else {
+                let active_by_tenant: Vec<String> = tenant_states
+                    .iter()
+                    .map(|ts| {
+                        let active = sessions
+                            .iter()
+                            .filter(|s| users[s.user_idx].tenant_id == ts.name)
+                            .count();
+                        format!(
+                            "{}({})",
+                            ts.name.split('-').next().unwrap_or(&ts.name),
+                            active
+                        )
+                    })
+                    .collect();
+
+                let spike_info: Vec<String> = tenant_states
+                    .iter()
+                    .filter(|ts| ts.spike.active)
+                    .map(|ts| {
+                        let remaining = (ts.spike.ends_at - sim_now).num_minutes();
+                        format!(
+                            "{}({:.0}x, {}min left)",
+                            ts.name.split('-').next().unwrap_or(&ts.name),
+                            ts.spike.multiplier,
+                            remaining
+                        )
+                    })
+                    .collect();
+
+                let total_users = users.len();
+                let returning = users
+                    .iter()
+                    .filter(|u| matches!(u.state, UserState::WillReturn(_)))
+                    .count();
+                let churned = users
+                    .iter()
+                    .filter(|u| matches!(u.state, UserState::Churned))
+                    .count();
+                let registered = users.iter().filter(|u| u.is_registered).count();
+                let oldest_active = users
+                    .iter()
+                    .filter(|u| !matches!(u.state, UserState::Churned))
+                    .map(|u| u.last_active)
+                    .min();
+                let oldest_str = oldest_active
+                    .map(|t| {
+                        let ago = sim_now - t;
+                        if ago.num_hours() > 0 {
+                            format!("{}h ago", ago.num_hours())
+                        } else {
+                            format!("{}m ago", ago.num_minutes())
+                        }
+                    })
+                    .unwrap_or_else(|| "-".to_string());
+
+                eprint!(
+                    "[{}] users={} (registered={} returning={} churned={}) sessions={} events={} rate={:.1}/s target={:.1}/s diurnal={:.2}x drift={:.2}x oldest={} | {}",
+                    sim_now.format("%H:%M:%S"),
+                    total_users,
+                    registered,
+                    returning,
+                    churned,
+                    sessions.len(),
+                    total_events,
+                    smoothed_rate,
+                    target_now,
+                    diurnal,
+                    daily_drift.multiplier(),
+                    oldest_str,
+                    active_by_tenant.join(" "),
+                );
+                if !spike_info.is_empty() {
+                    eprint!(" | spike: {}", spike_info.join(" "));
+                }
+                eprintln!();
             }
-            eprintln!();
 
             events_since_last_report = 0;
-            last_report = now_instant;
+            last_report = real_now;
+            last_report_sim = sim_now;
         }
 
-        // === 8. Sleep until next event or 1 second max ===
-        let next_event_time = sessions.iter().map(|s| s.next_event_at).min();
-        let sleep_until = match next_event_time {
-            Some(t) if t > now_instant => t.min(now_instant + Duration::from_secs(1)),
-            Some(_) => now_instant,
-            None => now_instant + Duration::from_secs(1),
-        };
-        if sleep_until > now_instant {
-            tokio::time::sleep(sleep_until - now_instant).await;
+        // === 8. Time advance / sleep ===
+        if args.backfill {
+            sim_now = sim_now + chrono::Duration::seconds(1);
+        } else {
+            let next_event_time = sessions.iter().map(|s| s.next_event_at).min();
+            let sleep_dur = match next_event_time {
+                Some(t) if t > sim_now => {
+                    let delta = t - sim_now;
+                    let dur = delta
+                        .to_std()
+                        .unwrap_or(Duration::from_secs(1))
+                        .min(Duration::from_secs(1));
+                    dur
+                }
+                Some(_) => Duration::ZERO,
+                None => Duration::from_secs(1),
+            };
+            if !sleep_dur.is_zero() {
+                tokio::time::sleep(sleep_dur).await;
+            }
         }
+    }
+
+    // === Post-loop: flush and summary (backfill only) ===
+    if args.backfill {
+        eprintln!("Backfill generation complete. Flushing Kafka producer...");
+        if let Err(e) = producer.flush(Duration::from_secs(120)) {
+            eprintln!("Flush error: {e}");
+        }
+        let elapsed = backfill_real_start.elapsed();
+        let total_days = (backfill_end_dt - backfill_start_dt).num_days();
+        eprintln!(
+            "Done: {} events over {} simulated days in {:.1}s ({:.0} events/s real throughput)",
+            total_events,
+            total_days,
+            elapsed.as_secs_f64(),
+            total_events as f64 / elapsed.as_secs_f64().max(0.001),
+        );
     }
 }
