@@ -1083,8 +1083,10 @@ async fn main() {
                 events_since_last_report += 1;
             }
             for fut in futures {
-                if let Err((err, _)) = fut.await {
-                    eprintln!("Kafka send error: {err}");
+                match fut.await {
+                    Ok(Err((err, _))) => eprintln!("Kafka send error: {err}"),
+                    Err(e) => eprintln!("Kafka delivery canceled: {e}"),
+                    _ => {}
                 }
             }
         } else {
