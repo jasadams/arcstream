@@ -35,13 +35,15 @@ pub async fn run(
     while let Some(result) = stream.next().await {
         match result {
             Ok(msg) => {
-                if let Some(payload) = msg.payload() {
-                    match serde_json::from_slice::<FlatProfileUpdate>(payload) {
-                        Ok(flat) => {
-                            let _ = sender.send(flat.into_message());
-                        }
-                        Err(e) => {
-                            eprintln!("Failed to deserialize profile update: {e}");
+                if sender.receiver_count() > 0 {
+                    if let Some(payload) = msg.payload() {
+                        match serde_json::from_slice::<FlatProfileUpdate>(payload) {
+                            Ok(flat) => {
+                                let _ = sender.send(flat.into_message());
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to deserialize profile update: {e}");
+                            }
                         }
                     }
                 }

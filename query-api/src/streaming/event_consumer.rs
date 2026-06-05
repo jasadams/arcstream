@@ -35,13 +35,15 @@ pub async fn run(
     while let Some(result) = stream.next().await {
         match result {
             Ok(msg) => {
-                if let Some(payload) = msg.payload() {
-                    match serde_json::from_slice::<LiveEventMessage>(payload) {
-                        Ok(event) => {
-                            let _ = sender.send(event);
-                        }
-                        Err(e) => {
-                            eprintln!("Failed to deserialize event: {e}");
+                if sender.receiver_count() > 0 {
+                    if let Some(payload) = msg.payload() {
+                        match serde_json::from_slice::<LiveEventMessage>(payload) {
+                            Ok(event) => {
+                                let _ = sender.send(event);
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to deserialize event: {e}");
+                            }
                         }
                     }
                 }
