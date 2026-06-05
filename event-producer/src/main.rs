@@ -1069,25 +1069,25 @@ async fn main() {
         // === 5. Send events to Kafka ===
         let msg_timestamp = sim_now.timestamp_millis();
         if args.backfill {
-            let mut futures = Vec::with_capacity(events_to_send.len());
             for (tenant_id, json) in &events_to_send {
-                let record = FutureRecord::to(&args.topic)
-                    .key(tenant_id.as_str())
-                    .payload(json.as_str())
-                    .timestamp(msg_timestamp);
-                match producer.send_result(record) {
-                    Ok(fut) => futures.push(fut),
-                    Err((err, _)) => eprintln!("Kafka queue error: {err}"),
+                loop {
+                    let record = FutureRecord::to(&args.topic)
+                        .key(tenant_id.as_str())
+                        .payload(json.as_str())
+                        .timestamp(msg_timestamp);
+                    match producer.send_result(record) {
+                        Ok(_) => break,
+                        Err((rdkafka::error::KafkaError::MessageProduction(rdkafka::types::RDKafkaErrorCode::QueueFull), _)) => {
+                            producer.flush(Duration::from_secs(5)).expect("flush failed");
+                        }
+                        Err((err, _)) => {
+                            eprintln!("Kafka send error: {err}");
+                            break;
+                        }
+                    }
                 }
                 total_events += 1;
                 events_since_last_report += 1;
-            }
-            for fut in futures {
-                match fut.await {
-                    Ok(Err((err, _))) => eprintln!("Kafka send error: {err}"),
-                    Err(e) => eprintln!("Kafka delivery canceled: {e}"),
-                    _ => {}
-                }
             }
         } else {
             for (tenant_id, json) in &events_to_send {
