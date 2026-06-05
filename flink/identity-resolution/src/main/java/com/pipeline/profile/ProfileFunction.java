@@ -19,7 +19,7 @@ public class ProfileFunction
 
     private static final long SESSION_TIMEOUT_MS = 30 * 60 * 1000L;
     private static final long DAY_MS = 24 * 60 * 60 * 1000L;
-    private static final long MAX_PAST_MS = 7 * DAY_MS;
+    private static final long MAX_PAST_MS = 91 * DAY_MS;
     private static final long MAX_FUTURE_MS = 60 * 1000L;
     private static final int BUCKET_RETENTION_DAYS = 91;
 

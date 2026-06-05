@@ -80,7 +80,7 @@ public class ProfileUpdaterJob {
         env.execute("Profile Updater");
     }
 
-    private static final long MAX_PAST_MS = 7 * 24 * 60 * 60 * 1000L;
+    private static final long MAX_PAST_MS = 91L * 24 * 60 * 60 * 1000L;
     private static final long MAX_FUTURE_MS = 60 * 1000L;
 
     private static long clampEventTime(long eventTimeMs) {

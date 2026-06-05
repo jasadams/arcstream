@@ -1,0 +1,13 @@
+cloud_storage_enabled: true
+cloud_storage_region: us-east-1
+cloud_storage_bucket: redpanda-tiered
+cloud_storage_api_endpoint: minio
+cloud_storage_api_endpoint_port: 9000
+cloud_storage_disable_tls: true
+cloud_storage_access_key: minioadmin
+cloud_storage_secret_key: supersecretkey123
+cloud_storage_enable_remote_write: true
+cloud_storage_enable_remote_read: true
+cloud_storage_segment_max_upload_interval_sec: 30
+log_retention_ms: 7776000000
+delete_retention_ms: 7776000000

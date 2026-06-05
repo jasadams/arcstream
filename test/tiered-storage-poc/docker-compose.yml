@@ -1,0 +1,75 @@
+services:
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address :9001
+    ports:
+      - "9200:9000"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: supersecretkey123
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  init-minio:
+    image: minio/mc:latest
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        mc alias set local http://minio:9000 minioadmin supersecretkey123
+        mc mb --ignore-existing local/redpanda-tiered
+        echo "Bucket created"
+
+  redpanda:
+    image: redpandadata/redpanda:v24.3.7
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        cat > /etc/redpanda/.bootstrap.yaml <<'EOF'
+        cloud_storage_enabled: true
+        cloud_storage_region: us-east-1
+        cloud_storage_bucket: redpanda-tiered
+        cloud_storage_api_endpoint: minio
+        cloud_storage_api_endpoint_port: 9000
+        cloud_storage_disable_tls: true
+        cloud_storage_access_key: minioadmin
+        cloud_storage_secret_key: supersecretkey123
+        cloud_storage_enable_remote_write: true
+        cloud_storage_enable_remote_read: true
+        cloud_storage_segment_max_upload_interval_sec: 30
+        cloud_storage_url_style: path
+        log_retention_ms: 7776000000
+        delete_retention_ms: 7776000000
+        EOF
+        sed -i 's/^        //' /etc/redpanda/.bootstrap.yaml
+        exec rpk redpanda start \
+          --mode=dev-container \
+          --smp=1 \
+          --memory=512M \
+          --reserve-memory=0M \
+          --overprovisioned \
+          --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092 \
+          --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    ports:
+      - "19192:19092"
+      - "9744:9644"
+    depends_on:
+      init-minio:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9644/v1/status/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+volumes:
+  redpanda-data:
