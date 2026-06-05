@@ -74,12 +74,17 @@ pub fn EventListPage() -> impl IntoView {
     {
         use crate::websocket::EventStream;
 
-        let stream = use_context::<EventStream>();
+        let EventStream(event_signal) = expect_context::<EventStream>();
+
+        let ws_handle = send_wrapper::SendWrapper::new(
+            crate::websocket::subscribe_live_events(event_signal),
+        );
+        on_cleanup(move || ws_handle.disconnect());
+
         let owner = owner.clone();
 
         Effect::new(move || {
-            let Some(EventStream(sig)) = stream else { return };
-            let Some(event) = sig.get() else { return };
+            let Some(event) = event_signal.get() else { return };
             if paused.get_untracked() { return; }
 
             let eid = event.event_id.clone();

@@ -50,11 +50,16 @@ pub fn UserListPage() -> impl IntoView {
     #[cfg(feature = "hydrate")]
     {
         use crate::websocket::ProfileStream;
-        let stream = use_context::<ProfileStream>();
+
+        let ProfileStream(profile_signal) = expect_context::<ProfileStream>();
+
+        let ws_handle = send_wrapper::SendWrapper::new(
+            crate::websocket::subscribe_profile_updates(profile_signal),
+        );
+        on_cleanup(move || ws_handle.disconnect());
 
         Effect::new(move || {
-            let Some(ProfileStream(sig)) = stream else { return };
-            let Some(update) = sig.get() else { return };
+            let Some(update) = profile_signal.get() else { return };
             if paused.get_untracked() { return; }
 
             let cid = update.canonical_id.clone();

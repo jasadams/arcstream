@@ -1,7 +1,7 @@
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use std::rc::Rc;
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{MessageEvent, WebSocket, CloseEvent};
@@ -54,42 +54,115 @@ pub struct ProfileStream(pub RwSignal<Option<ProfileUpdateMessage>>);
 #[derive(Clone, Copy)]
 pub struct EventStream(pub RwSignal<Option<LiveEventMessage>>);
 
-pub fn provide_stream_contexts() -> (RwSignal<Option<ProfileUpdateMessage>>, RwSignal<Option<LiveEventMessage>>) {
+pub struct WsHandle {
+    cancelled: Rc<Cell<bool>>,
+    ws: Rc<RefCell<Option<WebSocket>>>,
+}
+
+impl WsHandle {
+    pub fn disconnect(&self) {
+        self.cancelled.set(true);
+        if let Some(ws) = self.ws.borrow_mut().take() {
+            ws.set_onclose(None);
+            ws.set_onerror(None);
+            ws.set_onmessage(None);
+            ws.set_onopen(None);
+            let _ = ws.close();
+        }
+    }
+}
+
+pub fn provide_stream_contexts() {
     let profile_signal: RwSignal<Option<ProfileUpdateMessage>> = RwSignal::new(None);
     let event_signal: RwSignal<Option<LiveEventMessage>> = RwSignal::new(None);
     provide_context(ProfileStream(profile_signal));
     provide_context(EventStream(event_signal));
-    (profile_signal, event_signal)
 }
 
-pub fn start_websockets(
-    profile_signal: RwSignal<Option<ProfileUpdateMessage>>,
-    event_signal: RwSignal<Option<LiveEventMessage>>,
-) {
-    connect_graphql_ws(
-        PROFILE_SUBSCRIBE_MSG,
-        "profileUpdates",
-        Rc::new(move |msg: ProfileUpdateMessage| {
-            leptos::task::spawn_local(async move {
-                let _ = profile_signal.try_set(Some(msg));
-            });
-        }),
-    );
+const PROFILE_FIELDS: &str = "canonicalId tenantId profile { canonicalId userId tenantId firstSeen lastSeen totalEvents totalSessions events1D events7D events30D events90D sessions1D sessions7D avgSessionDurationSec currentSessionActive currentSessionDurationSec pageViews clicks logins featureUses lastPage lastCountry lastDevice lastBrowser topPages topFeatures } changedFields timestamp trigger action";
 
-    connect_graphql_ws(
-        EVENT_SUBSCRIBE_MSG,
-        "liveEvents",
-        Rc::new(move |msg: LiveEventMessage| {
-            leptos::task::spawn_local(async move {
-                let _ = event_signal.try_set(Some(msg));
-            });
-        }),
-    );
+const EVENT_FIELDS: &str = "eventId eventType tenantId eventTime canonicalId anonymousId userId pageUrl deviceType browser country";
+
+pub fn subscribe_profile_updates(
+    signal: RwSignal<Option<ProfileUpdateMessage>>,
+) -> WsHandle {
+    let query = format!("subscription {{ profileUpdates {{ {} }} }}", PROFILE_FIELDS);
+    let msg = serde_json::json!({
+        "type": "subscribe", "id": "1",
+        "payload": { "query": query }
+    })
+    .to_string();
+    connect_graphql_ws(msg, "profileUpdates", make_profile_cb(signal))
 }
 
-const PROFILE_SUBSCRIBE_MSG: &str = r#"{"type":"subscribe","id":"1","payload":{"query":"subscription { profileUpdates { canonicalId tenantId profile { canonicalId userId tenantId firstSeen lastSeen totalEvents totalSessions events1D events7D events30D events90D sessions1D sessions7D avgSessionDurationSec currentSessionActive currentSessionDurationSec pageViews clicks logins featureUses lastPage lastCountry lastDevice lastBrowser topPages topFeatures } changedFields timestamp trigger action } }"}}"#;
+pub fn subscribe_profile_update(
+    tenant_id: &str,
+    canonical_id: &str,
+    signal: RwSignal<Option<ProfileUpdateMessage>>,
+) -> WsHandle {
+    let query = format!(
+        "subscription($tenantId: String!, $canonicalId: String!) {{ profileUpdate(tenantId: $tenantId, canonicalId: $canonicalId) {{ {} }} }}",
+        PROFILE_FIELDS
+    );
+    let msg = serde_json::json!({
+        "type": "subscribe", "id": "1",
+        "payload": {
+            "query": query,
+            "variables": { "tenantId": tenant_id, "canonicalId": canonical_id }
+        }
+    })
+    .to_string();
+    connect_graphql_ws(msg, "profileUpdate", make_profile_cb(signal))
+}
 
-const EVENT_SUBSCRIBE_MSG: &str = r#"{"type":"subscribe","id":"2","payload":{"query":"subscription { liveEvents { eventId eventType tenantId eventTime canonicalId anonymousId userId pageUrl deviceType browser country } }"}}"#;
+pub fn subscribe_live_events(
+    signal: RwSignal<Option<LiveEventMessage>>,
+) -> WsHandle {
+    let query = format!("subscription {{ liveEvents {{ {} }} }}", EVENT_FIELDS);
+    let msg = serde_json::json!({
+        "type": "subscribe", "id": "1",
+        "payload": { "query": query }
+    })
+    .to_string();
+    connect_graphql_ws(msg, "liveEvents", make_event_cb(signal))
+}
+
+pub fn subscribe_live_events_filtered(
+    tenant_id: &str,
+    signal: RwSignal<Option<LiveEventMessage>>,
+) -> WsHandle {
+    let query = format!(
+        "subscription($tenantId: String) {{ liveEvents(tenantId: $tenantId) {{ {} }} }}",
+        EVENT_FIELDS
+    );
+    let msg = serde_json::json!({
+        "type": "subscribe", "id": "1",
+        "payload": {
+            "query": query,
+            "variables": { "tenantId": tenant_id }
+        }
+    })
+    .to_string();
+    connect_graphql_ws(msg, "liveEvents", make_event_cb(signal))
+}
+
+fn make_profile_cb(
+    signal: RwSignal<Option<ProfileUpdateMessage>>,
+) -> Rc<dyn Fn(ProfileUpdateMessage)> {
+    Rc::new(move |msg: ProfileUpdateMessage| {
+        leptos::task::spawn_local(async move {
+            let _ = signal.try_set(Some(msg));
+        });
+    })
+}
+
+fn make_event_cb(signal: RwSignal<Option<LiveEventMessage>>) -> Rc<dyn Fn(LiveEventMessage)> {
+    Rc::new(move |msg: LiveEventMessage| {
+        leptos::task::spawn_local(async move {
+            let _ = signal.try_set(Some(msg));
+        });
+    })
+}
 
 #[derive(Deserialize)]
 struct GqlWsMessage {
@@ -111,33 +184,54 @@ fn build_ws_url(path: &str) -> String {
 }
 
 fn connect_graphql_ws<T: DeserializeOwned + 'static>(
-    subscribe_msg: &'static str,
+    subscribe_msg: String,
     data_field: &'static str,
     on_update: Rc<dyn Fn(T)>,
-) {
-    do_connect(subscribe_msg, data_field, on_update);
+) -> WsHandle {
+    let cancelled = Rc::new(Cell::new(false));
+    let ws_ref = Rc::new(RefCell::new(None));
+    do_connect(
+        subscribe_msg,
+        data_field,
+        on_update,
+        cancelled.clone(),
+        ws_ref.clone(),
+    );
+    WsHandle {
+        cancelled,
+        ws: ws_ref,
+    }
 }
 
 fn do_connect<T: DeserializeOwned + 'static>(
-    subscribe_msg: &'static str,
+    subscribe_msg: String,
     data_field: &'static str,
     on_update: Rc<dyn Fn(T)>,
+    cancelled: Rc<Cell<bool>>,
+    ws_ref: Rc<RefCell<Option<WebSocket>>>,
 ) {
+    if cancelled.get() {
+        return;
+    }
+
     let url = build_ws_url("/graphql/ws");
 
     let ws = match WebSocket::new_with_str(&url, "graphql-transport-ws") {
         Ok(ws) => ws,
         Err(_) => {
-            schedule_reconnect(subscribe_msg, data_field, on_update);
+            schedule_reconnect(subscribe_msg, data_field, on_update, cancelled, ws_ref);
             return;
         }
     };
 
+    *ws_ref.borrow_mut() = Some(ws.clone());
+
     let ws_clone = ws.clone();
+    let msg_for_open = subscribe_msg.clone();
     let onopen = Closure::<dyn FnMut()>::new(move || {
         let init = r#"{"type":"connection_init"}"#;
         let _ = ws_clone.send_with_str(init);
-        let _ = ws_clone.send_with_str(subscribe_msg);
+        let _ = ws_clone.send_with_str(&msg_for_open);
     });
     ws.set_onopen(Some(onopen.as_ref().unchecked_ref()));
     onopen.forget();
@@ -177,25 +271,43 @@ fn do_connect<T: DeserializeOwned + 'static>(
     ws.set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
     onmessage.forget();
 
-    let reconnect_cb = on_update.clone();
     let closed = Rc::new(Cell::new(false));
-    let closed_clone = closed.clone();
 
+    let reconnect_cb = on_update.clone();
+    let closed_close = closed.clone();
+    let cancelled_close = cancelled.clone();
+    let ws_ref_close = ws_ref.clone();
+    let msg_close = subscribe_msg.clone();
     let onclose = Closure::<dyn FnMut(CloseEvent)>::new(move |_: CloseEvent| {
-        if !closed_clone.get() {
-            closed_clone.set(true);
-            schedule_reconnect(subscribe_msg, data_field, reconnect_cb.clone());
+        if !closed_close.get() {
+            closed_close.set(true);
+            schedule_reconnect(
+                msg_close.clone(),
+                data_field,
+                reconnect_cb.clone(),
+                cancelled_close.clone(),
+                ws_ref_close.clone(),
+            );
         }
     });
     ws.set_onclose(Some(onclose.as_ref().unchecked_ref()));
     onclose.forget();
 
     let err_cb = on_update;
-    let err_closed = closed;
+    let closed_err = closed;
+    let cancelled_err = cancelled;
+    let ws_ref_err = ws_ref;
+    let msg_err = subscribe_msg;
     let onerror = Closure::<dyn FnMut()>::new(move || {
-        if !err_closed.get() {
-            err_closed.set(true);
-            schedule_reconnect(subscribe_msg, data_field, err_cb.clone());
+        if !closed_err.get() {
+            closed_err.set(true);
+            schedule_reconnect(
+                msg_err.clone(),
+                data_field,
+                err_cb.clone(),
+                cancelled_err.clone(),
+                ws_ref_err.clone(),
+            );
         }
     });
     ws.set_onerror(Some(onerror.as_ref().unchecked_ref()));
@@ -203,12 +315,24 @@ fn do_connect<T: DeserializeOwned + 'static>(
 }
 
 fn schedule_reconnect<T: DeserializeOwned + 'static>(
-    subscribe_msg: &'static str,
+    subscribe_msg: String,
     data_field: &'static str,
     on_update: Rc<dyn Fn(T)>,
+    cancelled: Rc<Cell<bool>>,
+    ws_ref: Rc<RefCell<Option<WebSocket>>>,
 ) {
+    if cancelled.get() {
+        return;
+    }
+
     let timeout = Closure::<dyn FnMut()>::new(move || {
-        do_connect(subscribe_msg, data_field, on_update.clone());
+        do_connect(
+            subscribe_msg.clone(),
+            data_field,
+            on_update.clone(),
+            cancelled.clone(),
+            ws_ref.clone(),
+        );
     });
     let window = web_sys::window().expect("no window");
     let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(

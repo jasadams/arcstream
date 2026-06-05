@@ -34,7 +34,9 @@ pub fn UserDetailPage() -> impl IntoView {
 
     #[cfg(feature = "hydrate")]
     let (live_profile, live_events) = {
-        use crate::websocket::{ProfileStream, EventStream};
+        use std::rc::Rc;
+        use std::cell::RefCell;
+        use crate::websocket::{ProfileStream, EventStream, WsHandle};
 
         let (live_profile, set_live_profile) = signal(Option::<LiveProfile>::None);
         let (live_events, set_live_events) = signal(Vec::<TimelineEntry>::new());
@@ -55,20 +57,19 @@ pub fn UserDetailPage() -> impl IntoView {
             }
         });
 
-        let profile_stream = use_context::<ProfileStream>();
+        let profile_signal = expect_context::<ProfileStream>().0;
+        let event_signal = expect_context::<EventStream>().0;
+
         Effect::new(move || {
-            let Some(ProfileStream(sig)) = profile_stream else { return };
-            let Some(update) = sig.get() else { return };
+            let Some(update) = profile_signal.get() else { return };
             let cid = canonical_id();
             if update.canonical_id == cid {
                 set_live_profile.set(Some(update.profile));
             }
         });
 
-        let event_stream = use_context::<EventStream>();
         Effect::new(move || {
-            let Some(EventStream(sig)) = event_stream else { return };
-            let Some(event) = sig.get() else { return };
+            let Some(event) = event_signal.get() else { return };
             let cid = canonical_id();
             if event.canonical_id == cid {
                 let eid = event.event_id.clone();
@@ -90,6 +91,28 @@ pub fn UserDetailPage() -> impl IntoView {
                         current.insert(0, (eid, RwSignal::new(row), RwSignal::new(true)));
                     }
                 });
+            }
+        });
+
+        let handles: Rc<RefCell<Vec<WsHandle>>> = Rc::new(RefCell::new(Vec::new()));
+        let handles_cleanup = send_wrapper::SendWrapper::new(handles.clone());
+
+        Effect::new(move || {
+            let tid = tenant_id();
+            let cid = canonical_id();
+
+            for h in handles.borrow_mut().drain(..) {
+                h.disconnect();
+            }
+
+            let h1 = crate::websocket::subscribe_profile_update(&tid, &cid, profile_signal);
+            let h2 = crate::websocket::subscribe_live_events_filtered(&tid, event_signal);
+            handles.borrow_mut().extend([h1, h2]);
+        });
+
+        on_cleanup(move || {
+            for h in handles_cleanup.borrow_mut().drain(..) {
+                h.disconnect();
             }
         });
 
