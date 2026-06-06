@@ -1,5 +1,5 @@
 use async_graphql::{Context, Enum, Object, SimpleObject};
-use chrono::{DurationRound, Utc};
+use chrono::{DurationRound, NaiveDate, Utc};
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -588,14 +588,17 @@ fn format_time_bucket(bucket: &str, granularity: &str) -> String {
 fn rollup_to_weekly(daily_points: Vec<TimeSeriesPoint>) -> Vec<TimeSeriesPoint> {
     use std::collections::BTreeMap;
 
-    let mut weeks: BTreeMap<String, f64> = BTreeMap::new();
+    let mut weeks: BTreeMap<NaiveDate, f64> = BTreeMap::new();
     for p in daily_points {
         let week_start = parse_bucket_to_week_start(&p.bucket);
         *weeks.entry(week_start).or_default() += p.value;
     }
     weeks
         .into_iter()
-        .map(|(bucket, value)| TimeSeriesPoint { bucket, value })
+        .map(|(date, value)| TimeSeriesPoint {
+            bucket: date.format("%b %d").to_string(),
+            value,
+        })
         .collect()
 }
 
@@ -604,15 +607,15 @@ fn rollup_grouped_to_weekly(
 ) -> Vec<GroupedTimeSeriesPoint> {
     use std::collections::BTreeMap;
 
-    let mut weeks: BTreeMap<(String, String), f64> = BTreeMap::new();
+    let mut weeks: BTreeMap<(NaiveDate, String), f64> = BTreeMap::new();
     for p in daily_points {
         let week_start = parse_bucket_to_week_start(&p.bucket);
         *weeks.entry((week_start, p.group)).or_default() += p.value;
     }
     weeks
         .into_iter()
-        .map(|((bucket, group), value)| GroupedTimeSeriesPoint {
-            bucket,
+        .map(|((date, group), value)| GroupedTimeSeriesPoint {
+            bucket: date.format("%b %d").to_string(),
             group,
             value,
         })
@@ -622,7 +625,7 @@ fn rollup_grouped_to_weekly(
 fn rollup_avg_to_weekly(daily_points: Vec<TimeSeriesPoint>) -> Vec<TimeSeriesPoint> {
     use std::collections::BTreeMap;
 
-    let mut weeks: BTreeMap<String, (f64, usize)> = BTreeMap::new();
+    let mut weeks: BTreeMap<NaiveDate, (f64, usize)> = BTreeMap::new();
     for p in daily_points {
         let week_start = parse_bucket_to_week_start(&p.bucket);
         let entry = weeks.entry(week_start).or_default();
@@ -631,15 +634,15 @@ fn rollup_avg_to_weekly(daily_points: Vec<TimeSeriesPoint>) -> Vec<TimeSeriesPoi
     }
     weeks
         .into_iter()
-        .map(|(bucket, (sum, count))| TimeSeriesPoint {
-            bucket,
+        .map(|(date, (sum, count))| TimeSeriesPoint {
+            bucket: date.format("%b %d").to_string(),
             value: ((sum / count as f64) * 10.0).round() / 10.0,
         })
         .collect()
 }
 
-fn parse_bucket_to_week_start(bucket: &str) -> String {
-    use chrono::{Datelike, NaiveDate};
+fn parse_bucket_to_week_start(bucket: &str) -> NaiveDate {
+    use chrono::Datelike;
 
     NaiveDate::parse_from_str(bucket, "%b %d")
         .or_else(|_| NaiveDate::parse_from_str(&format!("{} 2026", bucket), "%b %d %Y"))
@@ -647,8 +650,6 @@ fn parse_bucket_to_week_start(bucket: &str) -> String {
             let iso = d.iso_week();
             NaiveDate::from_isoywd_opt(iso.year(), iso.week(), chrono::Weekday::Mon)
                 .unwrap_or(d)
-                .format("%b %d")
-                .to_string()
         })
-        .unwrap_or_else(|_| bucket.to_string())
+        .unwrap_or_else(|_| chrono::Utc::now().date_naive())
 }
