@@ -1,5 +1,6 @@
 {
   "schemaName": "sessions",
+  "primaryKeyColumns": ["session_id"],
   "dimensionFieldSpecs": [
     {"name": "session_id", "dataType": "STRING"},
     {"name": "canonical_id", "dataType": "STRING"},

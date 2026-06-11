@@ -1,5 +1,6 @@
 {
   "schemaName": "events",
+  "primaryKeyColumns": ["event_id"],
   "dimensionFieldSpecs": [
     {"name": "event_id", "dataType": "STRING"},
     {"name": "event_type", "dataType": "STRING"},

@@ -1,6 +1,15 @@
 {
   "tableName": "events",
   "tableType": "REALTIME",
+  "dedupConfig": {
+    "dedupEnabled": true,
+    "hashFunction": "MD5",
+    "dedupTimeColumn": "event_time",
+    "metadataTTL": 259200000
+  },
+  "routing": {
+    "instanceSelectorType": "strictReplicaGroup"
+  },
   "segmentsConfig": {
     "timeColumnName": "event_time",
     "timeType": "MILLISECONDS",

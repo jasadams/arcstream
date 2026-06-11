@@ -1,6 +1,15 @@
 {
   "tableName": "sessions",
   "tableType": "REALTIME",
+  "dedupConfig": {
+    "dedupEnabled": true,
+    "hashFunction": "MD5",
+    "dedupTimeColumn": "start_time",
+    "metadataTTL": 259200000
+  },
+  "routing": {
+    "instanceSelectorType": "strictReplicaGroup"
+  },
   "segmentsConfig": {
     "timeColumnName": "start_time",
     "timeType": "MILLISECONDS",
