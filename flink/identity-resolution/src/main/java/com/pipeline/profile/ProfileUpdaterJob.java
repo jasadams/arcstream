@@ -2,6 +2,7 @@ package com.pipeline.profile;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pipeline.identity.UnifiedEvent;
+import com.pipeline.common.Checkpointing;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.serialization.AbstractDeserializationSchema;
 import org.apache.flink.api.common.serialization.SerializationSchema;
@@ -9,7 +10,6 @@ import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
 import org.apache.flink.connector.kafka.sink.KafkaSink;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
-import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
@@ -29,7 +29,7 @@ public class ProfileUpdaterJob {
         String groupId = envOrDefault("GROUP_ID", "flink-profile-updater");
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.enableCheckpointing(60_000, CheckpointingMode.EXACTLY_ONCE);
+        Checkpointing.configure(env);
 
         KafkaSource<UnifiedEvent> source = KafkaSource.<UnifiedEvent>builder()
                 .setBootstrapServers(brokers)
