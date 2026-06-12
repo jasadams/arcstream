@@ -4,6 +4,7 @@ import com.pipeline.identity.UnifiedEvent;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.streaming.api.TimeDomain;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
 
@@ -22,6 +23,12 @@ public class ProfileFunction
     private static final long MAX_PAST_MS = 91 * DAY_MS;
     private static final long MAX_FUTURE_MS = 60 * 1000L;
     private static final int BUCKET_RETENTION_DAYS = 91;
+
+    // Emitting a full ProfileUpdate for every event multiplied write load
+    // across the Kafka sink, Pinot upserts, and downstream consumers. One
+    // debounced emission per profile per window carries identical final
+    // state; only intermediate per-event snapshots are skipped.
+    static final long EMIT_DEBOUNCE_MS = 5_000L;
 
     private transient ValueState<UserProfileState> profileState;
 
@@ -76,20 +83,14 @@ public class ProfileFunction
                 .format(DateTimeFormatter.ISO_LOCAL_DATE);
         profile.dailyBuckets.merge(dateKey, 1L, Long::sum);
 
-        if (event.sessionId != null && !event.sessionId.isEmpty()) {
-            profile.dailySessions
-                    .computeIfAbsent(dateKey, k -> new java.util.HashSet<>())
-                    .add(event.sessionId);
+        if (event.sessionId != null && !event.sessionId.isEmpty()
+                && !event.sessionId.equals(profile.currentSessionId)) {
+            profile.sessionsStarted++;
+            profile.dailySessionStarts.merge(dateKey, 1L, Long::sum);
+            profile.currentSessionId = event.sessionId;
+            profile.currentSessionStartMs = eventTimeMs;
         }
         pruneBuckets(profile);
-
-        if (event.sessionId != null && !event.sessionId.isEmpty()) {
-            profile.allSessionIds.add(event.sessionId);
-            if (!event.sessionId.equals(profile.currentSessionId)) {
-                profile.currentSessionId = event.sessionId;
-                profile.currentSessionStartMs = eventTimeMs;
-            }
-        }
 
         if (event.pageUrl != null && !event.pageUrl.isEmpty()) {
             profile.lastPage = event.pageUrl;
@@ -130,13 +131,17 @@ public class ProfileFunction
         ctx.timerService().registerEventTimeTimer(profile.sessionTimer);
 
         LocalDate eventDate = Instant.ofEpochMilli(eventTimeMs).atOffset(ZoneOffset.UTC).toLocalDate();
-        ProfileUpdate before = isNewProfile ? null : buildProfileUpdate(profile, "update", "event", eventDate);
+
+        if (isNewProfile) {
+            // New profiles emit immediately so downstream sees them appear
+            // without the debounce delay.
+            emit(profile, "create", "event", eventDate, out);
+        } else if (profile.emitTimer == 0) {
+            profile.emitTimer = ctx.timerService().currentProcessingTime() + EMIT_DEBOUNCE_MS;
+            ctx.timerService().registerProcessingTimeTimer(profile.emitTimer);
+        }
 
         profileState.update(profile);
-
-        ProfileUpdate after = buildProfileUpdate(profile, isNewProfile ? "create" : "update", "event", eventDate);
-        after.changedFields = computeChangedFields(before, after);
-        out.collect(after);
     }
 
     @Override
@@ -148,9 +153,20 @@ public class ProfileFunction
 
         LocalDate timerDate = Instant.ofEpochMilli(timestamp).atOffset(ZoneOffset.UTC).toLocalDate();
 
-        if (timestamp == profile.sessionTimer && profile.currentSessionId != null) {
-            ProfileUpdate before = buildProfileUpdate(profile, "update", "session_timeout", timerDate);
+        if (ctx.timeDomain() == TimeDomain.PROCESSING_TIME) {
+            if (timestamp == profile.emitTimer) {
+                profile.emitTimer = 0;
+                // Window sums are event-time relative: during a backlog
+                // reprocess the wall clock is days ahead of the events.
+                LocalDate eventDate = Instant.ofEpochMilli(profile.lastSeenEpochMs)
+                        .atOffset(ZoneOffset.UTC).toLocalDate();
+                emit(profile, "update", "event", eventDate, out);
+                profileState.update(profile);
+            }
+            return;
+        }
 
+        if (timestamp == profile.sessionTimer && profile.currentSessionId != null) {
             long durationMs = profile.lastSeenEpochMs - profile.currentSessionStartMs;
             profile.closedSessionCount++;
             profile.totalSessionDurationMs += Math.max(0, durationMs);
@@ -166,10 +182,8 @@ public class ProfileFunction
             ctx.timerService().registerEventTimeTimer(profile.decayTimer7d);
             ctx.timerService().registerEventTimeTimer(profile.decayTimer30d);
 
+            emit(profile, "update", "session_timeout", timerDate, out);
             profileState.update(profile);
-            ProfileUpdate after = buildProfileUpdate(profile, "update", "session_timeout", timerDate);
-            after.changedFields = computeChangedFields(before, after);
-            out.collect(after);
         } else if (timestamp == profile.decayTimer1d
                 || timestamp == profile.decayTimer7d
                 || timestamp == profile.decayTimer30d) {
@@ -181,10 +195,17 @@ public class ProfileFunction
             if (timestamp == profile.decayTimer7d) profile.decayTimer7d = 0;
             if (timestamp == profile.decayTimer30d) profile.decayTimer30d = 0;
 
+            emit(profile, "update", trigger, timerDate, out);
             profileState.update(profile);
-            ProfileUpdate update = buildProfileUpdate(profile, "update", trigger, timerDate);
-            out.collect(update);
         }
+    }
+
+    private void emit(UserProfileState profile, String action, String trigger,
+                      LocalDate referenceDate, Collector<ProfileUpdate> out) {
+        ProfileUpdate update = buildProfileUpdate(profile, action, trigger, referenceDate);
+        update.changedFields = computeChangedFields(profile.lastEmitted, update);
+        profile.lastEmitted = captureSnapshot(update);
+        out.collect(update);
     }
 
     private ProfileUpdate buildProfileUpdate(UserProfileState p, String action, String trigger, LocalDate referenceDate) {
@@ -196,15 +217,15 @@ public class ProfileFunction
         update.lastSeen = p.lastSeenEpochMs;
         update.updatedAt = System.currentTimeMillis();
         update.totalEvents = p.totalEvents;
-        update.totalSessions = p.allSessionIds.size();
+        update.totalSessions = p.sessionsStarted;
         update.events1d = sumBuckets(p.dailyBuckets, referenceDate, 1);
         update.events7d = sumBuckets(p.dailyBuckets, referenceDate, 7);
         update.events30d = sumBuckets(p.dailyBuckets, referenceDate, 30);
         update.events90d = sumBuckets(p.dailyBuckets, referenceDate, 90);
-        update.sessions1d = sumSessions(p.dailySessions, referenceDate, 1);
-        update.sessions7d = sumSessions(p.dailySessions, referenceDate, 7);
-        update.sessions30d = sumSessions(p.dailySessions, referenceDate, 30);
-        update.sessions90d = sumSessions(p.dailySessions, referenceDate, 90);
+        update.sessions1d = sumBuckets(p.dailySessionStarts, referenceDate, 1);
+        update.sessions7d = sumBuckets(p.dailySessionStarts, referenceDate, 7);
+        update.sessions30d = sumBuckets(p.dailySessionStarts, referenceDate, 30);
+        update.sessions90d = sumBuckets(p.dailySessionStarts, referenceDate, 90);
         update.avgSessionDurationSec = p.closedSessionCount > 0
                 ? p.totalSessionDurationMs / p.closedSessionCount / 1000 : 0;
         update.currentSessionActive = p.currentSessionId != null;
@@ -226,7 +247,24 @@ public class ProfileFunction
         return update;
     }
 
-    private List<String> computeChangedFields(ProfileUpdate before, ProfileUpdate after) {
+    private UserProfileState.EmittedSnapshot captureSnapshot(ProfileUpdate u) {
+        UserProfileState.EmittedSnapshot s = new UserProfileState.EmittedSnapshot();
+        s.totalEvents = u.totalEvents;
+        s.totalSessions = u.totalSessions;
+        s.lastSeen = u.lastSeen;
+        s.pageViews = u.pageViews;
+        s.clicks = u.clicks;
+        s.logins = u.logins;
+        s.featureUses = u.featureUses;
+        s.avgSessionDurationSec = u.avgSessionDurationSec;
+        s.lastPage = u.lastPage;
+        s.lastCountry = u.lastCountry;
+        s.lastDevice = u.lastDevice;
+        s.lastBrowser = u.lastBrowser;
+        return s;
+    }
+
+    private List<String> computeChangedFields(UserProfileState.EmittedSnapshot before, ProfileUpdate after) {
         if (before == null) {
             return new ArrayList<>(List.of("canonical_id", "tenant_id", "total_events", "first_seen", "last_seen"));
         }
@@ -270,25 +308,13 @@ public class ProfileFunction
                 return true;
             }
         });
-        profile.dailySessions.entrySet().removeIf(e -> {
+        profile.dailySessionStarts.entrySet().removeIf(e -> {
             try {
                 return LocalDate.parse(e.getKey()).isBefore(cutoff);
             } catch (Exception ex) {
                 return true;
             }
         });
-    }
-
-    private long sumSessions(Map<String, java.util.Set<String>> dailySessions, LocalDate referenceDate, int days) {
-        java.util.Set<String> allSessions = new java.util.HashSet<>();
-        for (int i = 0; i < days; i++) {
-            String key = referenceDate.minusDays(i).format(DateTimeFormatter.ISO_LOCAL_DATE);
-            java.util.Set<String> daySessions = dailySessions.get(key);
-            if (daySessions != null) {
-                allSessions.addAll(daySessions);
-            }
-        }
-        return allSessions.size();
     }
 
     private List<String> topK(Map<String, Long> counts, int k) {
