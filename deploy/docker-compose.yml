@@ -205,6 +205,7 @@ services:
         blob.server.port: 6124
         taskmanager.rpc.port: 6122
         state.backend: rocksdb
+        state.backend.incremental: true
         fs.allowed-fallback-filesystems: s3a
         state.checkpoints.dir: s3a://flink-checkpoints/checkpoints
         state.savepoints.dir: s3a://flink-checkpoints/savepoints
@@ -251,6 +252,7 @@ services:
         blob.server.port: 6124
         taskmanager.rpc.port: 6122
         state.backend: rocksdb
+        state.backend.incremental: true
         fs.allowed-fallback-filesystems: s3a
         state.checkpoints.dir: s3a://flink-checkpoints/checkpoints
         state.savepoints.dir: s3a://flink-checkpoints/savepoints
