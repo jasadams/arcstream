@@ -47,7 +47,7 @@ public class ProfileUpdaterJob {
         DataStream<UnifiedEvent> events = env.fromSource(
                 source,
                 WatermarkStrategy.<UnifiedEvent>forBoundedOutOfOrderness(Duration.ofSeconds(5))
-                        .withTimestampAssigner((event, ts) -> clampEventTime(parseEventTime(event.eventTime)))
+                        .withTimestampAssigner((event, ts) -> clampFutureOnly(parseEventTime(event.eventTime)))
                         .withIdleness(Duration.ofSeconds(30)),
                 "unified-events-source");
 
@@ -80,13 +80,18 @@ public class ProfileUpdaterJob {
         env.execute("Profile Updater");
     }
 
-    private static final long MAX_PAST_MS = 91L * 24 * 60 * 60 * 1000L;
     private static final long MAX_FUTURE_MS = 60 * 1000L;
 
-    private static long clampEventTime(long eventTimeMs) {
+    // Only clamp future timestamps in the watermark assigner.  Past
+    // timestamps must pass through so the watermark tracks event time
+    // during backfill.  Clamping old events to "now" poisons the
+    // watermark to wall-clock time, which makes every subsequent
+    // historical event "late" and fires ALL event-time timers
+    // (session timeouts + decay) immediately — a timer storm that
+    // floods profile-updates and overwhelms Pinot.
+    private static long clampFutureOnly(long eventTimeMs) {
         long now = System.currentTimeMillis();
         if (eventTimeMs > now + MAX_FUTURE_MS) return now;
-        if (eventTimeMs < now - MAX_PAST_MS) return now;
         return eventTimeMs;
     }
 
