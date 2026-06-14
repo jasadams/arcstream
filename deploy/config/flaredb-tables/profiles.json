@@ -1,0 +1,46 @@
+{
+  "tableName": "profiles",
+  "schema": [
+    {"name": "canonical_id", "type": "Utf8", "nullable": false},
+    {"name": "tenant_id", "type": "Utf8", "nullable": false},
+    {"name": "user_id", "type": "Utf8", "nullable": true},
+    {"name": "first_seen", "type": "Timestamp(Millisecond, None)", "nullable": true},
+    {"name": "last_seen", "type": "Timestamp(Millisecond, None)", "nullable": true},
+    {"name": "updated_at", "type": "Timestamp(Millisecond, None)", "nullable": true},
+    {"name": "total_events", "type": "Int64", "nullable": true},
+    {"name": "total_sessions", "type": "Int64", "nullable": true},
+    {"name": "events_1d", "type": "Int64", "nullable": true},
+    {"name": "events_7d", "type": "Int64", "nullable": true},
+    {"name": "events_30d", "type": "Int64", "nullable": true},
+    {"name": "events_90d", "type": "Int64", "nullable": true},
+    {"name": "sessions_1d", "type": "Int64", "nullable": true},
+    {"name": "sessions_7d", "type": "Int64", "nullable": true},
+    {"name": "sessions_30d", "type": "Int64", "nullable": true},
+    {"name": "sessions_90d", "type": "Int64", "nullable": true},
+    {"name": "avg_session_duration_sec", "type": "Int64", "nullable": true},
+    {"name": "page_views", "type": "Int64", "nullable": true},
+    {"name": "clicks", "type": "Int64", "nullable": true},
+    {"name": "logins", "type": "Int64", "nullable": true},
+    {"name": "feature_uses", "type": "Int64", "nullable": true},
+    {"name": "last_page", "type": "Utf8", "nullable": true},
+    {"name": "last_country", "type": "Utf8", "nullable": true},
+    {"name": "last_device", "type": "Utf8", "nullable": true},
+    {"name": "last_browser", "type": "Utf8", "nullable": true},
+    {"name": "action", "type": "Utf8", "nullable": true},
+    {"name": "timestamp", "type": "Timestamp(Millisecond, None)", "nullable": true},
+    {"name": "trigger", "type": "Utf8", "nullable": true}
+  ],
+  "upsertConfig": {
+    "mode": "FULL",
+    "primary_key_columns": ["tenant_id", "canonical_id"]
+  },
+  "ingestionConfig": {
+    "topic": "profile-updates",
+    "brokers": "redpanda:9092"
+  },
+  "indexConfig": {
+    "invertedIndexColumns": ["tenant_id"],
+    "bloomFilterColumns": ["canonical_id"],
+    "sortedColumn": "first_seen"
+  }
+}

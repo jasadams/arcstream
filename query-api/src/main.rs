@@ -12,7 +12,8 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use tower_http::cors::CorsLayer;
 
-use db::pinot::{PinotClient, PinotQuerier};
+use db::flaredb::FlareDBClient;
+use db::pinot::PinotQuerier;
 use db::LiveProfileProvider;
 use schema::query_stats::QueryStatsCollector;
 use schema::{AppSchema, QueryRoot};
@@ -60,9 +61,9 @@ async fn main() {
     let kafka_brokers = std::env::var("KAFKA_BROKERS")
         .unwrap_or_else(|_| "redpanda.data-pipeline.svc.cluster.local:9092".into());
 
-    let pinot = Arc::new(PinotClient {
-        broker_url: std::env::var("PINOT_BROKER_URL")
-            .unwrap_or_else(|_| "http://pinot-broker.data-pipeline.svc.cluster.local:8099/query/sql".into()),
+    let flaredb = Arc::new(FlareDBClient {
+        url: std::env::var("FLAREDB_URL")
+            .unwrap_or_else(|_| "http://flaredb.data-pipeline.svc.cluster.local:8099".into()),
         http: reqwest::Client::new(),
     });
 
@@ -98,8 +99,8 @@ async fn main() {
         async_graphql::EmptyMutation,
         SubscriptionRoot,
     )
-    .data(pinot.clone() as Arc<dyn PinotQuerier>)
-    .data(pinot as Arc<dyn LiveProfileProvider>)
+    .data(flaredb.clone() as Arc<dyn PinotQuerier>)
+    .data(flaredb as Arc<dyn LiveProfileProvider>)
     .data(profile_tx)
     .data(event_tx)
     .limit_depth(5)
