@@ -44,7 +44,7 @@ CREATE TABLE unified_events (
   bootstrap_servers = 'redpanda:9092',
   format = 'json',
   type = 'source',
-  'source.offset' = 'latest'
+  'source.offset' = 'earliest'
 );
 
 CREATE TABLE session_events (
