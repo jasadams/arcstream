@@ -10,11 +10,18 @@ dashboard/dist/
 
 # Maven
 flink/identity-resolution/target/
+dependency-reduced-pom.xml
 
-
-# IDE
+# Eclipse / IDE
 .idea/
 .vscode/
 *.swp
 .gstack/
 .claude/
+.classpath
+.project
+.settings/
+
+# Local overrides
+deploy/docker-compose.override.yml
+docs/review-logs/

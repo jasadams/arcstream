@@ -267,70 +267,93 @@ services:
         condition: service_healthy
 
   # ── Layer 4: Flink job submission (one-shot) ───────────────────────
+  # ARC-5: Retired — Arroyo pipelines replace all three Flink jobs.
+  # Flink jobmanager/taskmanager remain for ARC-7 (Iceberg coordination).
+  # Uncomment to re-enable Flink job submission alongside Arroyo.
+  #
+  # init-flink-jobs:
+  #   image: ghcr.io/jasadams/arcstream/flink:latest
+  #   platform: linux/amd64
+  #   restart: "no"
+  #   environment:
+  #     KAFKA_BROKERS: redpanda:9092
+  #     AWS_ACCESS_KEY_ID: minioadmin
+  #     AWS_SECRET_ACCESS_KEY: minioadmin
+  #     MINIO_ROOT_USER: minioadmin
+  #     MINIO_ROOT_PASSWORD: minioadmin
+  #     HADOOP_CONF_DIR: /opt/hadoop/conf
+  #     AWS_REGION: us-east-1
+  #     FLINK_ENV_JAVA_OPTS: "--add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED"
+  #   depends_on:
+  #     flink-jobmanager:
+  #       condition: service_healthy
+  #     flink-taskmanager:
+  #       condition: service_started
+  #     redpanda:
+  #       condition: service_healthy
+  #   entrypoint: ["/bin/bash", "-c"]
+  #   command:
+  #     - |
+  #       mkdir -p /opt/flink/plugins/s3-fs-hadoop
+  #       cp /opt/flink/opt/flink-s3-fs-hadoop-1.20.1.jar /opt/flink/plugins/s3-fs-hadoop/
+  #
+  #       cat > /opt/flink/conf/flink-conf.yaml << 'FCONF'
+  #       jobmanager.rpc.address: flink-jobmanager
+  #       jobmanager.rpc.port: 6123
+  #       rest.address: flink-jobmanager
+  #       rest.port: 8081
+  #       s3.endpoint: http://minio:9000
+  #       s3.path-style-access: true
+  #       fs.allowed-fallback-filesystems: s3a
+  #       FCONF
+  #       sed -i 's/^        //' /opt/flink/conf/flink-conf.yaml
+  #
+  #       echo "Waiting for Flink task slots..."
+  #       for i in $(seq 1 60); do
+  #         slots=$(curl -s http://flink-jobmanager:8081/overview 2>/dev/null | grep -o '"slots-available":[0-9]*' | cut -d: -f2)
+  #         if [ -n "$$slots" ] && [ "$$slots" -gt 0 ]; then
+  #           echo "Flink has $$slots available slots"
+  #           break
+  #         fi
+  #         sleep 5
+  #       done
+  #
+  #       echo "Submitting Identity Resolution job..."
+  #       /opt/flink/bin/flink run -d \
+  #         -c com.pipeline.identity.IdentityResolutionJob \
+  #         /opt/flink/jobs/identity-resolution.jar
+  #
+  #       echo "Submitting Profile Updater job..."
+  #       /opt/flink/bin/flink run -d \
+  #         -c com.pipeline.profile.ProfileUpdaterJob \
+  #         /opt/flink/jobs/identity-resolution.jar
+  #
+  #       echo "Submitting Sessionization job..."
+  #       /opt/flink/bin/flink run -d \
+  #         -c com.pipeline.session.SessionizationJob \
+  #         /opt/flink/jobs/identity-resolution.jar
+  #
+  #       echo "All Flink jobs submitted"
 
-  init-flink-jobs:
-    image: ghcr.io/jasadams/arcstream/flink:latest
-    platform: linux/amd64
-    restart: "no"
+  # ── Layer 4b: Arroyo stream processing ────────────────────────────
+
+  arroyo:
+    image: ghcr.io/arroyosystems/arroyo:latest
+    ports:
+      - "5115:5115"
     environment:
-      KAFKA_BROKERS: redpanda:9092
-      AWS_ACCESS_KEY_ID: minioadmin
-      AWS_SECRET_ACCESS_KEY: minioadmin
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-      HADOOP_CONF_DIR: /opt/hadoop/conf
-      AWS_REGION: us-east-1
-      FLINK_ENV_JAVA_OPTS: "--add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED"
+      ARROYO__CHECKPOINT_URL: /tmp/arroyo/checkpoints
+    volumes:
+      - arroyo-data:/root/.config/arroyo
     depends_on:
-      flink-jobmanager:
-        condition: service_healthy
-      flink-taskmanager:
-        condition: service_started
       redpanda:
         condition: service_healthy
-    entrypoint: ["/bin/bash", "-c"]
-    command:
-      - |
-        mkdir -p /opt/flink/plugins/s3-fs-hadoop
-        cp /opt/flink/opt/flink-s3-fs-hadoop-1.20.1.jar /opt/flink/plugins/s3-fs-hadoop/
-
-        cat > /opt/flink/conf/flink-conf.yaml << 'FCONF'
-        jobmanager.rpc.address: flink-jobmanager
-        jobmanager.rpc.port: 6123
-        rest.address: flink-jobmanager
-        rest.port: 8081
-        s3.endpoint: http://minio:9000
-        s3.path-style-access: true
-        fs.allowed-fallback-filesystems: s3a
-        FCONF
-        sed -i 's/^        //' /opt/flink/conf/flink-conf.yaml
-
-        echo "Waiting for Flink task slots..."
-        for i in $(seq 1 60); do
-          slots=$(curl -s http://flink-jobmanager:8081/overview 2>/dev/null | grep -o '"slots-available":[0-9]*' | cut -d: -f2)
-          if [ -n "$$slots" ] && [ "$$slots" -gt 0 ]; then
-            echo "Flink has $$slots available slots"
-            break
-          fi
-          sleep 5
-        done
-
-        echo "Submitting Identity Resolution job..."
-        /opt/flink/bin/flink run -d \
-          -c com.pipeline.identity.IdentityResolutionJob \
-          /opt/flink/jobs/identity-resolution.jar
-
-        echo "Submitting Profile Updater job..."
-        /opt/flink/bin/flink run -d \
-          -c com.pipeline.profile.ProfileUpdaterJob \
-          /opt/flink/jobs/identity-resolution.jar
-
-        echo "Submitting Sessionization job..."
-        /opt/flink/bin/flink run -d \
-          -c com.pipeline.session.SessionizationJob \
-          /opt/flink/jobs/identity-resolution.jar
-
-        echo "All Flink jobs submitted"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5115"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
   # ── Layer 5: Application services ──────────────────────────────────
 
@@ -384,3 +407,4 @@ volumes:
   minio-data:
   pinot-controller-data:
   pinot-server-data:
+  arroyo-data:

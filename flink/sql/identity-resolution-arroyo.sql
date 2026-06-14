@@ -1,6 +1,9 @@
 -- ARC-2: Identity Resolution pipeline in Arroyo using stateful SQL primitives
 -- Mirrors the logic in IdentityResolutionFunction.java (Flink DataStream API)
--- Output topic: unified-events-arroyo (separate from Flink's unified-events for comparison)
+-- ARC-5 cutover (strategy A): output topic is `unified-events` — Arroyo is now the
+-- sole producer of unified-events; the Flink IdentityResolutionJob is retired. Every
+-- downstream consumer (query-api, Pinot `events`, the Arroyo profile-updater and
+-- sessionization pipelines) already reads `unified-events`, so no consumer changes.
 
 CREATE TABLE raw_events (
   event_id TEXT NOT NULL,
@@ -28,7 +31,7 @@ CREATE TABLE raw_events (
   'source.offset' = 'latest'
 );
 
-CREATE TABLE unified_events_arroyo (
+CREATE TABLE unified_events (
   event_id TEXT NOT NULL,
   event_type TEXT NOT NULL,
   tenant_id TEXT NOT NULL,
@@ -44,13 +47,13 @@ CREATE TABLE unified_events_arroyo (
   event_action TEXT
 ) WITH (
   connector = 'kafka',
-  topic = 'unified-events-arroyo',
+  topic = 'unified-events',
   bootstrap_servers = 'redpanda:9092',
   format = 'json',
   type = 'sink'
 );
 
-INSERT INTO unified_events_arroyo
+INSERT INTO unified_events
 WITH anon_resolved AS (
   SELECT
     event_id,

@@ -111,7 +111,9 @@ impl PinotClient {
             .map_err(|e| format!("Failed to parse Pinot response: {e}"))?;
 
         if let Some(exc) = pinot_resp.exceptions.first() {
-            return Err(format!("Pinot query error: {}", exc.message));
+            if pinot_resp.result_table.is_none() {
+                return Err(format!("Pinot query error: {}", exc.message));
+            }
         }
 
         Ok(pinot_resp)
