@@ -75,3 +75,25 @@ PROFILE_RESPONSE=$(curl -sf -X POST "$ARROYO_URL/api/v1/pipelines" \
 
 echo "$PROFILE_RESPONSE" | jq '{id: .id, name: .name, state: .action}'
 echo "Profile-updater pipeline submitted. View at $ARROYO_URL"
+
+# ---------------------------------------------------------------------------
+# ARC-4: Sessionization
+# ---------------------------------------------------------------------------
+# Native Arroyo event-time SESSION-window pipeline; no UDF registration needed
+# (unlike ARC-3). Mirrors the identity-resolution submit block above.
+SESSION_SQL_FILE="$(dirname "$0")/../flink/sql/sessionization-arroyo.sql"
+
+echo "Submitting sessionization pipeline..."
+SESSION_QUERY=$(cat "$SESSION_SQL_FILE")
+SESSION_RESPONSE=$(curl -sf -X POST "$ARROYO_URL/api/v1/pipelines" \
+  -H "Content-Type: application/json" \
+  -d "$(jq -n \
+    --arg name "sessionization" \
+    --arg query "$SESSION_QUERY" \
+    --argjson parallelism 1 \
+    --argjson checkpoint_interval_micros 60000000 \
+    '{name: $name, query: $query, parallelism: $parallelism, checkpoint_interval_micros: $checkpoint_interval_micros}'
+  )")
+
+echo "$SESSION_RESPONSE" | jq '{id: .id, name: .name, state: .action}'
+echo "Sessionization pipeline submitted. View at $ARROYO_URL"
