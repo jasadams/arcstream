@@ -26,9 +26,6 @@ jobs:
           - image: event-producer
             dockerfile: docker/event-producer.Dockerfile
             context: .
-          - image: flink
-            dockerfile: flink/Dockerfile
-            context: flink
     steps:
       - uses: actions/checkout@v4
 
