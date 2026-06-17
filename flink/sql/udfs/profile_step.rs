@@ -15,6 +15,14 @@ serde_json = "1"
 // output field under its exact output key, so the SQL extraction is purely
 // mechanical (`extract_json_string` + `CAST`).
 //
+// IMPORTANT: every emitted NUMERIC/TIMESTAMP field is stored as a decimal
+// STRING (via `istr`), not a JSON number. The profile-updater SQL reads them
+// with `extract_json_string(...)`, which returns NULL for a JSON *number* — so
+// storing numbers as numbers silently nulled first_seen/last_seen/total_events/
+// all counters in `profile-updates` (and thus the dashboard). `get_i64` parses
+// these strings back so the internal read-modify-write is unaffected. This
+// mirrors `current_session_active`, long stored as the string "true"/"false".
+//
 // Deviations from the ticket's illustrative signature, all deliberate:
 //   * DROP `os`: no profile field tracks operating system, so it is unused.
 //   * ADD `user_id`: the profile persists the last non-empty user_id and emits
@@ -85,13 +93,13 @@ fn profile_step(
 
     // --- Step 2: first_seen / last_seen / total_events ---
     if is_new_profile {
-        state.insert("first_seen".into(), json!(event_ms));
+        state.insert("first_seen".into(), istr(event_ms));
     }
     let prev_last_seen = get_i64(&state, "last_seen");
     let last_seen = prev_last_seen.max(event_ms);
-    state.insert("last_seen".into(), json!(last_seen));
+    state.insert("last_seen".into(), istr(last_seen));
     let total_events = get_i64(&state, "total_events") + 1;
-    state.insert("total_events".into(), json!(total_events));
+    state.insert("total_events".into(), istr(total_events));
 
     // --- Step 3: persist last non-empty user_id ---
     if let Some(uid) = non_empty(user_id) {
@@ -221,18 +229,21 @@ fn profile_step(
     // EXACT output keys so the SQL extraction is mechanical. ---
     let user_id_out = get_str(&state, "user_id").unwrap_or_default();
     state.insert("user_id".into(), json!(user_id_out));
-    state.insert("updated_at".into(), json!(updated_at));
+    // All emitted numeric/timestamp fields go out as decimal STRINGS via `istr`
+    // so the SQL's `extract_json_string(...) + CAST(... AS BIGINT)` reads them;
+    // a JSON number would extract as NULL. (See `istr` doc.)
+    state.insert("updated_at".into(), istr(updated_at));
     // total_sessions is the emitted alias for sessions_started.
-    state.insert("total_sessions".into(), json!(get_i64(&state, "sessions_started")));
-    state.insert("events_1d".into(), json!(e1));
-    state.insert("events_7d".into(), json!(e7));
-    state.insert("events_30d".into(), json!(e30));
-    state.insert("events_90d".into(), json!(e90));
-    state.insert("sessions_1d".into(), json!(s1));
-    state.insert("sessions_7d".into(), json!(s7));
-    state.insert("sessions_30d".into(), json!(s30));
-    state.insert("sessions_90d".into(), json!(s90));
-    state.insert("avg_session_duration_sec".into(), json!(avg_session_duration_sec));
+    state.insert("total_sessions".into(), istr(get_i64(&state, "sessions_started")));
+    state.insert("events_1d".into(), istr(e1));
+    state.insert("events_7d".into(), istr(e7));
+    state.insert("events_30d".into(), istr(e30));
+    state.insert("events_90d".into(), istr(e90));
+    state.insert("sessions_1d".into(), istr(s1));
+    state.insert("sessions_7d".into(), istr(s7));
+    state.insert("sessions_30d".into(), istr(s30));
+    state.insert("sessions_90d".into(), istr(s90));
+    state.insert("avg_session_duration_sec".into(), istr(avg_session_duration_sec));
     // Store as the literal string "true"/"false" so the SQL CAST(... AS BOOLEAN)
     // is unambiguous (extract_json_string yields the inner text).
     state.insert(
@@ -241,13 +252,13 @@ fn profile_step(
     );
     state.insert(
         "current_session_duration_sec".into(),
-        json!(current_session_duration_sec),
+        istr(current_session_duration_sec),
     );
     // Ensure emitted counters exist even if their event type never fired.
-    state.insert("page_views".into(), json!(get_i64(&state, "page_views")));
-    state.insert("clicks".into(), json!(get_i64(&state, "clicks")));
-    state.insert("logins".into(), json!(get_i64(&state, "logins")));
-    state.insert("feature_uses".into(), json!(get_i64(&state, "feature_uses")));
+    state.insert("page_views".into(), istr(get_i64(&state, "page_views")));
+    state.insert("clicks".into(), istr(get_i64(&state, "clicks")));
+    state.insert("logins".into(), istr(get_i64(&state, "logins")));
+    state.insert("feature_uses".into(), istr(get_i64(&state, "feature_uses")));
     state.insert("last_page".into(), json!(get_str(&state, "last_page").unwrap_or_default()));
     state.insert("last_country".into(), json!(get_str(&state, "last_country").unwrap_or_default()));
     state.insert("last_device".into(), json!(get_str(&state, "last_device").unwrap_or_default()));
@@ -275,7 +286,28 @@ fn non_empty(v: Option<&str>) -> Option<&str> {
 }
 
 fn get_i64(state: &Map<String, Value>, key: &str) -> i64 {
-    state.get(key).and_then(Value::as_i64).unwrap_or(0)
+    // Tolerant of BOTH JSON numbers and decimal STRINGS. Emitted numeric fields
+    // are stored as strings (see `istr` / Step 16) so the SQL's
+    // `extract_json_string` can read them, but those same keys double as internal
+    // accumulators read back here on the next event; parsing strings keeps the
+    // read-modify-write correct regardless of representation.
+    state
+        .get(key)
+        .and_then(|v| {
+            v.as_i64()
+                .or_else(|| v.as_str().and_then(|s| s.parse::<i64>().ok()))
+        })
+        .unwrap_or(0)
+}
+
+/// Encode an integer as a JSON STRING (e.g. `42` -> `"42"`). Emitted numeric and
+/// timestamp output fields go through this so the profile-updater SQL's
+/// `extract_json_string(blob, '$.field')` returns the value: that function yields
+/// NULL on a JSON *number*, which is exactly what silently nulled every numeric
+/// profile column before this fix. Mirrors how `current_session_active` is stored
+/// as the string "true"/"false" for its `CAST(... AS BOOLEAN)`.
+fn istr(n: i64) -> Value {
+    json!(n.to_string())
 }
 
 fn get_str(state: &Map<String, Value>, key: &str) -> Option<String> {
@@ -575,13 +607,14 @@ mod tests {
             blob = Some(out);
         }
         let b = blob.unwrap();
-        // Reference day is the last event (2026-06-12).
-        assert_eq!(extract(&b, "events_1d"), json!(1));
-        assert_eq!(extract(&b, "events_7d"), json!(3));
-        assert_eq!(extract(&b, "events_30d"), json!(3));
-        assert_eq!(extract(&b, "events_90d"), json!(3));
-        assert_eq!(extract(&b, "total_events"), json!(3));
-        assert_eq!(extract(&b, "page_views"), json!(3));
+        // Reference day is the last event (2026-06-12). Emitted numerics are
+        // decimal STRINGS so the SQL's extract_json_string can read them.
+        assert_eq!(extract(&b, "events_1d"), json!("1"));
+        assert_eq!(extract(&b, "events_7d"), json!("3"));
+        assert_eq!(extract(&b, "events_30d"), json!("3"));
+        assert_eq!(extract(&b, "events_90d"), json!("3"));
+        assert_eq!(extract(&b, "total_events"), json!("3"));
+        assert_eq!(extract(&b, "page_views"), json!("3"));
     }
 
     #[test]
@@ -600,7 +633,7 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(extract(&out1, "total_sessions"), json!(1));
+        assert_eq!(extract(&out1, "total_sessions"), json!("1"));
         assert_eq!(extract(&out1, "current_session_active"), json!("true"));
 
         // second event in s1, 5 minutes later -> advances last_seen.
@@ -617,8 +650,8 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(extract(&out2, "total_sessions"), json!(1));
-        assert_eq!(extract(&out2, "current_session_duration_sec"), json!(300));
+        assert_eq!(extract(&out2, "total_sessions"), json!("1"));
+        assert_eq!(extract(&out2, "current_session_duration_sec"), json!("300"));
 
         // s2 starts -> closes s1, accumulating 300s = 300000ms over 1 closed.
         let out3 = profile_step(
@@ -634,9 +667,9 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(extract(&out3, "total_sessions"), json!(2));
+        assert_eq!(extract(&out3, "total_sessions"), json!("2"));
         // avg = 300000 / 1 / 1000 = 300 sec
-        assert_eq!(extract(&out3, "avg_session_duration_sec"), json!(300));
+        assert_eq!(extract(&out3, "avg_session_duration_sec"), json!("300"));
         assert_eq!(extract(&out3, "current_session_active"), json!("true"));
     }
 
@@ -683,6 +716,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(extract(&out1, "action"), json!("create"));
+        // first_seen == last_seen on the create event (both decimal strings).
         assert_eq!(extract(&out1, "first_seen"), extract(&out1, "last_seen"));
 
         let out2 = profile_step(
@@ -699,8 +733,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(extract(&out2, "action"), json!("update"));
-        assert_eq!(extract(&out2, "clicks"), json!(1));
-        assert_eq!(extract(&out2, "total_events"), json!(2));
+        assert_eq!(extract(&out2, "clicks"), json!("1"));
+        assert_eq!(extract(&out2, "total_events"), json!("2"));
     }
 
     #[test]
@@ -735,5 +769,81 @@ mod tests {
         )
         .unwrap();
         assert_eq!(extract(&out2, "user_id"), json!("user-42"));
+    }
+
+    // Regression for the dashboard "empty profiles + 0 users" bug: every emitted
+    // numeric/timestamp field MUST be a JSON string that parses to an integer.
+    // The profile-updater SQL reads them with extract_json_string, which returns
+    // NULL on a JSON number; storing them as numbers nulled every numeric profile
+    // column downstream (flaredb -> query-api drops the row / counts 0).
+    #[test]
+    fn emitted_numeric_fields_are_integer_strings() {
+        let out = profile_step(
+            None,
+            "page_view",
+            "2026-06-10 12:00:00.000",
+            Some("u1"),
+            Some("s1"),
+            Some("/a"),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let v: Value = serde_json::from_str(&out).unwrap();
+
+        for key in [
+            "first_seen",
+            "last_seen",
+            "updated_at",
+            "total_events",
+            "total_sessions",
+            "events_1d",
+            "events_7d",
+            "events_30d",
+            "events_90d",
+            "sessions_1d",
+            "sessions_7d",
+            "sessions_30d",
+            "sessions_90d",
+            "avg_session_duration_sec",
+            "current_session_duration_sec",
+            "page_views",
+            "clicks",
+            "logins",
+            "feature_uses",
+        ] {
+            let field = &v[key];
+            assert!(
+                field.is_string(),
+                "{key} must be a JSON string for extract_json_string; got {field:?}"
+            );
+            assert!(
+                field.as_str().unwrap().parse::<i64>().is_ok(),
+                "{key} must be a decimal integer string; got {field:?}"
+            );
+        }
+
+        // first_seen/total_events read back correctly on the NEXT event (proves
+        // get_i64 parses the string-encoded state, so accumulation is unaffected).
+        let out2 = profile_step(
+            Some(&out),
+            "page_view",
+            "2026-06-10 12:01:00.000",
+            Some("u1"),
+            Some("s1"),
+            Some("/b"),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let v2: Value = serde_json::from_str(&out2).unwrap();
+        assert_eq!(v2["total_events"], json!("2"));
+        // first_seen unchanged from the create event; last_seen advanced.
+        assert_eq!(v2["first_seen"], v["first_seen"]);
+        assert_ne!(v2["last_seen"], v["last_seen"]);
     }
 }
