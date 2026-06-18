@@ -90,14 +90,17 @@ impl Tenant {
                 sessions_1d, sessions_7d, sessions_30d, sessions_90d, \
                 avg_session_duration_sec \
              FROM profiles \
-             WHERE tenant_id = '{safe_tenant}' \
+             WHERE tenant_id = '{safe_tenant}' AND first_seen IS NOT NULL \
              ORDER BY {sort_col} {order_sql} \
              LIMIT {limit} OFFSET {offset}"
         );
+        // Exclude orphan rows with a null first_seen so a page of them can't
+        // silently blank the list (parse_jsonl drops null first_seen/last_seen);
+        // keeps listed rows and totalCount consistent.
         let count_sql = format!(
             "SELECT COUNT(*) AS total \
              FROM profiles \
-             WHERE tenant_id = '{safe_tenant}'"
+             WHERE tenant_id = '{safe_tenant}' AND first_seen IS NOT NULL"
         );
 
         let (data_result, count_result) =

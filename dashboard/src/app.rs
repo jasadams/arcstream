@@ -165,6 +165,7 @@ pub fn App() -> impl IntoView {
                     <A href="/profiles">"Profiles"</A>
                     <A href="/events">"Events"</A>
                     <A href="/analytics">"Analytics"</A>
+                    <BackendToggle />
                     <DevModeToggle />
                     <a href="https://github.com/jasadams/arcstream" target="_blank" rel="noopener" class="github-link" inner_html=SVG_GITHUB></a>
                 </nav>
@@ -208,6 +209,71 @@ fn DevModeToggle() -> impl IntoView {
                 "\u{2699} Dev"
             </button>
         </Show>
+    }
+}
+
+/// Nav toggle that switches the analytics backend per-browser. Stores the choice
+/// in a `backend` cookie (default Pinot) which the dashboard server forwards to
+/// query-api as `x-backend`; clicking flips it and reloads so data re-fetches.
+#[component]
+fn BackendToggle() -> impl IntoView {
+    let current = RwSignal::new("pinot".to_string());
+
+    // After hydration, reflect the actual cookie value (avoids an SSR mismatch).
+    #[cfg(feature = "hydrate")]
+    leptos::prelude::Effect::new(move |_| {
+        current.set(read_backend_cookie_client());
+    });
+
+    let toggle = move |_| {
+        #[cfg(feature = "hydrate")]
+        {
+            let cur = current.get_untracked();
+            let next = if cur == "flare" || cur == "flaredb" { "pinot" } else { "flare" };
+            set_backend_cookie_client(next);
+            if let Some(w) = web_sys::window() {
+                let _ = w.location().reload();
+            }
+        }
+    };
+
+    view! {
+        <button
+            class="backend-toggle"
+            on:click=toggle
+            title="Analytics backend — click to switch (Pinot / FlareDB)"
+        >
+            {move || {
+                let c = current.get();
+                if c == "flare" || c == "flaredb" { "FlareDB" } else { "Pinot" }
+            }}
+        </button>
+    }
+}
+
+#[cfg(feature = "hydrate")]
+fn read_backend_cookie_client() -> String {
+    use wasm_bindgen::JsCast;
+    web_sys::window()
+        .and_then(|w| w.document())
+        .and_then(|d| d.dyn_into::<web_sys::HtmlDocument>().ok())
+        .and_then(|hd| hd.cookie().ok())
+        .and_then(|cookies| {
+            cookies
+                .split(';')
+                .find_map(|kv| kv.trim().strip_prefix("backend=").map(str::to_owned))
+        })
+        .unwrap_or_else(|| "pinot".to_owned())
+}
+
+#[cfg(feature = "hydrate")]
+fn set_backend_cookie_client(val: &str) {
+    use wasm_bindgen::JsCast;
+    if let Some(hd) = web_sys::window()
+        .and_then(|w| w.document())
+        .and_then(|d| d.dyn_into::<web_sys::HtmlDocument>().ok())
+    {
+        let _ = hd.set_cookie(&format!("backend={val}; path=/; max-age=31536000; SameSite=Lax"));
     }
 }
 

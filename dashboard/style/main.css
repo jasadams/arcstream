@@ -135,6 +135,30 @@ header a[aria-current="page"] { color: var(--text); }
     border-color: var(--accent);
 }
 
+/* Analytics backend toggle in the nav (Pinot default / FlareDB) */
+.backend-toggle {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    margin-left: auto;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 150ms, border-color 150ms;
+}
+
+.backend-toggle:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
 /* Dev panel below header */
 .dev-panel {
     background: var(--surface);

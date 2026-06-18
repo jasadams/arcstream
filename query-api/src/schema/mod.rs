@@ -140,10 +140,16 @@ impl GlobalQuery {
                 sessions_1d, sessions_7d, sessions_30d, sessions_90d, \
                 avg_session_duration_sec \
              FROM profiles \
+             WHERE first_seen IS NOT NULL \
              ORDER BY first_seen DESC \
              LIMIT {limit} OFFSET {offset}"
         );
-        let count_sql = "SELECT COUNT(*) AS total FROM profiles";
+        // Exclude orphan rows with a null first_seen (e.g. stale pre-population
+        // cruft): they carry no usable profile data, and because parse_jsonl
+        // drops any row whose required first_seen/last_seen is null, a page of
+        // them would otherwise silently blank the profiles list. Filtering keeps
+        // the listed rows and totalCount consistent.
+        let count_sql = "SELECT COUNT(*) AS total FROM profiles WHERE first_seen IS NOT NULL";
 
         let (data_result, count_result) =
             tokio::try_join!(pinot.query_with_stats(&data_sql), pinot.query_with_stats(count_sql))
