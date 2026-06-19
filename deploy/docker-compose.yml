@@ -30,25 +30,91 @@ services:
       retries: 30
       start_period: 10s
 
-  # ── Layer 1: Arroyo stream processing ─────────────────────────────
+  # ── Layer 1: Flink stream processing ──────────────────────────────
 
-  arroyo:
-    image: ghcr.io/arroyosystems/arroyo:latest
+  flink-jobmanager:
+    image: ghcr.io/jasadams/arcstream/flink:latest
+    platform: linux/amd64
+    entrypoint: ["/bin/bash", "-c"]
+    command: ["exec /docker-entrypoint.sh jobmanager"]
     ports:
-      - "5115:5115"
+      - "8081:8081"
     environment:
-      ARROYO__CHECKPOINT_URL: /tmp/arroyo/checkpoints
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        jobmanager.memory.process.size: 1024m
+        taskmanager.memory.process.size: 2048m
+        taskmanager.numberOfTaskSlots: 4
+        parallelism.default: 1
+        state.backend: rocksdb
+        state.backend.incremental: true
+        state.checkpoints.dir: file:///flink-checkpoints
+        state.backend.rocksdb.localdir: /flink-rocksdb
+        execution.checkpointing.interval: 60000
+        execution.checkpointing.min-pause: 30000
+      FLINK_ENV_JAVA_OPTS: "--add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED"
     volumes:
-      - arroyo-data:/root/.config/arroyo
+      - flink-checkpoints:/flink-checkpoints
     depends_on:
       redpanda:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5115"]
+      test: ["CMD", "curl", "-f", "http://localhost:8081/overview"]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 20
       start_period: 15s
+
+  flink-taskmanager:
+    image: ghcr.io/jasadams/arcstream/flink:latest
+    platform: linux/amd64
+    entrypoint: ["/bin/bash", "-c"]
+    command: ["exec /docker-entrypoint.sh taskmanager"]
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.memory.process.size: 2048m
+        taskmanager.numberOfTaskSlots: 4
+        state.backend: rocksdb
+        state.backend.incremental: true
+        state.checkpoints.dir: file:///flink-checkpoints
+        state.backend.rocksdb.localdir: /flink-rocksdb
+      FLINK_ENV_JAVA_OPTS: "--add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED"
+    volumes:
+      - flink-checkpoints:/flink-checkpoints
+    depends_on:
+      flink-jobmanager:
+        condition: service_healthy
+
+  # One-shot: submit the 3 Flink jobs once task slots are available.
+  init-flink-jobs:
+    image: ghcr.io/jasadams/arcstream/flink:latest
+    platform: linux/amd64
+    restart: "no"
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+      FLINK_ENV_JAVA_OPTS: "--add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED"
+    depends_on:
+      flink-jobmanager:
+        condition: service_healthy
+      flink-taskmanager:
+        condition: service_started
+      redpanda:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        echo "rest.address: flink-jobmanager" >> /opt/flink/conf/flink-conf.yaml
+        echo "Waiting for Flink task slots..."
+        for i in $$(seq 1 60); do
+          slots=$$(curl -s http://flink-jobmanager:8081/overview 2>/dev/null | grep -o '"slots-available":[0-9]*' | cut -d: -f2)
+          [ -n "$$slots" ] && [ "$$slots" -gt 0 ] && { echo "slots: $$slots"; break; }
+          sleep 5
+        done
+        run() { /opt/flink/bin/flink run -d -m flink-jobmanager:8081 -c "$$1" /opt/flink/jobs/identity-resolution.jar; }
+        run com.pipeline.identity.IdentityResolutionJob
+        run com.pipeline.profile.ProfileUpdaterJob
+        run com.pipeline.session.SessionizationJob
 
   # ── Layer 2: FlareDB OLAP database ────────────────────────────────
 
@@ -121,5 +187,5 @@ services:
 
 volumes:
   redpanda-data:
-  arroyo-data:
+  flink-checkpoints:
   flaredb-data:
