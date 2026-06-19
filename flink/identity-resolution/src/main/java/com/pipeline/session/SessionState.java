@@ -12,6 +12,7 @@ public class SessionState implements Serializable {
     public String tenantId;
     public long startTimeMs;
     public long lastEventTimeMs;
+    public long registeredTimerMs;
     public int eventCount;
     public Set<String> pages = new HashSet<>();
     public Map<String, Integer> eventTypeCounts = new HashMap<>();

@@ -46,6 +46,9 @@ public class SessionizationJob {
         DataStream<UnifiedEvent> events = env.fromSource(
                 source,
                 WatermarkStrategy.<UnifiedEvent>forBoundedOutOfOrderness(Duration.ofSeconds(5))
+                        // Drive watermarks (and the event-time session timers) off
+                        // the event_time field, not the Kafka record timestamp.
+                        .withTimestampAssigner((event, ts) -> SessionFunction.parseTimestamp(event.eventTime))
                         .withIdleness(Duration.ofSeconds(30)),
                 "unified-events-source");
 

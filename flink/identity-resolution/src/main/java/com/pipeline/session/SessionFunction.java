@@ -59,9 +59,19 @@ public class SessionFunction
             session.country = event.country;
         }
 
-        // Register/reset session timeout timer
-        long timerTime = ctx.timerService().currentProcessingTime() + SESSION_TIMEOUT_MS;
-        ctx.timerService().registerProcessingTimeTimer(timerTime);
+        // Event-time session timeout: close the session when the watermark
+        // passes (last event + 30min) of EVENT time. This is replay-safe — a
+        // backfill produces the same sessions as the live stream — unlike a
+        // wall-clock (processing-time) timer, which would never close historical
+        // sessions during a replay and is not correct sessionization.
+        // Keep a single timer per session: delete the previous one and register
+        // the new deadline whenever activity extends the session.
+        if (session.registeredTimerMs != 0L) {
+            ctx.timerService().deleteEventTimeTimer(session.registeredTimerMs);
+        }
+        long timerTime = session.lastEventTimeMs + SESSION_TIMEOUT_MS;
+        ctx.timerService().registerEventTimeTimer(timerTime);
+        session.registeredTimerMs = timerTime;
 
         sessionState.update(session);
     }
@@ -73,16 +83,14 @@ public class SessionFunction
         SessionState session = sessionState.value();
         if (session == null) return;
 
-        // Check if enough time has passed since last event
-        long elapsed = System.currentTimeMillis() - session.lastEventTimeMs;
-        if (elapsed >= SESSION_TIMEOUT_MS) {
+        // The event-time timer fired => the watermark reached last-event + timeout,
+        // i.e. SESSION_TIMEOUT of EVENT time elapsed with no further activity.
+        // (Stale timers can't fire here: each new event deletes the old timer, so
+        // a firing timer always matches the current deadline. The guard is a
+        // safety net.)
+        if (timestamp >= session.lastEventTimeMs + SESSION_TIMEOUT_MS) {
             out.collect(buildSummary(session));
             sessionState.clear();
-        } else {
-            // Not timed out yet — re-register for remaining time
-            long remaining = SESSION_TIMEOUT_MS - elapsed;
-            ctx.timerService().registerProcessingTimeTimer(
-                    ctx.timerService().currentProcessingTime() + remaining);
         }
     }
 
@@ -103,7 +111,7 @@ public class SessionFunction
         return s;
     }
 
-    private long parseTimestamp(String ts) {
+    public static long parseTimestamp(String ts) {
         try {
             return java.time.LocalDateTime.parse(ts,
                     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))
