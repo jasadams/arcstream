@@ -2,6 +2,14 @@
 
 Generate historical event data and ingest it through the full pipeline (event-producer → Kafka → Flink → Pinot).
 
+## ⚠️ Critical (hard-won, June 2026)
+
+- **The live `event-producer` Deployment MUST stay at `replicas=0` for the ENTIRE backfill.** Step 1 scales it down — verify it actually stays at 0. If it runs concurrently with the backfill Job, it interleaves *current-dated* events through the historical block (~1 per 3000). Flink/sessionization's watermark (`max(event_ts)-5s`) then jumps to ~now on the first such event, and every later historical event is "late" → dropped (or, on Arroyo, sessions never close → OOM). Start the live producer ONLY in step 6, after the backfill Job is `Complete` — it then cleanly appends after the historical block (monotonic, safe).
+- **redpanda data + Flink RocksDB local dir must be on `local-path`, NOT Longhorn.** Heavy reprocess IO through Longhorn's engine saturates it on a single node → EIO faults → cluster-wide melt. (redpanda → `redpanda-data-local`; Flink `state.backend.rocksdb.localdir` → a local-path PVC.)
+- **Kafka tiers to the NAS MinIO** (`cloud_storage_*` cluster config → 192.168.1.100). Topics need `retention.ms=90d` (≥ backfill span, else old segments are deleted-then-stuck local) + a `retention.local.target.bytes` cap so local disk doesn't hoard the whole backfill.
+- **Sessionization closes on EVENT-time** (watermark), not wall-clock — replay-safe. (`SessionFunction` uses event-time timers.)
+- Backfill image: `event-producer:1.2.0` has `--backfill/--backfill-start/--backfill-end`. (`:paced` adds `--backfill-wall-hours` but is a local-only build.)
+
 ## Prerequisites
 
 - `kubectl` access to the `data-pipeline` namespace
