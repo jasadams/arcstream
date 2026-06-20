@@ -187,7 +187,8 @@ impl super::LiveProfileProvider for PinotClient {
              sessions_1d, sessions_7d, \
              avg_session_duration_sec, \
              page_views, clicks, logins, feature_uses, \
-             last_page, last_country, last_device, last_browser \
+             last_page, last_country, last_device, last_browser, \
+             top_pages, top_features \
              FROM profiles \
              WHERE tenant_id = '{tenant_id}' AND canonical_id = '{canonical_id}' \
              LIMIT 1"
