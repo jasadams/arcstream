@@ -49,23 +49,38 @@ pub fn EventListPage() -> impl IntoView {
 
     let paused = RwSignal::new(true);
     let rows: RwSignal<Vec<EventEntry>> = RwSignal::new(Vec::new());
+    // Route-owned "initial fetch resolved" flag. Drives the skeleton/empty/table
+    // switch from a signal instead of reading the `events` resource inside the view,
+    // which would leave orphaned DOM on navigation (see user_detail.rs for the full
+    // explanation of the late-resolving-Suspense leak).
+    let loaded = RwSignal::new(false);
+    let error: RwSignal<Option<String>> = RwSignal::new(None);
     let owner = Owner::current().expect("component must have owner");
 
     {
         let owner = owner.clone();
         Effect::new(move || {
-            if let Some(Ok(result)) = events.get() {
-                dev.query_stats.update(|s| s.extend(result.stats));
-                let new_rows: Vec<EventEntry> = owner.with(|| {
-                    result.data
-                        .into_iter()
-                        .map(|e| {
-                            let eid = e.event_id.clone();
-                            (eid, RwSignal::new(e), RwSignal::new(false))
-                        })
-                        .collect()
-                });
-                rows.set(new_rows);
+            match events.get() {
+                Some(Ok(result)) => {
+                    dev.query_stats.update(|s| s.extend(result.stats));
+                    let new_rows: Vec<EventEntry> = owner.with(|| {
+                        result.data
+                            .into_iter()
+                            .map(|e| {
+                                let eid = e.event_id.clone();
+                                (eid, RwSignal::new(e), RwSignal::new(false))
+                            })
+                            .collect()
+                    });
+                    rows.set(new_rows);
+                    error.set(None);
+                    loaded.set(true);
+                }
+                Some(Err(e)) => {
+                    error.set(Some(e.to_string()));
+                    loaded.set(true);
+                }
+                None => {}
             }
         });
     }
@@ -121,86 +136,94 @@ pub fn EventListPage() -> impl IntoView {
                 <LiveToggle paused />
             </div>
         </div>
-        <Suspense fallback=move || view! {
-            <table class="event-table skeleton-table" aria-label="Live events">
-                <thead>
-                    <tr>
-                        <th>{"\u{00a0}"}</th>
-                        <th>{"\u{00a0}"}</th>
-                        <th>{"\u{00a0}"}</th>
-                        <th>{"\u{00a0}"}</th>
-                        <th class="hide-mobile">{"\u{00a0}"}</th>
-                        <th class="hide-mobile">{"\u{00a0}"}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {(0..100).map(|_| view! {
-                        <tr class="skeleton-row">
-                            <td>{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</td>
-                            <td><span class="badge-event badge-default">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</span></td>
-                            <td>
-                                <div class="user-identity compact">
-                                    <span class="user-avatar"><div class="skel-circle" style="width:22px;height:22px"></div></span>
-                                    <span class="user-petname">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</span>
-                                </div>
-                            </td>
-                            <td class="page-url">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</td>
-                            <td class="hide-mobile">
-                                <span class="device-inline">{"\u{00a0}\u{00a0}"}</span>
-                                {"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}
-                            </td>
-                            <td class="hide-mobile">
-                                <span class="flag">{"\u{00a0}"}</span>
-                                {" \u{00a0}\u{00a0}\u{00a0}\u{00a0}"}
-                            </td>
-                        </tr>
-                    }).collect::<Vec<_>>()}
-                </tbody>
-            </table>
-        }>
-            {move || {
-                let r = rows.get();
-                if r.is_empty() {
-                    return events.get().map(|result| match result {
-                        Ok(_) => view! {
-                            <div class="empty-state">
-                                <svg class="empty-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
-                                    <circle cx="24" cy="24" r="12" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>
-                                    <circle cx="24" cy="24" r="4" fill="currentColor" opacity="0.6"/>
-                                </svg>
-                                <p>"Waiting for events"</p>
-                                <span class="empty-sub">"Events stream here in real-time as users interact with your application."</span>
-                            </div>
-                        }.into_any(),
-                        Err(e) => view! { <div class="loading">{format!("Error: {e}")}</div> }.into_any()
-                    });
-                }
-                Some(view! {
-                    <table class="event-table" aria-label="Live events">
+        // Render from the route-owned `rows`/`loaded`/`error` signals, never from a
+        // resource read inside the view. Reading the resource inside <Suspense> left
+        // orphaned table DOM on navigation (the late-resolved fragment mounted into
+        // <main> after the route owner was disposed). Signals are torn down
+        // synchronously on navigation, so nothing can leak. The skeleton is shown
+        // until the initial fetch resolves; on the server `loaded` is false, and the
+        // client hydrates the same skeleton before the seeding effect runs, so there
+        // is no hydration mismatch.
+        {move || {
+            if let Some(e) = error.get() {
+                return view! { <div class="loading">{format!("Error: {e}")}</div> }.into_any();
+            }
+            if !loaded.get() {
+                return view! {
+                    <table class="event-table skeleton-table" aria-label="Live events">
                         <thead>
                             <tr>
-                                <th>"Time"</th>
-                                <th>"Type"</th>
-                                <th>"User"</th>
-                                <th>"Page"</th>
-                                <th class="hide-mobile">"Device"</th>
-                                <th class="hide-mobile">"Country"</th>
+                                <th>{"\u{00a0}"}</th>
+                                <th>{"\u{00a0}"}</th>
+                                <th>{"\u{00a0}"}</th>
+                                <th>{"\u{00a0}"}</th>
+                                <th class="hide-mobile">{"\u{00a0}"}</th>
+                                <th class="hide-mobile">{"\u{00a0}"}</th>
                             </tr>
                         </thead>
-                        <tbody aria-live="polite">
-                            <For
-                                each=move || rows.get()
-                                key=|(eid, _, _)| eid.clone()
-                                let:entry
-                            >
-                                <EventRowView event=entry.1 is_new=entry.2 />
-                            </For>
+                        <tbody>
+                            {(0..100).map(|_| view! {
+                                <tr class="skeleton-row">
+                                    <td>{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</td>
+                                    <td><span class="badge-event badge-default">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</span></td>
+                                    <td>
+                                        <div class="user-identity compact">
+                                            <span class="user-avatar"><div class="skel-circle" style="width:22px;height:22px"></div></span>
+                                            <span class="user-petname">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</span>
+                                        </div>
+                                    </td>
+                                    <td class="page-url">{"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}</td>
+                                    <td class="hide-mobile">
+                                        <span class="device-inline">{"\u{00a0}\u{00a0}"}</span>
+                                        {"\u{00a0}\u{00a0}\u{00a0}\u{00a0}\u{00a0}"}
+                                    </td>
+                                    <td class="hide-mobile">
+                                        <span class="flag">{"\u{00a0}"}</span>
+                                        {" \u{00a0}\u{00a0}\u{00a0}\u{00a0}"}
+                                    </td>
+                                </tr>
+                            }).collect::<Vec<_>>()}
                         </tbody>
                     </table>
-                }.into_any())
-            }}
-        </Suspense>
+                }.into_any();
+            }
+            if rows.get().is_empty() {
+                return view! {
+                    <div class="empty-state">
+                        <svg class="empty-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+                            <circle cx="24" cy="24" r="12" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>
+                            <circle cx="24" cy="24" r="4" fill="currentColor" opacity="0.6"/>
+                        </svg>
+                        <p>"Waiting for events"</p>
+                        <span class="empty-sub">"Events stream here in real-time as users interact with your application."</span>
+                    </div>
+                }.into_any();
+            }
+            view! {
+                <table class="event-table" aria-label="Live events">
+                    <thead>
+                        <tr>
+                            <th>"Time"</th>
+                            <th>"Type"</th>
+                            <th>"User"</th>
+                            <th>"Page"</th>
+                            <th class="hide-mobile">"Device"</th>
+                            <th class="hide-mobile">"Country"</th>
+                        </tr>
+                    </thead>
+                    <tbody aria-live="polite">
+                        <For
+                            each=move || rows.get()
+                            key=|(eid, _, _)| eid.clone()
+                            let:entry
+                        >
+                            <EventRowView event=entry.1 is_new=entry.2 />
+                        </For>
+                    </tbody>
+                </table>
+            }.into_any()
+        }}
     }
 }
 

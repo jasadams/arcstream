@@ -27,6 +27,12 @@ pub fn UserDetailPage() -> impl IntoView {
         |(tenant, cid)| get_live_profile(tenant, cid),
     );
 
+    // Seeds the route-owned `live_events` signal (read only by the client effect
+    // below, never inside <Suspense> in the view). Rendering the timeline from the
+    // signal instead of this resource is what stops late-resolving Suspense fragments
+    // from orphaning DOM on navigation. The `#[allow]` covers SSR, where the seeding
+    // effect doesn't run so the binding is unused.
+    #[cfg_attr(feature = "ssr", allow(unused_variables))]
     let events = Resource::new(
         move || (tenant_id(), canonical_id()),
         |(tenant, cid)| get_events(tenant, cid),
@@ -353,57 +359,27 @@ pub fn UserDetailPage() -> impl IntoView {
         </Suspense>
 
         <div class="section-title">"Recent Events"</div>
-        <Suspense fallback=move || view! { <div class="timeline-placeholder"></div> }>
-            {move || {
-                let current = live_events.get();
-                if current.is_empty() {
-                    return events.get().map(|result| match result {
-                        Ok(evts) => render_timeline(evts).into_any(),
-                        Err(e) => view! { <div class="loading">{format!("Error: {e}")}</div> }.into_any()
-                    });
-                }
-                Some(view! {
-                    <div class="timeline" aria-live="polite">
-                        <For
-                            each=move || live_events.get()
-                            key=|entry| entry.0.clone()
-                            let:entry
-                        >
-                            <TimelineItemView event=entry.1 is_new=entry.2 />
-                        </For>
-                    </div>
-                }.into_any())
-            }}
-        </Suspense>
-    }
-}
-
-fn render_timeline(events: Vec<EventRow>) -> impl IntoView {
-    view! {
-        <div class="timeline">
-            {events.into_iter().map(|e| {
-                let event_time = e.event_time.clone();
-                let icon_svg = device_svg(&e.device_type);
-                let event_href = format!("/events/{}/{}/{}?t={}", e.tenant_id, e.canonical_id, e.event_id, &e.event_time[..10.min(e.event_time.len())]);
-                view! {
-                    <div class="timeline-item">
-                        <A href=event_href>
-                            <div class="time"><RelativeTime timestamp=event_time /></div>
-                            <div class="detail">
-                                <span class=format!("badge {}", event_type_class(&e.event_type))>{event_type_label(&e.event_type)}</span>
-                                " "
-                                {e.page_url.clone()}
-                                " "
-                                <span class="timeline-device">
-                                    <span class="device-icon active" inner_html=icon_svg></span>
-                                    {format!(" {} · {}", e.device_type, e.browser)}
-                                </span>
-                            </div>
-                        </A>
-                    </div>
-                }
-            }).collect::<Vec<_>>()}
+        // Render the feed purely from the route-owned `live_events` signal (seeded
+        // from the `events` resource and the live WS stream by the effects above).
+        //
+        // Previously this read the `events` resource inside <Suspense>. On client-side
+        // navigation away before the resource resolved, the late-resolved fragment
+        // mounted at the router outlet marker — which by then lived in <main> after the
+        // next route's content — and was never disposed, so the timeline bled onto the
+        // following page (e.g. /analytics). A <For> over a route-owned signal is torn
+        // down synchronously when the route's owner is disposed, so it cannot leak.
+        <div class="timeline" aria-live="polite">
+            <For
+                each=move || live_events.get()
+                key=|entry| entry.0.clone()
+                let:entry
+            >
+                <TimelineItemView event=entry.1 is_new=entry.2 />
+            </For>
         </div>
+        {move || live_events.get().is_empty().then(|| view! {
+            <div class="timeline-placeholder"></div>
+        })}
     }
 }
 
