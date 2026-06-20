@@ -326,6 +326,34 @@ pub fn UserDetailPage() -> impl IntoView {
                     <div class="value"><RollingCounter value=Signal::from(feature_uses) /></div>
                 </div>
             </div>
+            <div class="section-title">"Top Pages"</div>
+            <div class="tag-list">
+                {move || {
+                    let pages = profile_data.get().map(|p| {
+                        p.top_pages.iter().filter(|pg| !pg.is_empty()).cloned().collect::<Vec<_>>()
+                    });
+                    match pages {
+                        Some(pg) if !pg.is_empty() => pg.into_iter().map(|pg| {
+                            view! { <span class="badge badge-event">{pg}</span> }
+                        }).collect::<Vec<_>>().into_any(),
+                        _ => view! { <span class="empty-hint">"None yet"</span> }.into_any(),
+                    }
+                }}
+            </div>
+            <div class="section-title">"Top Features"</div>
+            <div class="tag-list">
+                {move || {
+                    let features = profile_data.get().map(|p| {
+                        p.top_features.iter().filter(|pg| !pg.is_empty()).cloned().collect::<Vec<_>>()
+                    });
+                    match features {
+                        Some(f) if !f.is_empty() => f.into_iter().map(|f| {
+                            view! { <span class="badge badge-active">{f}</span> }
+                        }).collect::<Vec<_>>().into_any(),
+                        _ => view! { <span class="empty-hint">"None yet"</span> }.into_any(),
+                    }
+                }}
+            </div>
         </div>
         }) }}
         </Suspense>
