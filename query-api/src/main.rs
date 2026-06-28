@@ -29,17 +29,21 @@ struct Backend {
     live: Arc<dyn LiveProfileProvider>,
 }
 
-/// Selects the analytics backend per request. Pinot is the DEFAULT; FlareDB is
-/// opt-in via the `x-backend: flaredb` header (set by the dashboard toggle).
+/// Selects the analytics backend per request. Pinot is the DEFAULT; the FlareDB
+/// variants are opt-in via the `x-backend` header (set by the dashboard toggle):
+/// `flaredb` → the original FlareDB backend, `flaredb-m3` → the M3 single-copy
+/// Iceberg build. Unknown/missing backends fall back to Pinot.
 #[derive(Clone)]
 struct BackendSelector {
     pinot: Backend,
     flaredb: Option<Backend>,
+    flaredb_m3: Option<Backend>,
 }
 
 impl BackendSelector {
     fn select(&self, name: &str) -> &Backend {
         match name {
+            "flaredb-m3" | "flare-m3" | "m3" => self.flaredb_m3.as_ref().unwrap_or(&self.pinot),
             "flare" | "flaredb" => self.flaredb.as_ref().unwrap_or(&self.pinot),
             _ => &self.pinot,
         }
@@ -125,9 +129,23 @@ async fn main() {
         }
     });
 
+    // FlareDB M3 (single-copy Iceberg build) — opt-in when FLAREDB_M3_URL set.
+    let flaredb_m3_backend = std::env::var("FLAREDB_M3_URL").ok().map(|url| {
+        eprintln!("FlareDB M3 backend enabled at {url}");
+        let c = Arc::new(FlareDBClient {
+            url,
+            http: reqwest::Client::new(),
+        });
+        Backend {
+            querier: c.clone() as Arc<dyn PinotQuerier>,
+            live: c as Arc<dyn LiveProfileProvider>,
+        }
+    });
+
     let backends = BackendSelector {
         pinot: pinot.clone(),
         flaredb: flaredb_backend,
+        flaredb_m3: flaredb_m3_backend,
     };
 
     let (profile_tx, _) = broadcast::channel::<ProfileUpdateMessage>(1024);

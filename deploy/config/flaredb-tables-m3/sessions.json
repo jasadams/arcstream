@@ -1,0 +1,36 @@
+{
+  "tableName": "sessions",
+  "schema": [
+    {"name": "session_id", "type": "Utf8", "nullable": false},
+    {"name": "canonical_id", "type": "Utf8", "nullable": false},
+    {"name": "tenant_id", "type": "Utf8", "nullable": false},
+    {"name": "start_time", "type": "Timestamp(Millisecond, None)", "nullable": false},
+    {"name": "end_time", "type": "Timestamp(Millisecond, None)", "nullable": true},
+    {"name": "duration_sec", "type": "Int64", "nullable": true},
+    {"name": "event_count", "type": "Int64", "nullable": true},
+    {"name": "device_type", "type": "Utf8", "nullable": true},
+    {"name": "browser", "type": "Utf8", "nullable": true},
+    {"name": "country", "type": "Utf8", "nullable": true}
+  ],
+  "ingestionConfig": {
+    "topic": "session-events",
+    "brokers": "redpanda:9092"
+  },
+  "transformConfigs": [
+    {"source_column": "start_time", "derived_column": "session_date", "function": "DATE_FROM_TIMESTAMP"},
+    {"source_column": "start_time", "derived_column": "session_hour", "function": "HOUR_FROM_TIMESTAMP"}
+  ],
+  "indexConfig": {
+    "invertedIndexColumns": ["tenant_id"],
+    "starTreeConfig": {
+      "dimensions_split_order": ["tenant_id", "session_date", "session_hour", "country", "device_type", "browser"],
+      "metric_aggregations": [
+        {"column": "duration_sec", "functions": ["SUM"]},
+        {"column": "event_count", "functions": ["SUM"]},
+        {"column": "*", "functions": ["COUNT"]}
+      ],
+      "max_leaf_records": 10000
+    },
+    "sortedColumn": "start_time"
+  }
+}

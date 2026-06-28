@@ -20,7 +20,7 @@ async fn read_backend_cookie() -> String {
                 .split(';')
                 .find_map(|kv| kv.trim().strip_prefix("backend=").map(str::to_owned))
         })
-        .filter(|b| b == "pinot" || b == "flare" || b == "flaredb")
+        .filter(|b| b == "pinot" || b == "flare" || b == "flaredb" || b == "flaredb-m3")
         .unwrap_or_else(|| "pinot".to_owned())
 }
 

@@ -1,0 +1,152 @@
+{
+  "tableName": "events",
+  "schema": [
+    {
+      "name": "event_id",
+      "type": "Utf8",
+      "nullable": false
+    },
+    {
+      "name": "event_type",
+      "type": "Utf8",
+      "nullable": false
+    },
+    {
+      "name": "tenant_id",
+      "type": "Utf8",
+      "nullable": false
+    },
+    {
+      "name": "event_time",
+      "type": "Timestamp(Millisecond, None)",
+      "nullable": false
+    },
+    {
+      "name": "canonical_id",
+      "type": "Utf8",
+      "nullable": false
+    },
+    {
+      "name": "anonymous_id",
+      "type": "Utf8",
+      "nullable": true
+    },
+    {
+      "name": "session_id",
+      "type": "Utf8",
+      "nullable": true
+    },
+    {
+      "name": "user_id",
+      "type": "Utf8",
+      "nullable": true
+    },
+    {
+      "name": "page_url",
+      "type": "Utf8",
+      "nullable": true
+    },
+    {
+      "name": "device_type",
+      "type": "Utf8",
+      "nullable": true
+    },
+    {
+      "name": "browser",
+      "type": "Utf8",
+      "nullable": true
+    },
+    {
+      "name": "country",
+      "type": "Utf8",
+      "nullable": true
+    },
+    {
+      "name": "referrer",
+      "type": "Utf8",
+      "nullable": true
+    },
+    {
+      "name": "element_id",
+      "type": "Utf8",
+      "nullable": true
+    },
+    {
+      "name": "feature_name",
+      "type": "Utf8",
+      "nullable": true
+    },
+    {
+      "name": "os",
+      "type": "Utf8",
+      "nullable": true
+    },
+    {
+      "name": "properties",
+      "type": "Utf8",
+      "nullable": true
+    }
+  ],
+  "ingestionConfig": {
+    "topic": "unified-events",
+    "brokers": "redpanda:9092",
+    "maxRowsPerSegment": 1000000
+  },
+  "transformConfigs": [
+    {
+      "source_column": "event_time",
+      "derived_column": "event_date",
+      "function": "DATE_FROM_TIMESTAMP"
+    },
+    {
+      "source_column": "event_time",
+      "derived_column": "event_hour",
+      "function": "HOUR_FROM_TIMESTAMP"
+    }
+  ],
+  "indexConfig": {
+    "invertedIndexColumns": [
+      "tenant_id",
+      "event_type",
+      "canonical_id"
+    ],
+    "bloomFilterColumns": [
+      "canonical_id",
+      "event_id"
+    ],
+    "starTreeConfig": {
+      "dimensions_split_order": [
+        "tenant_id",
+        "event_date",
+        "event_hour",
+        "country",
+        "event_type",
+        "device_type",
+        "browser",
+        "page_url"
+      ],
+      "metric_aggregations": [
+        {
+          "column": "*",
+          "functions": [
+            "COUNT"
+          ]
+        },
+        {
+          "column": "session_id",
+          "functions": [
+            "DISTINCT_COUNT_HLL"
+          ]
+        },
+        {
+          "column": "canonical_id",
+          "functions": [
+            "DISTINCT_COUNT_HLL"
+          ]
+        }
+      ],
+      "max_leaf_records": 10000
+    },
+    "sortedColumn": "event_time"
+  }
+}
