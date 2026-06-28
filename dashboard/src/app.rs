@@ -214,9 +214,7 @@ fn DevModeToggle() -> impl IntoView {
 
 /// Nav toggle that switches the analytics backend per-browser. Stores the choice
 /// in a `backend` cookie (default Pinot) which the dashboard server forwards to
-/// query-api as `x-backend`; clicking cycles through the available backends and
-/// reloads so data re-fetches. Three options: Pinot (default), FlareDB (the
-/// original backend), and FlareDB M3 (single-copy Iceberg build).
+/// query-api as `x-backend`; clicking flips it and reloads so data re-fetches.
 #[component]
 fn BackendToggle() -> impl IntoView {
     let current = RwSignal::new("pinot".to_string());
@@ -231,12 +229,7 @@ fn BackendToggle() -> impl IntoView {
         #[cfg(feature = "hydrate")]
         {
             let cur = current.get_untracked();
-            // Cycle: Pinot → FlareDB → FlareDB M3 → Pinot.
-            let next = match cur.as_str() {
-                "flare" | "flaredb" => "flaredb-m3",
-                "flaredb-m3" | "flare-m3" | "m3" => "pinot",
-                _ => "flare",
-            };
+            let next = if cur == "flare" || cur == "flaredb" { "pinot" } else { "flare" };
             set_backend_cookie_client(next);
             if let Some(w) = web_sys::window() {
                 let _ = w.location().reload();
@@ -248,15 +241,11 @@ fn BackendToggle() -> impl IntoView {
         <button
             class="backend-toggle"
             on:click=toggle
-            title="Analytics backend — click to cycle (Pinot / FlareDB / FlareDB M3)"
+            title="Analytics backend — click to switch (Pinot / FlareDB)"
         >
             {move || {
                 let c = current.get();
-                match c.as_str() {
-                    "flare" | "flaredb" => "FlareDB",
-                    "flaredb-m3" | "flare-m3" | "m3" => "FlareDB M3",
-                    _ => "Pinot",
-                }
+                if c == "flare" || c == "flaredb" { "FlareDB" } else { "Pinot" }
             }}
         </button>
     }
