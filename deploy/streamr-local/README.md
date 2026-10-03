@@ -84,8 +84,41 @@ python3 -m unittest discover -s deploy/streamr-local -p test_local.py -v
 
 ## Readiness limits
 
-This is local identity integration and container-recreation evidence. Live-state volumes
-also persist, so it does not by itself prove recovery solely from a remote checkpoint.
+### Checkpoint recovery without existing live state
+
+Use a separate instance to keep the existing LAN evaluation available. All commands
+for that instance must use the same name and ports; the helper records and checks them.
+
+```sh
+python3 deploy/streamr-local/local.py pin --instance checkpoint-only --http-port 15116 --broker-port 29093 --image localhost/streamr:arc-13-m2
+python3 deploy/streamr-local/local.py up --instance checkpoint-only --http-port 15116 --broker-port 29093
+python3 deploy/streamr-local/local.py recovery --instance checkpoint-only --http-port 15116 --broker-port 29093 --fresh-live-state
+```
+
+The recovery runner processes ten events, stops each pipeline at a completed checkpoint,
+and recreates Streamr before processing the last three. With `--fresh-live-state`, it
+also detaches the old RocksDB volume and mounts a newly created, verified-empty one.
+It records both mounts, checks checkpoint restore logs and newer run IDs, then compares
+all physical committed outputs with the independent oracle. SQLite, broker, compiler
+and published checkpoint volumes persist. Evidence lives in
+`target/streamr-local/checkpoint-only/`; the separate console uses port 15116 on the LAN.
+
+This is completed-checkpoint recovery from local published checkpoint files, not a
+remote-storage test or an arbitrary crash test. The original detached state volume and
+new external proof volume are retained. `down` preserves them; `reset` archives completed
+or partial recovery evidence and clears the override so the next run uses the base state
+volume. External proof volumes remain available for inspection and need explicit cleanup.
+Never use the default instance's `reset` merely to run this separate test.
+
+An initial test that recreated Streamr while pipelines remained running reproduced the
+known Kafka sink gap: a later checkpoint entered its commit phase before restart, and
+the worker logged `Restoring from commit phase not yet implemented`. The completed-
+checkpoint runner now stops pipelines at checkpoints to keep its scope deterministic.
+That change does not fix or qualify commit-phase recovery; it remains a production gate.
+
+The default recreation test retains live-state volumes. The fresh-state variant proves
+identity recovery without the old live-state volume, while published checkpoint files
+remain on local storage; neither variant establishes recovery from remote storage.
 The pipelines commit independently; unified and merge output visibility is not atomic
 across the two topics. Sinks request transactional commits and consumers read committed
 records, but the current Kafka sink has an unfinished commit-phase recovery path. This
@@ -115,3 +148,10 @@ hook). Immutable local image ID:
 Manifest digest: `sha256:c6bfaa83fee541c98a2433613237a50591c8901183f8921231fa3952faeefd64`.
 The candidate embeds `/app/streamr-provenance.json` with source, binary, builder and
 runtime-asset hashes. This is an available local image, not a published registry release.
+
+The separate checkpoint-only instance also passed with a verified-empty replacement
+live-state volume: all 13 unified events and two directed merges matched every field,
+with no missing or extra physical committed outputs. All three jobs restored published
+checkpoints on newer worker runs. The run took 22.57 seconds. All 15 helper tests pass.
+The preceding commit-phase failure and its logs are archived separately; STR-37 tracks
+the engine fix and blocks STR-32/ARC-17 qualification.

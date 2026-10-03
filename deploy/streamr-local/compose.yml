@@ -10,9 +10,9 @@ services:
       - --reserve-memory=0M
       - --overprovisioned
       - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:29092
-      - --advertise-kafka-addr=internal://broker:9092,external://localhost:29092
+      - --advertise-kafka-addr=internal://broker:9092,external://localhost:${STREAMR_BROKER_PORT:-29092}
     ports:
-      - "127.0.0.1:29092:29092"
+      - "127.0.0.1:${STREAMR_BROKER_PORT:-29092}:29092"
     volumes:
       - broker-data:/var/lib/redpanda/data
     healthcheck:
@@ -26,7 +26,7 @@ services:
     pull_policy: never
     command: ["-c", "/config/streamr.toml", "cluster"]
     ports:
-      - "0.0.0.0:15115:5115"
+      - "0.0.0.0:${STREAMR_HTTP_PORT:-15115}:5115"
     volumes:
       - ./streamr.toml:/config/streamr.toml:ro,z
       - api-data:/state

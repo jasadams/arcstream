@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -18,6 +19,8 @@ HERE = Path(__file__).resolve().parent
 EVIDENCE = ROOT / "target/streamr-local"
 PROJECT = "arcstream-streamr-eval"
 API = "http://127.0.0.1:15115/api/v1"
+HTTP_PORT = 15115
+BROKER_PORT = 29092
 TOPICS = ["arc-eval-raw-events", "arc-eval-identity-capture",
           "arc-eval-unified-events", "arc-eval-identity-merges"]
 PIPELINES = {"identity": "arc-eval-identity-owner", "unified": "arc-eval-unified", "merges": "arc-eval-merges"}
@@ -50,10 +53,14 @@ def compose(*args):
             if info["Image"].removeprefix("sha256:") != lock["image_id"].removeprefix("sha256:"):
                 raise SetupError("Existing evaluation container uses another image; refusing to replace it")
     environment = EVIDENCE / "compose.env"
-    environment.write_text(f"STREAMR_IMAGE={lock['image_id']}\n")
+    environment.write_text(f"STREAMR_IMAGE={lock['image_id']}\nSTREAMR_HTTP_PORT={HTTP_PORT}\nSTREAMR_BROKER_PORT={BROKER_PORT}\n")
     provider = ["podman-compose"] if os.environ.get("CONTAINER_ENGINE", "podman") == "podman" else ["docker", "compose"]
+    files = ["-f", str(HERE / "compose.yml")]
+    override = EVIDENCE / "live-state.override.json"
+    if override.exists():
+        files += ["-f", str(override)]
     return run(provider + ["--env-file", str(environment), "-p", PROJECT,
-                           "-f", str(HERE / "compose.yml"), *args], timeout=180)
+                           *files, *args], timeout=180)
 
 
 def engine():
@@ -200,7 +207,7 @@ def collect_evidence():
         "source_sha256": {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths},
         "artifact_sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
                             for path in EVIDENCE.glob("*.jsonl")},
-        "scope": "Local Kafka identity correctness/container recreation; capacity, commit-phase fault recovery and profiles/sessions pending",
+        "scope": "Local Kafka identity correctness/checkpoint recovery; capacity, commit-phase fault recovery and profiles/sessions pending",
     })
     (EVIDENCE / "streamr.log").write_text(run([engine(), "logs", container("streamr")], include_stderr=True))
 
@@ -213,7 +220,25 @@ def checkpoint(pipeline_id, started_after):
     return max(finished, key=lambda value: value["epoch"]) if finished else None
 
 
-def smoke(recovery):
+def fresh_live_state():
+    """Detach and retain the old state volume; mount a verified-empty new one."""
+    image = json.loads((EVIDENCE / "candidate.json").read_text())["image_id"]
+    before = json.loads(run([engine(), "inspect", container("streamr")]))[0]
+    old = next(mount for mount in before["Mounts"] if mount["Destination"] == "/live-state")
+    print(compose("stop", "streamr"))
+    volume = f"{PROJECT}-fresh-live-state-{time.time_ns()}"
+    run([engine(), "volume", "create", "--label", f"com.docker.compose.project={PROJECT}", volume])
+    run([engine(), "run", "--rm", "--entrypoint", "/bin/sh", "-v", f"{volume}:/proof:ro",
+         image, "-c", 'set -eu; contents=$(find /proof -mindepth 1 -maxdepth 1 -print -quit); test -z "$contents"'])
+    override = {"services": {"streamr": {"volumes": ["fresh-live-state:/live-state"]}},
+                "volumes": {"fresh-live-state": {"external": True, "name": volume}}}
+    write_json("live-state.override.json", override)
+    write_json("fresh-live-state.json", {"old_mount": old, "new_volume": volume,
+                                         "verified_empty_before_restart": True})
+    return volume
+
+
+def smoke(recovery, fresh_state=False):
     ready()
     if topic_rows(TOPICS[0]):
         raise SetupError("Raw evaluation topic is not empty. Use fresh evaluation volumes for a new fixture run")
@@ -230,13 +255,32 @@ def smoke(recovery):
         before = {name: job(identifier) for name, identifier in ids.items()}
         # Checkpoint after committed prefix observation, rather than a stale empty snapshot.
         after_prefix = time.time_ns() // 1000
+        # Stop every job at a completed checkpoint so restart cannot race a later
+        # checkpoint's unfinished Kafka commit phase. That fault is a separate gate.
+        for name, identifier in ids.items():
+            api(f"/pipelines/{identifier}", "PATCH", {"stop": "checkpoint"})
+            wait_for(lambda identifier=identifier: job(identifier)["state"] == "Stopped",
+                     f"{name} prefix checkpoint stop")
         checkpoints = {name: wait_for(lambda identifier=identifier: checkpoint(identifier, after_prefix),
                                      f"{name} published checkpoint after prefix")
                        for name, identifier in ids.items()}
         write_json("before-recreation.json", {"jobs": before, "checkpoints": checkpoints})
-        print("Recreating only the evaluation Streamr container; broker and all volumes persist.", flush=True)
+        volume = fresh_live_state() if fresh_state else None
+        print("Recreating evaluation Streamr; broker and published checkpoints persist.", flush=True)
         print(compose("up", "-d", "--no-deps", "--force-recreate", "streamr"))
+        if volume:
+            info = json.loads(run([engine(), "inspect", container("streamr")]))[0]
+            mount = next(item for item in info["Mounts"] if item["Destination"] == "/live-state")
+            if mount.get("Name") != volume:
+                raise SetupError(f"Expected fresh live-state volume {volume}, got {mount}")
+            record = json.loads((EVIDENCE / "fresh-live-state.json").read_text())
+            record["new_mount"] = mount
+            if mount["Source"] == record["old_mount"]["Source"]:
+                raise SetupError("Live-state source did not change")
+            write_json("fresh-live-state.json", record)
         ready()
+        for identifier in ids.values():
+            api(f"/pipelines/{identifier}", "PATCH", {"stop": "none"})
         def restored(name, identifier):
             current = running(identifier)
             return current if current and current["run_id"] > before[name]["run_id"] else None
@@ -279,20 +323,48 @@ def smoke(recovery):
     compare(oracle, adapted)
     for name, rows in [("raw.jsonl", raw), ("intermediate.jsonl", intermediate), ("outputs.jsonl", actual)]:
         (EVIDENCE / name).write_text("".join(json.dumps(row) + "\n" for row in rows))
-    result.update(status="pass", container_recreation=recovery, elapsed_seconds=(time.time_ns() // 1000 - start) / 1e6)
+    result.update(status="pass", container_recreation=recovery, fresh_live_state=fresh_state,
+                  elapsed_seconds=(time.time_ns() // 1000 - start) / 1e6)
     write_json("comparison.json", result)
     collect_evidence()
     print(json.dumps(result, sort_keys=True))
 
 
 def main():
+    global PROJECT, API, EVIDENCE, HTTP_PORT, BROKER_PORT
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["pin", "up", "submit", "smoke", "recovery", "status", "down", "reset"])
     parser.add_argument("--image", help="provenance-labelled local candidate to pin")
+    parser.add_argument("--instance", help="separate named evaluation instance (lowercase letters, digits, hyphens)")
+    parser.add_argument("--http-port", type=int, default=15115)
+    parser.add_argument("--broker-port", type=int, default=29092)
+    parser.add_argument("--fresh-live-state", action="store_true", help="recovery only: retain old RocksDB volume and restart with an empty one")
     args = parser.parse_args()
+    if args.instance:
+        if not re.fullmatch(r"[a-z][a-z0-9-]{0,39}", args.instance):
+            parser.error("Invalid instance name")
+        if args.http_port == 15115 or args.broker_port == 29092:
+            parser.error("Named instances require distinct HTTP and broker ports")
+        PROJECT = f"arcstream-streamr-eval-{args.instance}"
+        EVIDENCE = ROOT / "target/streamr-local" / args.instance
+    elif args.http_port != 15115 or args.broker_port != 29092:
+        parser.error("Custom ports require --instance")
+    if args.http_port == args.broker_port:
+        parser.error("HTTP and broker ports must differ")
+    if not all(1024 <= port <= 65535 for port in (args.http_port, args.broker_port)):
+        parser.error("Ports must be between 1024 and 65535")
+    if args.fresh_live_state and (args.command != "recovery" or not args.instance):
+        parser.error("Fresh live-state recovery requires a separate named instance")
+    HTTP_PORT, BROKER_PORT = args.http_port, args.broker_port
+    API = f"http://127.0.0.1:{HTTP_PORT}/api/v1"
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     try:
         engine()
+        settings = {"project": PROJECT, "http_port": HTTP_PORT, "broker_port": BROKER_PORT}
+        settings_file = EVIDENCE / "instance.json"
+        if settings_file.exists() and json.loads(settings_file.read_text()) != settings:
+            raise SetupError("Instance settings differ from the recorded ports/project; refusing to operate")
+        settings_file.write_text(json.dumps(settings, indent=2) + "\n")
         if args.command == "pin":
             if not args.image:
                 raise SetupError("pin requires --image")
@@ -308,14 +380,14 @@ def main():
         elif args.command == "submit":
             submit()
         elif args.command in {"smoke", "recovery"}:
-            smoke(args.command == "recovery")
+            smoke(args.command == "recovery", args.fresh_live_state)
         elif args.command == "status":
             print(compose("ps"))
             print(json.dumps(api("/jobs"), indent=2))
         elif args.command == "down":
             print(compose("down"))
         elif args.command == "reset":
-            if (EVIDENCE / "comparison.json").exists():
+            if any((EVIDENCE / name).exists() for name in ("comparison.json", "before-recreation.json")):
                 archive = EVIDENCE / "runs" / str(time.time_ns())
                 archive.mkdir(parents=True)
                 for path in EVIDENCE.iterdir():
@@ -326,7 +398,8 @@ def main():
             # Clear generated run outputs after archiving; keep the image pin.
             for name in ("comparison.json", "provenance.json", "before-recreation.json", "after-recreation.json",
                          "restored-checkpoints.json", "prefix-capture.json", "prefix-unified.json", "pipelines.json",
-                         "raw.jsonl", "intermediate.jsonl", "outputs.jsonl", "streamr.log"):
+                         "raw.jsonl", "intermediate.jsonl", "outputs.jsonl", "streamr.log",
+                         "live-state.override.json", "fresh-live-state.json"):
                 (EVIDENCE / name).unlink(missing_ok=True)
     except (SetupError, OSError, ValueError, KeyError) as error:
         print(str(error), file=sys.stderr)
