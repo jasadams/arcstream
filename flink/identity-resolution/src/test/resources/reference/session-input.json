@@ -1,0 +1,187 @@
+{
+  "base_time": "2026-06-01T12:00:00Z",
+  "steps": [
+    {
+      "op": "event",
+      "step": "a-first",
+      "offset_ms": 60000,
+      "payload": {
+        "event_id": "a-first",
+        "session_id": "session-a",
+        "tenant_id": "acme",
+        "canonical_id": "canonical-a",
+        "event_type": "page_view",
+        "page_url": "/home",
+        "device_type": "desktop",
+        "browser": "Chrome",
+        "country": "AU"
+      }
+    },
+    {
+      "op": "event",
+      "step": "b-first",
+      "offset_ms": 0,
+      "payload": {
+        "event_id": "b-first",
+        "session_id": "session-b",
+        "tenant_id": "beta",
+        "canonical_id": "canonical-b",
+        "event_type": "page_view",
+        "page_url": "/docs",
+        "device_type": "mobile",
+        "browser": "Firefox",
+        "country": "US"
+      }
+    },
+    {
+      "op": "event",
+      "step": "a-extend",
+      "offset_ms": 120000,
+      "payload": {
+        "event_id": "a-extend",
+        "session_id": "session-a",
+        "tenant_id": "acme",
+        "canonical_id": "canonical-a",
+        "event_type": "page_view",
+        "page_url": "/home",
+        "device_type": "",
+        "browser": "",
+        "country": ""
+      }
+    },
+    {
+      "op": "event",
+      "step": "a-older",
+      "offset_ms": 30000,
+      "payload": {
+        "event_id": "a-older",
+        "session_id": "session-a",
+        "tenant_id": "acme",
+        "canonical_id": "canonical-a",
+        "event_type": "click",
+        "page_url": "/pricing",
+        "device_type": "tablet",
+        "browser": "Safari",
+        "country": "NZ"
+      }
+    },
+    {
+      "op": "event",
+      "step": "a-empty-metadata",
+      "offset_ms": 90000,
+      "payload": {
+        "event_id": "a-empty-metadata",
+        "session_id": "session-a",
+        "tenant_id": "acme",
+        "canonical_id": "canonical-a",
+        "event_type": "login",
+        "page_url": "",
+        "device_type": null,
+        "browser": "",
+        "country": null
+      }
+    },
+    {
+      "op": "event",
+      "step": "b-extend",
+      "offset_ms": 600000,
+      "payload": {
+        "event_id": "b-extend",
+        "session_id": "session-b",
+        "tenant_id": "beta",
+        "canonical_id": "canonical-b",
+        "event_type": "signup",
+        "page_url": "/signup",
+        "device_type": "desktop",
+        "browser": "Chrome",
+        "country": "CA"
+      }
+    },
+    {
+      "op": "processing_time",
+      "step": "processing-clock-alone",
+      "time_ms": 1800000000000
+    },
+    {
+      "op": "snapshot_restore",
+      "step": "restore-pending-closures",
+      "checkpoint_id": 1
+    },
+    {
+      "op": "watermark",
+      "step": "b-canceled-deadline",
+      "offset_ms": 1800000
+    },
+    {
+      "op": "watermark",
+      "step": "a-canceled-deadline",
+      "offset_ms": 1860000
+    },
+    {
+      "op": "watermark",
+      "step": "a-deadline-minus-one",
+      "offset_ms": 1919999
+    },
+    {
+      "op": "watermark",
+      "step": "close-a",
+      "offset_ms": 1920000
+    },
+    {
+      "op": "snapshot_restore",
+      "step": "restore-after-a",
+      "checkpoint_id": 2
+    },
+    {
+      "op": "watermark",
+      "step": "b-deadline-minus-one",
+      "offset_ms": 2399999
+    },
+    {
+      "op": "watermark",
+      "step": "close-b",
+      "offset_ms": 2400000
+    },
+    {
+      "op": "snapshot_restore",
+      "step": "restore-after-all",
+      "checkpoint_id": 3
+    },
+    {
+      "op": "watermark",
+      "step": "closed-sessions-stay-closed",
+      "offset_ms": 2499999
+    },
+    {
+      "op": "event",
+      "step": "a-reuse",
+      "offset_ms": 2500000,
+      "payload": {
+        "event_id": "a-reuse",
+        "session_id": "session-a",
+        "tenant_id": "acme",
+        "canonical_id": "canonical-a-new",
+        "event_type": "page_view",
+        "page_url": "/fresh",
+        "device_type": null,
+        "browser": null,
+        "country": null
+      }
+    },
+    {
+      "op": "watermark",
+      "step": "reuse-deadline-minus-one",
+      "offset_ms": 4299999
+    },
+    {
+      "op": "watermark",
+      "step": "close-reused-a",
+      "offset_ms": 4300000
+    },
+    {
+      "op": "watermark",
+      "step": "no-duplicate-closures",
+      "offset_ms": 5000000
+    }
+  ]
+}
