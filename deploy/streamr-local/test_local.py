@@ -173,9 +173,9 @@ class SubmissionTests(unittest.TestCase):
         self.assertFalse((local.EVIDENCE / "faults.override.json").exists())
 
     def test_fault_checkpoint_must_be_persisted_and_still_committing(self):
-        records = [{"epoch": 7, "finish_time": 10, "events": [{"event": "Committing"}]},
+        records = [{"epoch": 7, "finish_time": 10, "events": [{"event": "WritingMetadata", "finish_time": 10}]},
                    {"epoch": 8, "finish_time": None, "events": [{"event": "Checkpointing"}]},
-                   {"epoch": 9, "finish_time": None, "events": [{"event": "Committing"}]}]
+                   {"epoch": 9, "finish_time": None, "events": [{"event": "WritingMetadata", "finish_time": 10}]}]
         with patch.object(local, "job", return_value={"id": "job"}), \
                 patch.object(local, "api", return_value={"data": records}):
             self.assertIsNone(local.committing_checkpoint("pipeline", 7))

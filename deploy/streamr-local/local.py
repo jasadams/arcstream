@@ -258,10 +258,15 @@ def commit_pause(job_id, point):
 
 
 def committing_checkpoint(pipeline_id, epoch):
+    # Called only after the matching sink commit-pause hook. The controller
+    # persists Committing before starting its timing span; that span is not
+    # visible in the API until the checkpoint completes. Require its durable
+    # metadata-writing span and an unfinished checkpoint at the paused epoch.
     records = api(f"/pipelines/{pipeline_id}/jobs/{job(pipeline_id)['id']}/checkpoints")["data"]
     return next((record for record in records if record["epoch"] == epoch
                  and not record.get("finish_time")
-                 and any(event["event"] == "Committing" for event in record.get("events", []))), None)
+                 and any(event["event"] == "WritingMetadata" and event.get("finish_time")
+                         for event in record.get("events", []))), None)
 
 
 def recovery_action(job_id, epoch):
