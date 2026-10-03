@@ -1,0 +1,283 @@
+{
+  "schema_version": 1,
+  "description": "Tenant-keyed anonymous, login, known-device, directed merge and checkpoint recovery reference.",
+  "steps": [
+    {
+      "op": "event",
+      "payload": {
+        "event_id": "identity-01",
+        "event_type": "page_view",
+        "tenant_id": "tenant-a",
+        "event_time": "2026-01-01 00:00:01.000",
+        "anonymous_id": "device-a",
+        "user_id": null,
+        "session_id": "session-1",
+        "page_url": "/page/1",
+        "referrer": "https://example.test/start",
+        "element_id": "button-1",
+        "feature_name": "reference-feature",
+        "device_type": "desktop",
+        "browser": "Firefox",
+        "os": "Linux",
+        "country": "AU",
+        "properties": "{\"step\":1,\"nested\":{\"enabled\":true}}"
+      }
+    },
+    {
+      "op": "event",
+      "payload": {
+        "event_id": "identity-02",
+        "event_type": "page_view",
+        "tenant_id": "tenant-a",
+        "event_time": "2026-01-01 00:00:02.000",
+        "anonymous_id": "device-a",
+        "user_id": "",
+        "session_id": null,
+        "page_url": null,
+        "referrer": null,
+        "element_id": null,
+        "feature_name": null,
+        "device_type": null,
+        "browser": null,
+        "os": null,
+        "country": null,
+        "properties": null
+      }
+    },
+    {
+      "op": "event",
+      "payload": {
+        "event_id": "identity-03",
+        "event_type": "feature_used",
+        "tenant_id": "tenant-a",
+        "event_time": "2026-01-01 00:00:03.000",
+        "anonymous_id": "device-a",
+        "user_id": "alice",
+        "session_id": "session-1",
+        "page_url": "/page/3",
+        "referrer": "https://example.test/start",
+        "element_id": "button-3",
+        "feature_name": "reference-feature",
+        "device_type": "desktop",
+        "browser": "Firefox",
+        "os": "Linux",
+        "country": "AU",
+        "properties": "{\"step\":3,\"nested\":{\"enabled\":true}}"
+      }
+    },
+    {
+      "op": "event",
+      "payload": {
+        "event_id": "identity-04",
+        "event_type": "page_view",
+        "tenant_id": "tenant-a",
+        "event_time": "2026-01-01 00:00:04.000",
+        "anonymous_id": "device-b",
+        "user_id": null,
+        "session_id": "session-0",
+        "page_url": "/page/4",
+        "referrer": "https://example.test/start",
+        "element_id": "button-4",
+        "feature_name": "reference-feature",
+        "device_type": "desktop",
+        "browser": "Firefox",
+        "os": "Linux",
+        "country": "AU",
+        "properties": "{\"step\":4,\"nested\":{\"enabled\":true}}"
+      }
+    },
+    {
+      "op": "event",
+      "payload": {
+        "event_id": "identity-05",
+        "event_type": "page_view",
+        "tenant_id": "tenant-a",
+        "event_time": "2026-01-01 00:00:05.000",
+        "anonymous_id": "device-b",
+        "user_id": "alice",
+        "session_id": "session-1",
+        "page_url": "/page/5",
+        "referrer": "https://example.test/start",
+        "element_id": "button-5",
+        "feature_name": "reference-feature",
+        "device_type": "desktop",
+        "browser": "Firefox",
+        "os": "Linux",
+        "country": "AU",
+        "properties": "{\"step\":5,\"nested\":{\"enabled\":true}}"
+      }
+    },
+    {
+      "op": "event",
+      "payload": {
+        "event_id": "identity-06",
+        "event_type": "feature_used",
+        "tenant_id": "tenant-a",
+        "event_time": "2026-01-01 00:00:06.000",
+        "anonymous_id": "device-b",
+        "user_id": null,
+        "session_id": "session-0",
+        "page_url": "/page/6",
+        "referrer": "https://example.test/start",
+        "element_id": "button-6",
+        "feature_name": "reference-feature",
+        "device_type": "desktop",
+        "browser": "Firefox",
+        "os": "Linux",
+        "country": "AU",
+        "properties": "{\"step\":6,\"nested\":{\"enabled\":true}}"
+      }
+    },
+    {
+      "op": "event",
+      "payload": {
+        "event_id": "identity-07",
+        "event_type": "page_view",
+        "tenant_id": "tenant-a",
+        "event_time": "2026-01-01 00:00:07.000",
+        "anonymous_id": "device-c",
+        "user_id": "alice",
+        "session_id": "session-1",
+        "page_url": "/page/7",
+        "referrer": "https://example.test/start",
+        "element_id": "button-7",
+        "feature_name": "reference-feature",
+        "device_type": "desktop",
+        "browser": "Firefox",
+        "os": "Linux",
+        "country": "AU",
+        "properties": "{\"step\":7,\"nested\":{\"enabled\":true}}"
+      }
+    },
+    {
+      "op": "event",
+      "payload": {
+        "event_id": "identity-08",
+        "event_type": "page_view",
+        "tenant_id": "tenant-b",
+        "event_time": "2026-01-01 00:00:08.000",
+        "anonymous_id": "device-a",
+        "user_id": "alice",
+        "session_id": "session-0",
+        "page_url": "/page/8",
+        "referrer": "https://example.test/start",
+        "element_id": "button-8",
+        "feature_name": "reference-feature",
+        "device_type": "desktop",
+        "browser": "Firefox",
+        "os": "Linux",
+        "country": "AU",
+        "properties": "{\"step\":8,\"nested\":{\"enabled\":true}}"
+      }
+    },
+    {
+      "op": "event",
+      "payload": {
+        "event_id": "identity-09",
+        "event_type": "feature_used",
+        "tenant_id": "tenant-b",
+        "event_time": "2026-01-01 00:00:09.000",
+        "anonymous_id": "device-b",
+        "user_id": null,
+        "session_id": "session-1",
+        "page_url": "/page/9",
+        "referrer": "https://example.test/start",
+        "element_id": "button-9",
+        "feature_name": "reference-feature",
+        "device_type": "desktop",
+        "browser": "Firefox",
+        "os": "Linux",
+        "country": "AU",
+        "properties": "{\"step\":9,\"nested\":{\"enabled\":true}}"
+      }
+    },
+    {
+      "op": "event",
+      "payload": {
+        "event_id": "identity-10",
+        "event_type": "page_view",
+        "tenant_id": "tenant-a",
+        "event_time": "2026-01-01 00:00:10.000",
+        "anonymous_id": "device-d",
+        "user_id": "bob",
+        "session_id": "session-0",
+        "page_url": "/page/10",
+        "referrer": "https://example.test/start",
+        "element_id": "button-10",
+        "feature_name": "reference-feature",
+        "device_type": "desktop",
+        "browser": "Firefox",
+        "os": "Linux",
+        "country": "AU",
+        "properties": "{\"step\":10,\"nested\":{\"enabled\":true}}"
+      }
+    },
+    {
+      "op": "snapshot_restore",
+      "checkpoint_id": 41
+    },
+    {
+      "op": "event",
+      "payload": {
+        "event_id": "identity-11",
+        "event_type": "page_view",
+        "tenant_id": "tenant-a",
+        "event_time": "2026-01-01 00:00:11.000",
+        "anonymous_id": "device-b",
+        "user_id": "",
+        "session_id": "session-1",
+        "page_url": "/page/11",
+        "referrer": "https://example.test/start",
+        "element_id": "button-11",
+        "feature_name": "reference-feature",
+        "device_type": "desktop",
+        "browser": "Firefox",
+        "os": "Linux",
+        "country": "AU",
+        "properties": "{\"step\":11,\"nested\":{\"enabled\":true}}"
+      }
+    },
+    {
+      "op": "event",
+      "payload": {
+        "event_id": "identity-12",
+        "event_type": "feature_used",
+        "tenant_id": "tenant-b",
+        "event_time": "2026-01-01 00:00:12.000",
+        "anonymous_id": "device-b",
+        "user_id": "alice",
+        "session_id": "session-0",
+        "page_url": "/page/12",
+        "referrer": "https://example.test/start",
+        "element_id": "button-12",
+        "feature_name": "reference-feature",
+        "device_type": "desktop",
+        "browser": "Firefox",
+        "os": "Linux",
+        "country": "AU",
+        "properties": "{\"step\":12,\"nested\":{\"enabled\":true}}"
+      }
+    },
+    {
+      "op": "event",
+      "payload": {
+        "event_id": "identity-13",
+        "event_type": "page_view",
+        "tenant_id": "tenant-a",
+        "event_time": "2026-01-01 00:00:13.000",
+        "anonymous_id": "device-e",
+        "user_id": "alice",
+        "session_id": "session-1",
+        "page_url": "/page/13",
+        "referrer": "https://example.test/start",
+        "element_id": "button-13",
+        "feature_name": "reference-feature",
+        "device_type": "desktop",
+        "browser": "Firefox",
+        "os": "Linux",
+        "country": "AU",
+        "properties": "{\"step\":13,\"nested\":{\"enabled\":true}}"
+      }
+    }
+  ]
+}
