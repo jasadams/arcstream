@@ -182,6 +182,22 @@ class SubmissionTests(unittest.TestCase):
             self.assertIsNone(local.committing_checkpoint("pipeline", 8))
             self.assertEqual(9, local.committing_checkpoint("pipeline", 9)["epoch"])
 
+    def test_marker_loss_cannot_target_default_instance(self):
+        with patch.object(local.sys, "argv", ["local.py", "marker-loss"]), \
+                patch.object(local, "broker") as broker:
+            with self.assertRaises(SystemExit):
+                local.main()
+            broker.assert_not_called()
+
+    def test_marker_loss_refuses_running_jobs_before_deleting_history(self):
+        (local.EVIDENCE / "comparison.json").write_text('{"status":"pass"}')
+        (local.EVIDENCE / "pipelines.json").write_text('{"identity":"pipeline"}')
+        with patch.object(local, "job", return_value={"state": "Running"}), \
+                patch.object(local, "broker") as broker:
+            with self.assertRaisesRegex(local.SetupError, "checkpoint-stopped"):
+                local.marker_loss()
+            broker.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

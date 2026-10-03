@@ -122,7 +122,11 @@ Per-instance evidence includes the interrupted checkpoint, pause point, old/new 
 mounts, restored epochs, physical output scans and worker logs. If a test times out,
 the arm file can leave that isolated worker paused; archive and reset that named
 instance, or remove its recorded arm file to release it deliberately. No default LAN
-instance or production volume is reset. `reset` also archives partial fault evidence.
+instance or production volume is reset. After a passing checkpoint-stopped fault run,
+`marker-loss` on that named instance deliberately deletes/recreates only its identity
+marker topic. It requires explicit history-loss rejection, a newer failed identity run
+and unchanged physical output hashes/counts. This is a destructive negative test of
+that disposable instance; retain its preceding successful evidence and reset before reuse. `reset` also archives partial fault evidence.
 
 These tests qualify the selected latest-checkpoint/fixed-parallelism identity path.
 Marker history must be preserved; older checkpoint rollback, topic deletion, rescaling,

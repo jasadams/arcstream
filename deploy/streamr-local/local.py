@@ -422,10 +422,47 @@ def smoke(recovery, fresh_state=False, commit_fault=None, broker_fault=False, fa
     print(json.dumps(result, sort_keys=True))
 
 
+def marker_loss():
+    """Negative test only after a passing, checkpoint-stopped named fixture."""
+    if json.loads((EVIDENCE / "comparison.json").read_text()).get("status") != "pass":
+        raise SetupError("Marker-loss test requires a passing fixture")
+    ids = json.loads((EVIDENCE / "pipelines.json").read_text())
+    before = {name: job(identifier) for name, identifier in ids.items()}
+    if any(value["state"] != "Stopped" for value in before.values()):
+        raise SetupError("Marker-loss test requires all evaluation jobs checkpoint-stopped")
+    physical_before = {topic: topic_rows(topic) for topic in TOPICS[1:4]}
+    write_json("marker-loss-before.json", {"jobs": before, "marker_records": topic_rows(TOPICS[4])})
+    broker("topic", "delete", TOPICS[4])
+    broker("topic", "create", TOPICS[4], "--partitions", "1", "--replicas", "1",
+           "--topic-config", "cleanup.policy=compact")
+    print(compose("up", "-d", "--no-deps", "--force-recreate", "streamr"))
+    ready()
+    api(f"/pipelines/{ids['identity']}", "PATCH", {"stop": "none"})
+    def rejected():
+        logs = run([engine(), "logs", container("streamr")], include_stderr=True)
+        return logs if "Kafka recovery generation sentinel missing" in logs else None
+    logs = wait_for(rejected, "explicit rejection of lost Kafka marker history")
+    (EVIDENCE / "marker-loss.log").write_text(logs)
+    current = wait_for(lambda: (value if (value := job(ids["identity"]))["state"] in {"Failed", "Error"} else None),
+                       "identity failure reported by API after marker loss")
+    if current["id"] != before["identity"]["id"] or current["run_id"] <= before["identity"]["run_id"]:
+        raise SetupError("Marker-loss rejection did not fail a newer run of the checkpointed identity job")
+    physical_after = {topic: topic_rows(topic) for topic in TOPICS[1:4]}
+    if physical_before != physical_after:
+        raise SetupError("Marker-loss rejection unexpectedly changed physical output")
+    write_json("marker-loss-result.json", {"status": "pass", "job": current,
+                                          "output_unchanged": True, "history_rejected": True,
+                                          "physical_before": {topic: {"count": len(rows), "sha256": hashlib.sha256(json.dumps(rows, sort_keys=True).encode()).hexdigest()}
+                                                              for topic, rows in physical_before.items()},
+                                          "physical_after": {topic: {"count": len(rows), "sha256": hashlib.sha256(json.dumps(rows, sort_keys=True).encode()).hexdigest()}
+                                                             for topic, rows in physical_after.items()}})
+    print("Marker history loss rejected explicitly; API reports failure and output is unchanged.")
+
+
 def main():
     global PROJECT, API, EVIDENCE, HTTP_PORT, BROKER_PORT
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["pin", "up", "submit", "smoke", "recovery", "commit-recovery", "status", "down", "reset"])
+    parser.add_argument("command", choices=["pin", "up", "submit", "smoke", "recovery", "commit-recovery", "marker-loss", "status", "down", "reset"])
     parser.add_argument("--image", help="provenance-labelled local candidate to pin")
     parser.add_argument("--instance", help="separate named evaluation instance (lowercase letters, digits, hyphens)")
     parser.add_argument("--http-port", type=int, default=15115)
@@ -456,6 +493,8 @@ def main():
         parser.error("Broker interruption requires commit-recovery with an explicit fault point")
     if not 0 <= args.fault_delay_seconds <= 120 or (args.fault_delay_seconds and not args.commit_fault):
         parser.error("Fault delay must be 0-120 seconds and requires commit-recovery")
+    if args.command == "marker-loss" and not args.instance:
+        parser.error("Marker-loss testing requires a separate named instance")
     HTTP_PORT, BROKER_PORT = args.http_port, args.broker_port
     API = f"http://127.0.0.1:{HTTP_PORT}/api/v1"
     EVIDENCE.mkdir(parents=True, exist_ok=True)
@@ -484,6 +523,8 @@ def main():
         elif args.command in {"smoke", "recovery", "commit-recovery"}:
             smoke(args.command != "smoke", args.fresh_live_state, args.commit_fault, args.broker_interruption,
                   args.fault_delay_seconds)
+        elif args.command == "marker-loss":
+            marker_loss()
         elif args.command == "status":
             print(compose("ps"))
             print(json.dumps(api("/jobs"), indent=2))
@@ -505,7 +546,7 @@ def main():
                          "restored-checkpoints.json", "prefix-capture.json", "prefix-unified.json", "pipelines.json",
                          "raw.jsonl", "intermediate.jsonl", "outputs.jsonl", "streamr.log",
                          "live-state.override.json", "fresh-live-state.json", "commit-fault.json", "faults.override.json",
-                         "recovery-action.json"):
+                         "recovery-action.json", "marker-loss-before.json", "marker-loss-result.json", "marker-loss.log"):
                 (EVIDENCE / name).unlink(missing_ok=True)
             shutil.rmtree(EVIDENCE / "faults", ignore_errors=True)
     except (SetupError, OSError, ValueError, KeyError) as error:
