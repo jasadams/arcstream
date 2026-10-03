@@ -88,7 +88,11 @@ python3 -m unittest discover -s deploy/streamr-local -p test_local.py -v
 
 The recovery candidate requires a preexisting dedicated compact-only marker topic for
 each transactional sink. `local.py up` provisions the three isolated `arc-eval-*-commits`
-topics; the SQL explicitly names them and sets an 8 MiB replay-journal limit per sink.
+topics; the SQL explicitly names them and sets an 8 MiB replay-journal memory budget
+per sink. The candidate additionally caps encoded replay metadata at 1 MiB before
+checkpoint publication, to fit the qualified single-subtask commit RPC path. JSON
+expansion can hit that encoded limit first; this is an explicit output-per-checkpoint
+capacity restriction, separate from larger-than-RAM operator state.
 Use an immutable candidate containing STR-37; the earlier milestone 2 image does not
 support these options. Its existing LAN evaluation must keep its original SQL and image.
 
@@ -101,6 +105,10 @@ python3 deploy/streamr-local/local.py commit-recovery --instance commit-before -
 For the committed-but-unacknowledged case, use a fresh `commit-after` instance on
 15118/29095 with `--commit-fault after`. For broker recovery, use a fresh `commit-broker`
 instance on 15119/29096 and add `--broker-interruption` to the before-commit case.
+For delayed recovery, use a fresh `commit-timeout` instance on 15120/29097 with
+`--commit-fault before --fault-delay-seconds 25`. The local SQL configures a 10-second
+transaction timeout; capture broker transaction state before killing the worker to
+distinguish actual broker expiration from a merely delayed restart.
 
 Fault tests enable `STREAMR_TEST_KAFKA_COMMIT_FAULT_DIR` only in the isolated instance,
 process the committed ten-event prefix, arm the identity job, and publish the final
