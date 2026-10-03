@@ -35,9 +35,9 @@ Actual UUID-bearing records are exported to
 {"stream":"unified-events","payload":{"event_id":"...","tenant_id":"...","canonical_id":"..."}}
 ```
 
-Merge records use `stream: identity-merges` and the production merge payload. A future
-Streamr capture adapter must emit these envelopes after executing the same input steps;
-it must preserve fields and separate merge outputs, including checkpoint/replay boundaries.
+Merge records use `stream: identity-merges` and the production merge payload. The Streamr
+capture adapter emits these envelopes after executing the same input steps; it preserves
+fields and separate merge outputs, including checkpoint/replay boundaries.
 For a Kafka-only replay, publish the `payload` of event steps, retaining order, and implement
 the snapshot/restart step in the evaluation harness rather than publishing it as an event.
 
@@ -94,7 +94,73 @@ comparison semantics before broader profile/session capture comparison.
 The snapshots here are Flink keyed-operator harness snapshots restored into new operator
 instances. They do not establish Kafka offset/sink consistency, remote checkpoint durability,
 RocksDB memory bounds, process crash recovery, partition idleness or a full replay.
-Next, run the same identity fixture through actual Streamr SQL, add reusable profile/session
-captures with explicit time controls, then execute the STR-32 backfill, hot-key,
+The identity SQL capture below executes the same fixture through actual Streamr operators.
+Next, add reusable profile/session captures with explicit time controls, then execute the STR-32 backfill, hot-key,
 larger-than-RAM and 24-hour live/fault qualification in isolated outputs. Milestone 1/2
-review and STR-3/4 state semantics remain prerequisites for Streamr acceptance.
+review and state-semantics acceptance remain prerequisites for migration.
+
+## Actual Streamr identity SQL capture
+
+`identity-capture.sql` implements the full current identity contract through a linear
+projection/CTE chain. It reads both maps, chooses the existing user identity before the
+anonymous identity, writes the anonymous binding, and conditionally creates a missing user
+binding. It forwards all 17 unified-event fields and captures the old anonymous identity
+when a real merge occurs. Tenant keys include a length-prefixed tenant component rather
+than a delimiter-only concatenation. UUID generation occurs before stateful execution.
+
+The milestone 2 candidate includes one ordered owner for chained state projections and
+guarded conditional calls. This capture requires that implementation and the opt-in
+`arcstream_identity_capture` hook in `arroyo-sql-testing`; the older STR-1-only branch is
+insufficient. The hook is ignored during normal tests and requires explicit file paths.
+It asserts one source, one singleton state owner, and actual resolved backend/mode.
+
+Run from this Arcstream worktree, using an isolated Streamr worktree containing the hook:
+
+```sh
+export STREAMR_BUILD_WRAPPER=/home/jason/repos/streamr/scripts/rust-build
+export STREAMR_DEV_IMAGE=9bbf20dad97b162f3c1d82fdfae020d344436b69cb66c8e06b804c6001241f1a
+# Optional warm target; builds sharing this target must use the same cooperative queue.
+export STREAMR_CAPTURE_TARGET=/path/to/warm/streamr/target
+bash test/streamr-reference/run-streamr.sh /path/to/streamr controller
+bash test/streamr-reference/run-streamr.sh /path/to/streamr leader
+bash test/streamr-reference/run-streamr.sh /path/to/streamr memory
+```
+
+The image ID above is the verified local Bookworm/Rust 1.96 builder. On another machine,
+build the repository's prescribed Bookworm image and set `STREAMR_DEV_IMAGE` accordingly;
+the runner explicitly invokes `cargo +1.96.0` and records the immutable image ID. Set
+`STREAMR_BUILD_WRAPPER` to your cooperative `scripts/rust-build` wrapper. Public Cargo
+dependencies are cached under ignored `target/capture-build`; no application database,
+Kafka broker, or production service is required.
+
+For each mode the hook captures an initial 13-row run, then starts another execution,
+checkpoints after event 10 at epoch 41, verifies published local checkpoint metadata,
+cancels all worker tasks, constructs a fresh restored program, and processes the remaining
+three events. The test file sink restores its checkpoint byte offset. Each run uses fresh
+RocksDB attempt directories; local working-state reuse is not the recovery source.
+`streamr_capture.py` only envelopes actual sink fields and converts SQL-produced merge
+metadata into directed merge records; it does not simulate identity resolution.
+
+Both initial and recovered captures must match the independent oracle exactly after UUID
+normalization. Raw sink rows, normalized envelopes, comparison results, query/input,
+operator/checkpoint logs and provenance stay in `target/streamr-identity/<mode>/`.
+This is a small worker-task cancellation/local durable restore fixture. It does not prove
+process-crash recovery, remote object storage, post-checkpoint speculative output rollback,
+Kafka delivery guarantees or larger-than-RAM throughput. It provides executable Arcstream
+evidence for the shared-map/conditional path without closing the broader STR-3/4 acceptance.
+
+Local verification on 2026-10-03 passed in all three modes:
+
+| Backend / checkpoint protocol | Initial capture | Recovered capture at epoch 41 |
+| --- | --- | --- |
+| Memory / controller | 13 unified events + 2 merges | 13 unified events + 2 merges |
+| RocksDB / controller | 13 unified events + 2 merges | 13 unified events + 2 merges |
+| RocksDB / leader | 13 unified events + 2 merges | 13 unified events + 2 merges |
+
+Every capture matched the independent oracle, preserving all fields and merge direction.
+The planned graph contains a file source, ordinary projections/watermark generation,
+one singleton stateful owner, and a file sink; it uses no join or aggregate/window state.
+The capture hook is stacked on milestone 2 revision `fb01f5e9`; exact tested revisions and
+artifact hashes are recorded by the runner. The 15 Flink tests and all 19 Python
+comparator/adapter tests also pass. This table is correctness evidence for the small
+identity fixture, not a capacity or full migration claim.
