@@ -84,13 +84,49 @@ python3 -m unittest discover -s deploy/streamr-local -p test_local.py -v
 
 ## Readiness limits
 
+### Kafka commit-phase fault tests
+
+The recovery candidate requires a preexisting dedicated compact-only marker topic for
+each transactional sink. `local.py up` provisions the three isolated `arc-eval-*-commits`
+topics; the SQL explicitly names them and sets an 8 MiB replay-journal limit per sink.
+Use an immutable candidate containing STR-37; the earlier milestone 2 image does not
+support these options. Its existing LAN evaluation must keep its original SQL and image.
+
+```sh
+python3 deploy/streamr-local/local.py pin --instance commit-before --http-port 15117 --broker-port 29094 --image localhost/streamr:str-37
+python3 deploy/streamr-local/local.py up --instance commit-before --http-port 15117 --broker-port 29094
+python3 deploy/streamr-local/local.py commit-recovery --instance commit-before --http-port 15117 --broker-port 29094 --commit-fault before --fresh-live-state
+```
+
+For the committed-but-unacknowledged case, use a fresh `commit-after` instance on
+15118/29095 with `--commit-fault after`. For broker recovery, use a fresh `commit-broker`
+instance on 15119/29096 and add `--broker-interruption` to the before-commit case.
+
+Fault tests enable `STREAMR_TEST_KAFKA_COMMIT_FAULT_DIR` only in the isolated instance,
+process the committed ten-event prefix, arm the identity job, and publish the final
+three events. The worker pauses immediately before commit or after broker commit and
+before acknowledgement, with a nonempty durable replay journal. The helper verifies
+the fault belongs to a newer persisted checkpoint in the committing phase, then sends
+SIGKILL. Recovery retains broker/API/checkpoints and can replace live RocksDB state;
+strict committed output scans must still contain exactly 13 events and two merges.
+
+Per-instance evidence includes the interrupted checkpoint, pause point, old/new state
+mounts, restored epochs, physical output scans and worker logs. If a test times out,
+the arm file can leave that isolated worker paused; archive and reset that named
+instance, or remove its recorded arm file to release it deliberately. No default LAN
+instance or production volume is reset. `reset` also archives partial fault evidence.
+
+These tests qualify the selected latest-checkpoint/fixed-parallelism identity path.
+Marker history must be preserved; older checkpoint rollback, topic deletion, rescaling,
+larger-than-RAM capacity and profile/session qualification require their own checks.
+
 ### Checkpoint recovery without existing live state
 
 Use a separate instance to keep the existing LAN evaluation available. All commands
 for that instance must use the same name and ports; the helper records and checks them.
 
 ```sh
-python3 deploy/streamr-local/local.py pin --instance checkpoint-only --http-port 15116 --broker-port 29093 --image localhost/streamr:arc-13-m2
+python3 deploy/streamr-local/local.py pin --instance checkpoint-only --http-port 15116 --broker-port 29093 --image localhost/streamr:str-37
 python3 deploy/streamr-local/local.py up --instance checkpoint-only --http-port 15116 --broker-port 29093
 python3 deploy/streamr-local/local.py recovery --instance checkpoint-only --http-port 15116 --broker-port 29093 --fresh-live-state
 ```

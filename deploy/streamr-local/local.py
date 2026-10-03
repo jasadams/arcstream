@@ -22,7 +22,8 @@ API = "http://127.0.0.1:15115/api/v1"
 HTTP_PORT = 15115
 BROKER_PORT = 29092
 TOPICS = ["arc-eval-raw-events", "arc-eval-identity-capture",
-          "arc-eval-unified-events", "arc-eval-identity-merges"]
+          "arc-eval-unified-events", "arc-eval-identity-merges", "arc-eval-identity-commits",
+          "arc-eval-unified-commits", "arc-eval-merges-commits"]
 PIPELINES = {"identity": "arc-eval-identity-owner", "unified": "arc-eval-unified", "merges": "arc-eval-merges"}
 sys.path.insert(0, str(ROOT / "test/streamr-reference"))
 from compare_identity import compare, read_records  # noqa: E402
@@ -59,6 +60,9 @@ def compose(*args):
     override = EVIDENCE / "live-state.override.json"
     if override.exists():
         files += ["-f", str(override)]
+    faults = EVIDENCE / "faults.override.json"
+    if faults.exists():
+        files += ["-f", str(faults)]
     return run(provider + ["--env-file", str(environment), "-p", PROJECT,
                            *files, *args], timeout=180)
 
@@ -207,7 +211,9 @@ def collect_evidence():
         "source_sha256": {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths},
         "artifact_sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
                             for path in EVIDENCE.glob("*.jsonl")},
-        "scope": "Local Kafka identity correctness/checkpoint recovery; capacity, commit-phase fault recovery and profiles/sessions pending",
+        "scope": "Local Kafka identity correctness/checkpoint recovery; selected commit fault is recorded separately; capacity and profiles/sessions pending",
+        "commit_fault": json.loads((EVIDENCE / "commit-fault.json").read_text())
+                        if (EVIDENCE / "commit-fault.json").exists() else None,
     })
     (EVIDENCE / "streamr.log").write_text(run([engine(), "logs", container("streamr")], include_stderr=True))
 
@@ -238,10 +244,56 @@ def fresh_live_state():
     return volume
 
 
-def smoke(recovery, fresh_state=False):
+def commit_pause(job_id, point):
+    """Only a structured hook emitted by the selected identity job is evidence."""
+    for line in run([engine(), "logs", container("streamr")], include_stderr=True).splitlines():
+        try:
+            fields = json.loads(line).get("fields", {})
+        except json.JSONDecodeError:
+            continue
+        if (fields.get("message") == "Kafka commit fault pause" and fields.get("job_id") == job_id
+                and fields.get("point") == point):
+            return fields
+    return None
+
+
+def committing_checkpoint(pipeline_id, epoch):
+    records = api(f"/pipelines/{pipeline_id}/jobs/{job(pipeline_id)['id']}/checkpoints")["data"]
+    return next((record for record in records if record["epoch"] == epoch
+                 and not record.get("finish_time")
+                 and any(event["event"] == "Committing" for event in record.get("events", []))), None)
+
+
+def recovery_action(job_id, epoch):
+    for line in run([engine(), "logs", container("streamr")], include_stderr=True).splitlines():
+        try:
+            fields = json.loads(line).get("fields", {})
+        except json.JSONDecodeError:
+            continue
+        if (fields.get("message") == "Kafka commit recovery" and fields.get("job_id") == job_id
+                and fields.get("epoch") == epoch):
+            return fields
+    return None
+
+
+def enable_commit_faults():
+    directory = EVIDENCE / "faults"
+    directory.mkdir(exist_ok=True)
+    if any(directory.iterdir()):
+        raise SetupError("Fault directory has an existing arm file; refusing to reuse it")
+    write_json("faults.override.json", {"services": {"streamr": {
+        "environment": {"STREAMR_TEST_KAFKA_COMMIT_FAULT_DIR": "/faults"},
+        "volumes": [f"{directory}:/faults:ro,z"]}}})
+    print(compose("up", "-d", "--no-deps", "--force-recreate", "streamr"))
+    ready()
+
+
+def smoke(recovery, fresh_state=False, commit_fault=None, broker_fault=False, fault_delay=0):
     ready()
     if topic_rows(TOPICS[0]):
         raise SetupError("Raw evaluation topic is not empty. Use fresh evaluation volumes for a new fixture run")
+    if commit_fault:
+        enable_commit_faults()
     ids = submit()
     fixture = json.loads((ROOT / "flink/identity-resolution/src/test/resources/reference/identity-input.json").read_text())
     events = [step["payload"] for step in fixture["steps"] if step["op"] == "event"]
@@ -257,13 +309,42 @@ def smoke(recovery, fresh_state=False):
         after_prefix = time.time_ns() // 1000
         # Stop every job at a completed checkpoint so restart cannot race a later
         # checkpoint's unfinished Kafka commit phase. That fault is a separate gate.
-        for name, identifier in ids.items():
-            api(f"/pipelines/{identifier}", "PATCH", {"stop": "checkpoint"})
-            wait_for(lambda identifier=identifier: job(identifier)["state"] == "Stopped",
-                     f"{name} prefix checkpoint stop")
         checkpoints = {name: wait_for(lambda identifier=identifier: checkpoint(identifier, after_prefix),
                                      f"{name} published checkpoint after prefix")
                        for name, identifier in ids.items()}
+        if commit_fault:
+            arm = EVIDENCE / "faults" / f"{commit_fault}-{before['identity']['id']}"
+            arm.touch()
+            publish(events[10:])
+            pause = wait_for(lambda: commit_pause(before['identity']['id'], commit_fault),
+                             f"identity paused {commit_fault} Kafka commit")
+            if not isinstance(pause.get("epoch"), int) or pause["epoch"] <= checkpoints["identity"]["epoch"]:
+                raise SetupError(f"Fault pause is not after the committed prefix checkpoint: {pause}")
+            interrupted = wait_for(lambda: committing_checkpoint(ids["identity"], pause["epoch"]),
+                                   "persisted identity checkpoint in committing phase")
+            pause["interrupted_checkpoint"] = interrupted
+            write_json("commit-fault.json", pause)
+            if fault_delay:
+                pause["fault_delay_seconds"] = fault_delay
+                write_json("commit-fault.json", pause)
+                time.sleep(fault_delay)
+            # Controller sends this commit only after persisting the snapshot.
+            checkpoints["identity"] = {"epoch": pause["epoch"]}
+            if broker_fault:
+                run([engine(), "kill", "--signal", "KILL", container("broker")])
+                pause["broker_interruption"] = True
+                write_json("commit-fault.json", pause)
+            run([engine(), "kill", "--signal", "KILL", container("streamr")])
+            arm.unlink()
+            if broker_fault:
+                run([engine(), "start", container("broker")])
+                wait_for(lambda: broker("cluster", "info"), "restarted isolated broker")
+        else:
+            for name, identifier in ids.items():
+                api(f"/pipelines/{identifier}", "PATCH", {"stop": "checkpoint"})
+                wait_for(lambda identifier=identifier: job(identifier)["state"] == "Stopped",
+                         f"{name} prefix checkpoint stop")
+            checkpoints = {name: checkpoint(identifier, after_prefix) for name, identifier in ids.items()}
         write_json("before-recreation.json", {"jobs": before, "checkpoints": checkpoints})
         volume = fresh_live_state() if fresh_state else None
         print("Recreating evaluation Streamr; broker and published checkpoints persist.", flush=True)
@@ -300,7 +381,15 @@ def smoke(recovery, fresh_state=False):
             if not any(record.get("job_id") == after[name]["id"]
                        and record.get("epoch", -1) >= checkpoints[name]["epoch"] for record in restore_records):
                 raise SetupError(f"Missing published-checkpoint restore evidence for {name}: {restore_records}")
-        publish(events[10:])
+        if commit_fault:
+            action = wait_for(lambda: recovery_action(before["identity"]["id"], pause["epoch"]),
+                              "identity transaction replay/skip decision")
+            expected_action = "replay" if commit_fault == "before" else "skipped"
+            if action.get("action") != expected_action or action.get("records", 0) <= 0:
+                raise SetupError(f"Expected nonempty {expected_action} recovery, got {action}")
+            write_json("recovery-action.json", action)
+        if not commit_fault:
+            publish(events[10:])
     else:
         publish(events)
     topic_rows(TOPICS[2], len(events))
@@ -324,6 +413,9 @@ def smoke(recovery, fresh_state=False):
     for name, rows in [("raw.jsonl", raw), ("intermediate.jsonl", intermediate), ("outputs.jsonl", actual)]:
         (EVIDENCE / name).write_text("".join(json.dumps(row) + "\n" for row in rows))
     result.update(status="pass", container_recreation=recovery, fresh_live_state=fresh_state,
+                  commit_fault=commit_fault,
+                  broker_interruption=broker_fault,
+                  fault_delay_seconds=fault_delay,
                   elapsed_seconds=(time.time_ns() // 1000 - start) / 1e6)
     write_json("comparison.json", result)
     collect_evidence()
@@ -333,12 +425,15 @@ def smoke(recovery, fresh_state=False):
 def main():
     global PROJECT, API, EVIDENCE, HTTP_PORT, BROKER_PORT
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["pin", "up", "submit", "smoke", "recovery", "status", "down", "reset"])
+    parser.add_argument("command", choices=["pin", "up", "submit", "smoke", "recovery", "commit-recovery", "status", "down", "reset"])
     parser.add_argument("--image", help="provenance-labelled local candidate to pin")
     parser.add_argument("--instance", help="separate named evaluation instance (lowercase letters, digits, hyphens)")
     parser.add_argument("--http-port", type=int, default=15115)
     parser.add_argument("--broker-port", type=int, default=29092)
     parser.add_argument("--fresh-live-state", action="store_true", help="recovery only: retain old RocksDB volume and restart with an empty one")
+    parser.add_argument("--commit-fault", choices=["before", "after"], help="commit-recovery only: kill before broker commit or after commit before acknowledgement")
+    parser.add_argument("--broker-interruption", action="store_true", help="commit-recovery only: also kill/restart the isolated broker")
+    parser.add_argument("--fault-delay-seconds", type=float, default=0, help="delay while paused before killing the isolated worker (0-120 seconds)")
     args = parser.parse_args()
     if args.instance:
         if not re.fullmatch(r"[a-z][a-z0-9-]{0,39}", args.instance):
@@ -353,8 +448,14 @@ def main():
         parser.error("HTTP and broker ports must differ")
     if not all(1024 <= port <= 65535 for port in (args.http_port, args.broker_port)):
         parser.error("Ports must be between 1024 and 65535")
-    if args.fresh_live_state and (args.command != "recovery" or not args.instance):
+    if args.fresh_live_state and (args.command not in {"recovery", "commit-recovery"} or not args.instance):
         parser.error("Fresh live-state recovery requires a separate named instance")
+    if (args.command == "commit-recovery") != bool(args.commit_fault) or (args.commit_fault and not args.instance):
+        parser.error("commit-recovery requires --commit-fault and a separate named instance")
+    if args.broker_interruption and not args.commit_fault:
+        parser.error("Broker interruption requires commit-recovery with an explicit fault point")
+    if not 0 <= args.fault_delay_seconds <= 120 or (args.fault_delay_seconds and not args.commit_fault):
+        parser.error("Fault delay must be 0-120 seconds and requires commit-recovery")
     HTTP_PORT, BROKER_PORT = args.http_port, args.broker_port
     API = f"http://127.0.0.1:{HTTP_PORT}/api/v1"
     EVIDENCE.mkdir(parents=True, exist_ok=True)
@@ -376,31 +477,37 @@ def main():
             existing = {value["name"] for value in json.loads(listed)}
             for topic in TOPICS:
                 if topic not in existing:
-                    print(broker("topic", "create", topic, "--partitions", "1", "--replicas", "1"))
+                    config = ["--topic-config", "cleanup.policy=compact"] if topic in TOPICS[4:] else []
+                    print(broker("topic", "create", topic, "--partitions", "1", "--replicas", "1", *config))
         elif args.command == "submit":
             submit()
-        elif args.command in {"smoke", "recovery"}:
-            smoke(args.command == "recovery", args.fresh_live_state)
+        elif args.command in {"smoke", "recovery", "commit-recovery"}:
+            smoke(args.command != "smoke", args.fresh_live_state, args.commit_fault, args.broker_interruption,
+                  args.fault_delay_seconds)
         elif args.command == "status":
             print(compose("ps"))
             print(json.dumps(api("/jobs"), indent=2))
         elif args.command == "down":
             print(compose("down"))
         elif args.command == "reset":
-            if any((EVIDENCE / name).exists() for name in ("comparison.json", "before-recreation.json")):
+            if any((EVIDENCE / name).exists() for name in ("comparison.json", "before-recreation.json", "prefix-capture.json", "commit-fault.json")):
                 archive = EVIDENCE / "runs" / str(time.time_ns())
                 archive.mkdir(parents=True)
                 for path in EVIDENCE.iterdir():
                     if path.is_file() and path.suffix in {".json", ".jsonl", ".log"}:
                         shutil.copy2(path, archive / path.name)
+                if (EVIDENCE / "faults").exists():
+                    shutil.copytree(EVIDENCE / "faults", archive / "faults")
                 print(f"Previous evidence archived to {archive}")
             print(compose("down", "--volumes"))
             # Clear generated run outputs after archiving; keep the image pin.
             for name in ("comparison.json", "provenance.json", "before-recreation.json", "after-recreation.json",
                          "restored-checkpoints.json", "prefix-capture.json", "prefix-unified.json", "pipelines.json",
                          "raw.jsonl", "intermediate.jsonl", "outputs.jsonl", "streamr.log",
-                         "live-state.override.json", "fresh-live-state.json"):
+                         "live-state.override.json", "fresh-live-state.json", "commit-fault.json", "faults.override.json",
+                         "recovery-action.json"):
                 (EVIDENCE / name).unlink(missing_ok=True)
+            shutil.rmtree(EVIDENCE / "faults", ignore_errors=True)
     except (SetupError, OSError, ValueError, KeyError) as error:
         print(str(error), file=sys.stderr)
         return 1
