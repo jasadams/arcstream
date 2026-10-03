@@ -1,4 +1,5 @@
 import copy
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -98,6 +99,8 @@ class SubmissionTests(unittest.TestCase):
         (local.EVIDENCE / "comparison.json").write_text('{"status":"pass"}')
         (local.EVIDENCE / "restored-checkpoints.json").write_text('[{"epoch":4}]')
         (local.EVIDENCE / "candidate.json").write_text('{"image_id":"pinned"}')
+        (local.EVIDENCE / "live-state.override.json").write_text('{"volumes":{}}')
+        (local.EVIDENCE / "fresh-live-state.json").write_text('{"new_volume":"retained-proof"}')
         with patch.object(local.sys, "argv", ["local.py", "reset"]), \
                 patch.object(local, "compose", return_value="") as compose:
             self.assertEqual(0, local.main())
@@ -106,6 +109,39 @@ class SubmissionTests(unittest.TestCase):
         self.assertEqual('[{"epoch":4}]', (archive / "restored-checkpoints.json").read_text())
         self.assertFalse((local.EVIDENCE / "restored-checkpoints.json").exists())
         self.assertTrue((local.EVIDENCE / "candidate.json").exists())
+        self.assertFalse((local.EVIDENCE / "live-state.override.json").exists())
+        self.assertFalse((local.EVIDENCE / "fresh-live-state.json").exists())
+        self.assertTrue((archive / "fresh-live-state.json").exists())
+
+    def test_fresh_state_recovery_cannot_target_default_lan_instance(self):
+        with patch.object(local.sys, "argv", ["local.py", "recovery", "--fresh-live-state"]), \
+                patch.object(local, "compose") as compose:
+            with self.assertRaises(SystemExit):
+                local.main()
+            compose.assert_not_called()
+
+    def test_recorded_instance_settings_cannot_be_changed(self):
+        (local.EVIDENCE / "instance.json").write_text('{"project":"other","http_port":15117,"broker_port":29094}')
+        with patch.object(local.sys, "argv", ["local.py", "up"]), patch.object(local, "compose") as compose:
+            self.assertEqual(1, local.main())
+            compose.assert_not_called()
+
+    def test_fresh_volume_must_be_empty_before_mount_override_is_written(self):
+        (local.EVIDENCE / "candidate.json").write_text('{"image_id":"pinned"}')
+        old = {"Destination": "/live-state", "Source": "/retained-old-volume"}
+        def run(args, **kwargs):
+            if args[1] == "inspect":
+                return json.dumps([{"Mounts": [old]}])
+            if args[1] == "run":
+                raise local.SetupError("Volume not empty")
+            return ""
+        with patch.object(local, "container", return_value="isolated"), \
+                patch.object(local, "compose", return_value="") as compose, \
+                patch.object(local, "run", side_effect=run):
+            with self.assertRaisesRegex(local.SetupError, "Volume not empty"):
+                local.fresh_live_state()
+            compose.assert_called_once_with("stop", "streamr")
+            self.assertFalse((local.EVIDENCE / "live-state.override.json").exists())
 
 
 if __name__ == "__main__":
