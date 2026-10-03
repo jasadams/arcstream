@@ -445,11 +445,20 @@ def marker_loss():
     api(f"/pipelines/{ids['identity']}", "PATCH", {"stop": "none"})
     def rejected():
         logs = run([engine(), "logs", container("streamr")], include_stderr=True)
-        return logs if "Kafka recovery generation sentinel missing" in logs else None
+        for line in logs.splitlines():
+            try:
+                fields = json.loads(line).get("fields", {})
+            except json.JSONDecodeError:
+                continue
+            if (fields.get("message") == "task failed"
+                    and fields.get("job_id") == before["identity"]["id"]
+                    and "Kafka recovery generation sentinel missing" in fields.get("reason", "")):
+                return logs
+        return None
     logs = wait_for(rejected, "explicit rejection of lost Kafka marker history")
     (EVIDENCE / "marker-loss.log").write_text(logs)
-    current = wait_for(lambda: (value if (value := job(ids["identity"]))["state"] in {"Failed", "Error"} else None),
-                       "identity failure reported by API after marker loss")
+    current = wait_for(lambda: (value if (value := job(ids["identity"]))["state"] in {"Recovering", "Failed", "Error"} else None),
+                       "identity failure/retry reported by API after marker loss")
     if current["id"] != before["identity"]["id"] or current["run_id"] <= before["identity"]["run_id"]:
         raise SetupError("Marker-loss rejection did not fail a newer run of the checkpointed identity job")
     physical_after = {topic: topic_rows(topic) for topic in TOPICS[1:4]}
