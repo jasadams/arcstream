@@ -72,7 +72,7 @@ ones, and verify closed state does not emit again. Assertions check business res
 rather than reproduce a separate implementation. Profile times are anchored to yesterday
 at noon UTC to remain inside the production 91-day wall-clock clamp; volatile output
 fields are checked against measured emission clock bounds by the profile comparator below.
-A session JSONL comparison adapter is still pending.
+The session comparator below checks fixed event-time outputs without clock normalization.
 
 ### Profile capture and strict comparison
 
@@ -114,6 +114,42 @@ late events, historical replay, Kafka delivery or a Streamr timer implementation
 work. All 16 Flink tests and 40 Python tests pass, including the six captured profile
 updates compared against the independent oracle.
 
+### Session capture and strict comparison
+
+`session-input.json` uses fixed historical event times (2026-06-01 noon UTC) and two
+session IDs across two tenants. It extends both deadlines, restores into a fresh operator,
+checks silence at the canceled deadlines and immediately before each valid deadline, then
+closes sessions with watermarks. Advancing processing time alone must emit nothing. Two
+more restores cover one closed/one pending session and all closed state. Reusing a closed
+session ID with a new canonical ID must start fresh state and produce a third summary.
+
+The runner exports `flink/identity-resolution/target/reference/session.jsonl` and resolved
+`session-fixture.json`, and compares the actual output with the independent
+`session-expected.jsonl` oracle. Compare a candidate using:
+
+```sh
+python3 test/streamr-reference/compare_session.py \
+  flink/identity-resolution/src/test/resources/reference/session-expected.jsonl \
+  /path/to/session-capture.jsonl
+```
+
+Each line has `stream: session-summaries`, the emitting fixture `step`, and `payload`.
+Replay the exported resolved fixture, including separate processing-clock/watermark
+controls and snapshot steps. All 12 payload fields and their types must match. `pages`
+is an unordered distinct string set, serialized as a native array; `event_types` is a
+native object of exact integer counts. Only page order and cross-key ordering within the
+same emitting step are ignored. Emission steps, duplicate/missing closures, first-arrival
+start, maximum event-time end, duration, ownership and last-nonempty arrival metadata stay
+exact. No output timestamps are dropped or normalized.
+
+The older arriving event deliberately preserves the first-arrival start and changes
+last-nonempty metadata; it is not a post-watermark late-event test. Distinct tenant/session
+IDs avoid the production cross-tenant key collision. This is operator-state recovery,
+not source offsets, sink commits, process crash or all-idle Kafka qualification.
+[Session capability handoff](session-capabilities.md) records the SQL session semantic
+differences and remaining STR-20 work. The complete runner passes 17 Flink tests and 56
+Python tests, plus all three independent output comparisons.
+
 Some tests deliberately characterize existing behavior that needs a contract decision:
 
 - Profile keys are `canonical_id` alone and session keys are `session_id` alone. Reusing
@@ -135,8 +171,8 @@ The snapshots here are Flink keyed-operator harness snapshots restored into new 
 instances. They do not establish Kafka offset/sink consistency, remote checkpoint durability,
 RocksDB memory bounds, process crash recovery, partition idleness or a full replay.
 The identity SQL capture below executes the same fixture through actual Streamr operators.
-Next, add a session capture with explicit time controls and execute the profile fixture
-through Streamr once STR-29 supplies its required capabilities, then run the STR-32 backfill, hot-key,
+Next, execute the profile and session fixtures through Streamr once STR-29/20 supply
+their required capabilities, then run the STR-32 backfill, hot-key,
 larger-than-RAM and 24-hour live/fault qualification in isolated outputs. Milestone 1/2
 review and state-semantics acceptance remain prerequisites for migration.
 

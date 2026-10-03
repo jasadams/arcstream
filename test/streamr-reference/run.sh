@@ -29,6 +29,10 @@ python3 test/streamr-reference/compare_profile.py \
   flink/identity-resolution/target/reference/profile.jsonl \
   flink/identity-resolution/target/reference/profile-fixture.json \
   > target/reference/profile-comparison.json
+python3 test/streamr-reference/compare_session.py \
+  flink/identity-resolution/src/test/resources/reference/session-expected.jsonl \
+  flink/identity-resolution/target/reference/session.jsonl \
+  > target/reference/session-comparison.json
 
 REFERENCE_BUILDER="$builder" python3 - <<'PY'
 import hashlib
@@ -53,10 +57,15 @@ provenance = {
         "flink/identity-resolution/target/reference/profile.jsonl").read_bytes()).hexdigest(),
     "profile_fixture_sha256": hashlib.sha256(Path(
         "flink/identity-resolution/target/reference/profile-fixture.json").read_bytes()).hexdigest(),
+    "session_capture_sha256": hashlib.sha256(Path(
+        "flink/identity-resolution/target/reference/session.jsonl").read_bytes()).hexdigest(),
+    "session_fixture_sha256": hashlib.sha256(Path(
+        "flink/identity-resolution/target/reference/session-fixture.json").read_bytes()).hexdigest(),
     "scope": "Flink keyed-operator reference; Streamr and Kafka qualification pending",
 }
 Path("target/reference/provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
 PY
 cat target/reference/identity-comparison.json
 cat target/reference/profile-comparison.json
+cat target/reference/session-comparison.json
 printf 'Flink and comparator checks passed. Evidence: %s/target/reference\n' "$repo_root"
