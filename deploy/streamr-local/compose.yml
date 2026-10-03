@@ -26,7 +26,7 @@ services:
     pull_policy: never
     command: ["-c", "/config/streamr.toml", "cluster"]
     ports:
-      - "127.0.0.1:15115:5115"
+      - "0.0.0.0:15115:5115"
     volumes:
       - ./streamr.toml:/config/streamr.toml:ro,z
       - api-data:/state

@@ -20,9 +20,11 @@ python3 deploy/streamr-local/local.py submit
 python3 deploy/streamr-local/local.py recovery
 ```
 
-Set `CONTAINER_ENGINE=docker` for Docker. API/console: http://127.0.0.1:15115.
-Host Kafka: `127.0.0.1:29092`; containers use `broker:9092`. Both published ports bind
-only to loopback. `up` creates four single-partition evaluation topics and is repeatable.
+Set `CONTAINER_ENGINE=docker` for Docker. API/console: http://127.0.0.1:15115 locally
+or `http://<host-LAN-IP>:15115` from the local network (this host: http://192.168.1.200:15115).
+The console/API port binds to all IPv4 interfaces. Host Kafka stays at
+`127.0.0.1:29092`; containers use `broker:9092`.
+`up` creates four single-partition evaluation topics and is repeatable.
 `submit` validates the actual API graph, checks HTTP-success responses for SQL errors,
 reuses matching pipelines and fails on changed queries/duplicate names. All jobs use
 parallelism 1 and two-second checkpoints. Readiness and commands have bounded timeouts;
