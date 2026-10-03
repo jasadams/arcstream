@@ -1,0 +1,39 @@
+# Small local correctness fixture budgets, not production sizing defaults.
+checkpoint-url = "file:///checkpoints"
+default-checkpoint-interval = "2s"
+disable-telemetry = true
+
+[logging]
+format = "json"
+
+[api]
+bind-address = "0.0.0.0"
+http-port = 5115
+
+[database]
+type = "sqlite"
+
+[database.sqlite]
+path = "/state/config.sqlite"
+
+[compiler]
+artifact-url = "file:///compiler/artifacts"
+build-dir = "/compiler/build"
+
+[worker]
+sql-state-backend = "rocksdb"
+
+[worker.disk-sql-state]
+directory = "/live-state"
+max-row-bytes = 24576
+
+[worker.live-state-resources]
+block-cache-bytes = 8388608
+memtable-bytes = 4194304
+queued-write-bytes = 1048576
+decoded-value-bytes = 1048576
+scan-page-bytes = 2097152
+max-blocking-operations = 2
+max-snapshots = 2
+max-open-databases = 2
+disk-reserve-bytes = 67108864

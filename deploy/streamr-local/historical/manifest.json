@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "purpose": "Archived historical reference only; never submitted or registered by the local evaluation runner.",
+  "source_repository": "https://github.com/jasadams/arcstream",
+  "assets": [
+    {
+      "file": "identity-resolution-arroyo.sql",
+      "source_ref": "4cd3265^",
+      "source_commit": "12863d1aceebe24ac9709a738fc8c685d0ef04ed",
+      "source_path": "flink/sql/identity-resolution-arroyo.sql",
+      "sha256": "a4ac5d76e70e8cc901bd10b9fdefb7e250b0e5232c82a43e228495f3e9d7b33f",
+      "bytes": 2687,
+      "git_blob": "52b97cd9d5082d107bbea99554e2932833db93aa"
+    },
+    {
+      "file": "profile-updater-arroyo.sql",
+      "source_ref": "4cd3265^",
+      "source_commit": "12863d1aceebe24ac9709a738fc8c685d0ef04ed",
+      "source_path": "flink/sql/profile-updater-arroyo.sql",
+      "sha256": "5fda35d32774796eb93dd01812f4340a71450b6565d93276a506450dcc5536ea",
+      "bytes": 5633,
+      "git_blob": "2983cc00abb3fc1643cf8a2271e7cab95d698f9f"
+    },
+    {
+      "file": "sessionization-arroyo.sql",
+      "source_ref": "4cd3265^",
+      "source_commit": "12863d1aceebe24ac9709a738fc8c685d0ef04ed",
+      "source_path": "flink/sql/sessionization-arroyo.sql",
+      "sha256": "42f9be5e6049742b15d547c0377b7256c323bbf157241ad30918675f483849be",
+      "bytes": 3803,
+      "git_blob": "f74c5eb86a444a2e1bc935003e156c410163b763"
+    },
+    {
+      "file": "udfs/profile_step.rs",
+      "source_ref": "22e43a6^",
+      "source_commit": "7cf8d1a1b805734b0ff72177435863074df2a99e",
+      "source_path": "flink/sql/udfs/profile_step.rs",
+      "sha256": "f43f7c256808677750e7fde7fb703a1103c6356d39ada86c37fcbb046facbed3",
+      "bytes": 32962,
+      "git_blob": "aaf69eb879d9033d6c0bbb2b742b77e43674daf4"
+    }
+  ],
+  "original_dirty_fork_snapshot": {
+    "path": "/home/jason/repos/streamr",
+    "head": "33d0bdf8662170b9f130baf58eb7350781c482b6",
+    "branch": "jason/str-1-stateful-planner",
+    "status_short": [
+      " M Dockerfile.dev",
+      "?? Dockerfile.local",
+      "?? docker/cargo-dev-config.toml",
+      "?? scripts/"
+    ],
+    "tracked_delta_stat": "Dockerfile.dev | 16 ++++++++++++++--\n 1 file changed, 14 insertions(+), 2 deletions(-)",
+    "tracked_delta_sha256": "7ae518b2ad3974cea858946dd3dc15ba61f8c331887ef9a465d697aab2182991",
+    "tracked_changed_paths": [
+      "Dockerfile.dev"
+    ],
+    "dockerfile_local_sha256": "5044d0b7cdcbc58605dc5c11643232f424646794d517d53c69e40096ea1882a9",
+    "note": "Read-only inventory; unrelated changes preserved. No untracked content copied. This checkout is not the clean candidate source used by local evaluation."
+  }
+}
