@@ -71,8 +71,48 @@ processing time from watermark advancement, ensure extended deadlines replace ea
 ones, and verify closed state does not emit again. Assertions check business results
 rather than reproduce a separate implementation. Profile times are anchored to yesterday
 at noon UTC to remain inside the production 91-day wall-clock clamp; volatile output
-fields are not claimed deterministic. Profile/session JSONL comparison adapters are still
-pending.
+fields are checked against measured emission clock bounds by the profile comparator below.
+A session JSONL comparison adapter is still pending.
+
+### Profile capture and strict comparison
+
+`profile-input.json` drives the production `ProfileFunction` through four events, a
+five-second debounce, a 30-minute session timeout, and 1/7/30-day idle decay. It restores
+three snapshots into fresh operators before the pending debounce, session and decay
+timers. No event arrives after the four initial events. The independent
+`profile-expected.jsonl` asserts six emissions and every one of the 33 payload fields.
+Steps immediately before debounce and timeout must emit nothing.
+
+The runner exports `flink/identity-resolution/target/reference/profile.jsonl` and the
+resolved `profile-fixture.json`, then runs:
+
+```sh
+python3 test/streamr-reference/compare_profile.py \
+  flink/identity-resolution/src/test/resources/reference/profile-expected.jsonl \
+  /path/to/profile-capture.jsonl \
+  /path/to/profile-fixture.json
+```
+
+Candidate captures must use `stream: profile-updates`, the fixture's emission `step`,
+`payload`, and `captured_from_ms`/`captured_to_ms` measured by the harness around each
+emitting action. Replay the resolved fixture to share the event-time anchor. Advance
+processing time independently of watermarks and restore at every snapshot step; do not
+inject synthetic activity to make idle timers fire.
+
+Numeric fields must be integers, arrays must be native arrays of strings, and the active
+session flag must be a boolean. Only `changed_fields` order is treated as a set; its
+membership and uniqueness are exact. Top-K lists have no ties in this fixture and retain
+their order. Emission steps, triggers, counters and metadata must match exactly. Relative
+event timestamps resolve against the exported anchor. `updated_at`, formatted UTC
+`timestamp` and active session duration must fall within harness-measured wall-clock
+bounds; none is dropped. The active duration intentionally characterizes the current
+Flink wall-clock calculation. An event-time duration change needs explicit acceptance.
+
+This small fixture does not qualify high-cardinality top-K bounds, tenant collisions,
+late events, historical replay, Kafka delivery or a Streamr timer implementation.
+[Profile capability handoff](profile-capabilities.md) identifies the remaining STR-29
+work. All 16 Flink tests and 40 Python tests pass, including the six captured profile
+updates compared against the independent oracle.
 
 Some tests deliberately characterize existing behavior that needs a contract decision:
 
@@ -95,7 +135,8 @@ The snapshots here are Flink keyed-operator harness snapshots restored into new 
 instances. They do not establish Kafka offset/sink consistency, remote checkpoint durability,
 RocksDB memory bounds, process crash recovery, partition idleness or a full replay.
 The identity SQL capture below executes the same fixture through actual Streamr operators.
-Next, add reusable profile/session captures with explicit time controls, then execute the STR-32 backfill, hot-key,
+Next, add a session capture with explicit time controls and execute the profile fixture
+through Streamr once STR-29 supplies its required capabilities, then run the STR-32 backfill, hot-key,
 larger-than-RAM and 24-hour live/fault qualification in isolated outputs. Milestone 1/2
 review and state-semantics acceptance remain prerequisites for migration.
 

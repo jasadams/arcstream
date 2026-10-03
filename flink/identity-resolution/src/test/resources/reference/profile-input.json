@@ -1,0 +1,132 @@
+{
+  "description": "Yesterday-noon UTC relative fixture; canonical-ID production key. Restore timers before debounce, timeout and decay.",
+  "steps": [
+    {
+      "op": "processing_time",
+      "step": "start",
+      "time_ms": 1000
+    },
+    {
+      "op": "event",
+      "step": "create",
+      "offset_ms": 0,
+      "payload": {
+        "event_id": "profile-1",
+        "event_type": "page_view",
+        "canonical_id": "profile-1",
+        "tenant_id": "acme",
+        "user_id": "known-user",
+        "session_id": "session-1",
+        "page_url": "/home",
+        "country": "AU",
+        "device_type": "desktop",
+        "browser": "Firefox",
+        "feature_name": ""
+      }
+    },
+    {
+      "op": "event",
+      "step": "buffer-1",
+      "offset_ms": 60000,
+      "payload": {
+        "event_id": "profile-2",
+        "event_type": "click",
+        "canonical_id": "profile-1",
+        "tenant_id": "acme",
+        "user_id": "known-user",
+        "session_id": "session-1",
+        "page_url": "/home",
+        "country": "AU",
+        "device_type": "desktop",
+        "browser": "Firefox",
+        "feature_name": ""
+      }
+    },
+    {
+      "op": "event",
+      "step": "buffer-2",
+      "offset_ms": 90000,
+      "payload": {
+        "event_id": "profile-3",
+        "event_type": "feature_used",
+        "canonical_id": "profile-1",
+        "tenant_id": "acme",
+        "user_id": "known-user",
+        "session_id": "session-1",
+        "page_url": "/home",
+        "country": "AU",
+        "device_type": "desktop",
+        "browser": "Firefox",
+        "feature_name": "search"
+      }
+    },
+    {
+      "op": "event",
+      "step": "buffer-3",
+      "offset_ms": 120000,
+      "payload": {
+        "event_id": "profile-4",
+        "event_type": "login",
+        "canonical_id": "profile-1",
+        "tenant_id": "acme",
+        "user_id": "",
+        "session_id": "session-1",
+        "page_url": "",
+        "country": "",
+        "device_type": null,
+        "browser": "",
+        "feature_name": ""
+      }
+    },
+    {
+      "op": "snapshot_restore",
+      "step": "restore-debounce",
+      "checkpoint_id": 1
+    },
+    {
+      "op": "processing_time",
+      "step": "before-debounce",
+      "time_ms": 5999
+    },
+    {
+      "op": "processing_time",
+      "step": "debounce",
+      "time_ms": 6000
+    },
+    {
+      "op": "snapshot_restore",
+      "step": "restore-session",
+      "checkpoint_id": 2
+    },
+    {
+      "op": "watermark",
+      "step": "before-timeout",
+      "offset_ms": 1919999
+    },
+    {
+      "op": "watermark",
+      "step": "timeout",
+      "offset_ms": 1920000
+    },
+    {
+      "op": "snapshot_restore",
+      "step": "restore-decay",
+      "checkpoint_id": 3
+    },
+    {
+      "op": "watermark",
+      "step": "decay-1d",
+      "offset_ms": 86520000
+    },
+    {
+      "op": "watermark",
+      "step": "decay-7d",
+      "offset_ms": 604920000
+    },
+    {
+      "op": "watermark",
+      "step": "decay-30d",
+      "offset_ms": 2592120000
+    }
+  ]
+}
