@@ -143,6 +143,61 @@ class SubmissionTests(unittest.TestCase):
             compose.assert_called_once_with("stop", "streamr")
             self.assertFalse((local.EVIDENCE / "live-state.override.json").exists())
 
+    def test_commit_fault_cannot_target_default_instance(self):
+        with patch.object(local.sys, "argv", ["local.py", "commit-recovery", "--commit-fault", "before"]), \
+                patch.object(local, "compose") as compose:
+            with self.assertRaises(SystemExit):
+                local.main()
+            compose.assert_not_called()
+
+    def test_commit_pause_requires_selected_job_and_point(self):
+        rows = [{"fields": {"message": "Kafka commit fault pause", "job_id": "other", "point": "before", "epoch": 4}},
+                {"fields": {"message": "Kafka commit fault pause", "job_id": "selected", "point": "after", "epoch": 5}}]
+        with patch.object(local, "container", return_value="isolated"), \
+                patch.object(local, "run", return_value="\n".join(json.dumps(row) for row in rows)):
+            self.assertIsNone(local.commit_pause("selected", "before"))
+            self.assertEqual(5, local.commit_pause("selected", "after")["epoch"])
+
+    def test_reset_preserves_partial_fault_evidence_and_removes_arms(self):
+        (local.EVIDENCE / "prefix-capture.json").write_text('[]')
+        faults = local.EVIDENCE / "faults"
+        faults.mkdir()
+        (faults / "before-job").touch()
+        (local.EVIDENCE / "faults.override.json").write_text('{}')
+        with patch.object(local.sys, "argv", ["local.py", "reset"]), \
+                patch.object(local, "compose", return_value=""):
+            self.assertEqual(0, local.main())
+        archive = next((local.EVIDENCE / "runs").iterdir())
+        self.assertTrue((archive / "faults" / "before-job").exists())
+        self.assertFalse(faults.exists())
+        self.assertFalse((local.EVIDENCE / "faults.override.json").exists())
+
+    def test_fault_checkpoint_must_be_persisted_and_still_committing(self):
+        records = [{"epoch": 7, "finish_time": 10, "events": [{"event": "WritingMetadata", "finish_time": 10}]},
+                   {"epoch": 8, "finish_time": None, "events": [{"event": "Checkpointing"}]},
+                   {"epoch": 9, "finish_time": None, "events": [{"event": "WritingMetadata", "finish_time": 10}]}]
+        with patch.object(local, "job", return_value={"id": "job"}), \
+                patch.object(local, "api", return_value={"data": records}):
+            self.assertIsNone(local.committing_checkpoint("pipeline", 7))
+            self.assertIsNone(local.committing_checkpoint("pipeline", 8))
+            self.assertEqual(9, local.committing_checkpoint("pipeline", 9)["epoch"])
+
+    def test_marker_loss_cannot_target_default_instance(self):
+        with patch.object(local.sys, "argv", ["local.py", "marker-loss"]), \
+                patch.object(local, "broker") as broker:
+            with self.assertRaises(SystemExit):
+                local.main()
+            broker.assert_not_called()
+
+    def test_marker_loss_refuses_running_jobs_before_deleting_history(self):
+        (local.EVIDENCE / "comparison.json").write_text('{"status":"pass"}')
+        (local.EVIDENCE / "pipelines.json").write_text('{"identity":"pipeline"}')
+        with patch.object(local, "job", return_value={"state": "Running"}), \
+                patch.object(local, "broker") as broker:
+            with self.assertRaisesRegex(local.SetupError, "checkpoint-stopped"):
+                local.marker_loss()
+            broker.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -24,7 +24,10 @@ CREATE TABLE unified_events (
 ) WITH (
   connector = 'kafka', bootstrap_servers = 'broker:9092',
   topic = 'arc-eval-unified-events', format = 'json', type = 'sink',
-  'sink.commit_mode' = 'exactly_once'
+  'sink.commit_mode' = 'exactly_once',
+  'sink.recovery_topic' = 'arc-eval-unified-commits',
+  'sink.recovery_max_bytes' = '8388608',
+  client_configs = 'transaction.timeout.ms=10000'
 );
 
 INSERT INTO unified_events

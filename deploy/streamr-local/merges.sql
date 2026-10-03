@@ -20,7 +20,10 @@ CREATE TABLE identity_merges (
 ) WITH (
   connector = 'kafka', bootstrap_servers = 'broker:9092',
   topic = 'arc-eval-identity-merges', format = 'json', type = 'sink',
-  'sink.commit_mode' = 'exactly_once'
+  'sink.commit_mode' = 'exactly_once',
+  'sink.recovery_topic' = 'arc-eval-merges-commits',
+  'sink.recovery_max_bytes' = '8388608',
+  client_configs = 'transaction.timeout.ms=10000'
 );
 
 INSERT INTO identity_merges
