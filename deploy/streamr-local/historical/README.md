@@ -1,0 +1,11 @@
+These files are archived historical Arroyo references. The local evaluation runner must not submit these SQL files or register this UDF. They still contain historical broker addresses and canonical topic names.
+
+The three SQL files are byte-exact copies from Arcstream commit `12863d1aceebe24ac9709a738fc8c685d0ef04ed` (`4cd3265^`). The corrected `profile_step.rs` is a byte-exact copy from commit `7cf8d1a1b805734b0ff72177435863074df2a99e` (`22e43a6^`). [manifest.json](manifest.json) records original paths, full commits, Git blob IDs, byte lengths and SHA256 hashes. These revisions are deliberately distinct; the archive does not assert that they formed one tested deployment.
+
+Use the parent directory's `identity.sql`, `unified.sql` and `merges.sql` for the current isolated identity evaluation. The archived identity query is historical context, not the current validated implementation.
+
+Profiles remain blocked and unqualified. The archived SQL emits collection fields as `TEXT`, and the UDF serializes top-page/top-feature arrays to strings. Its numeric corrections do not supply native array output, bounded per-profile collection storage or durable idle decay, debounce and session-close timers. See [the current profile capability contract](../../../test/streamr-reference/profile-capabilities.md) and STR-29 before restoring profiles.
+
+Sessions remain blocked and unqualified. The archived query uses event-time SQL session windows and a different output contract from the current Flink session function. Its comments describe an earlier acceptance of those differences; those comments are archival evidence, not an acceptance decision for this restart. See [the current session capability contract](../../../test/streamr-reference/session-capabilities.md) and STR-20.
+
+The manifest also inventories `/home/jason/repos/streamr` without copying untracked file contents. At capture, that checkout was on `jason/str-1-stateful-planner` at `33d0bdf8662170b9f130baf58eb7350781c482b6`, with a tracked `Dockerfile.dev` delta and untracked local build tooling. Those changes were preserved. The tracked patch and `Dockerfile.local` hashes identify this dirty checkout; they do not identify the clean candidate used by local evaluation.

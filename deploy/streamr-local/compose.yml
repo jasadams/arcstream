@@ -1,0 +1,50 @@
+services:
+  broker:
+    image: docker.io/redpandadata/redpanda@sha256:cab4be29c87c6bd529aff6fcfe89f1e6d98307d167b3dcf121ab7b57b2cede32
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --memory=512M
+      - --reserve-memory=0M
+      - --overprovisioned
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:29092
+      - --advertise-kafka-addr=internal://broker:9092,external://localhost:29092
+    ports:
+      - "127.0.0.1:29092:29092"
+    volumes:
+      - broker-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "info", "-X", "brokers=localhost:9092"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
+  streamr:
+    image: ${STREAMR_IMAGE:?Run local.py pin before starting the evaluation}
+    pull_policy: never
+    command: ["-c", "/config/streamr.toml", "cluster"]
+    ports:
+      - "0.0.0.0:15115:5115"
+    volumes:
+      - ./streamr.toml:/config/streamr.toml:ro,z
+      - api-data:/state
+      - checkpoints:/checkpoints
+      - live-state:/live-state
+      - compiler-data:/compiler
+    depends_on:
+      broker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5115/api/v1/ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
+volumes:
+  broker-data:
+  api-data:
+  checkpoints:
+  live-state:
+  compiler-data:
