@@ -1,6 +1,8 @@
 mod db;
 mod schema;
 mod streaming;
+mod subscription_config;
+mod optional_text;
 
 use axum::{
     extract::State,
@@ -133,14 +135,15 @@ async fn main() {
     let (profile_tx, _) = broadcast::channel::<ProfileUpdateMessage>(1024);
     let (event_tx, _) = broadcast::channel::<LiveEventMessage>(2048);
 
+    let subscriptions = subscription_config::SubscriptionConfig::from_env();
     let consumer_tx = profile_tx.clone();
     let consumer_brokers = kafka_brokers.clone();
     tokio::spawn(async move {
         streaming::consumer::run(
             consumer_tx,
             &consumer_brokers,
-            "query-api-subscriptions",
-            "profile-updates",
+            &subscriptions.profiles_group_id,
+            &subscriptions.profiles_topic,
         )
         .await;
     });
@@ -151,8 +154,8 @@ async fn main() {
         streaming::event_consumer::run(
             event_consumer_tx,
             &event_consumer_brokers,
-            "query-api-events",
-            "unified-events",
+            &subscriptions.events_group_id,
+            &subscriptions.events_topic,
         )
         .await;
     });
