@@ -1,0 +1,161 @@
+{
+  "base": "c7f477799ef7fb716a4b8d3917a671db210deeba",
+  "instruction_paths": [
+    "CLAUDE.md",
+    ".claude/build-test.md",
+    ".claude/team.md"
+  ],
+  "scope": "all8finite guarded25field matrix cells pass independently audited; observed source-prefix2/9; full33/timeout-reset/capacity/production unqualified",
+  "component_sources": [
+    "/home/jason/repos/arcstream-native-profile-session/deploy/streamr-native/profile-composition/query-union.sql",
+    "/home/jason/repos/arcstream-native-profile-session/test/streamr-reference/profile-composition/run.py",
+    "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/assets/native-session-cursor/flags.sql"
+  ],
+  "component_sha256": {
+    "/home/jason/repos/arcstream-native-profile-session/deploy/streamr-native/profile-composition/query-union.sql": "605e69d05db8c69e1f9a5daa76668bdde6b3310a6914647d1b220d456531b72d",
+    "/home/jason/repos/arcstream-native-profile-session/test/streamr-reference/profile-composition/run.py": "aec1dacf18d1ab6c8026033ef3d233ca824a4831b51603ffed605049d7c23183",
+    "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/assets/native-session-cursor/flags.sql": "1936d2a93eab685fbd763c91de322d7e0fdfcbce449cfb4c106740870183b9da"
+  },
+  "binary_sha256": "9baf16501c77a5a30bf87c50c2d3693a14986ae92d253731cda5370953e6d2ed",
+  "checkpoint_source_prefix": 2,
+  "resource_topology": "5 aggregate owners +1 cursor;6DB/snapshot;scan4MiB/decoded16MiB/queued32MiB/execution16MiB;maxbatch1MiB changed from8MiB",
+  "fixture_policy": "9 deterministic rows; tenant isolation; UTC midnight; transition rather than distinct-session counting; no rank ties",
+  "artifact_sha256": {
+    "deploy/streamr-native/profile-session-counts/query.sql": "eb8e9e8c6393bd7dc6902126005e4466197f24acff3f4054499e1b9ee219dc48",
+    "deploy/streamr-native/profile-session-counts/README.md": "423ac140caf71a2e65bfa6e4b358d4794b890a2e43a4fbb34f8b9594eb201618",
+    "test/streamr-reference/profile-session-counts/input.jsonl": "491a66282eae9358f0765eb121b25c1929a1cec5246afa4d807e49acec0d775c",
+    "test/streamr-reference/profile-session-counts/expected-prefixes.json": "fbdff38e391527f7c5e7943e0ab29aa3502cd202440cafd6902c499bf6af2645",
+    "test/streamr-reference/profile-session-counts/run.py": "31deeb9cf2786733192439a8feb8fd6909434e43c79c15c9b06768909465f86c",
+    "deploy/streamr-native/profile-session-counts/query-guarded.sql": "e2f31232aef78da4d54e28a1f7656e40a3c71651e5a0a9655997ff3901092adc"
+  },
+  "resource_repair": {
+    "override": "STREAMR_TEST_SCAN_PAGE_BYTES=4194304",
+    "previous_page_bytes": 4681,
+    "new_page_bytes": 42130,
+    "queued_write_bytes": 33554432,
+    "source": "crates/arroyo-state/src/live/checkpoint.rs ParquetCheckpointBudget::new; crates/arroyo-sql-testing/src/smoke_tests.rs existing override",
+    "preserved_failure": "profile-session-counts-native-001/runtime.log"
+  },
+  "execution_receipt": "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/profile-session-counts-native-002/result.json",
+  "audit_status": "all8 independent artifact audit pass",
+  "runner_matrix_options": {
+    "backend": [
+      "memory",
+      "rocksdb"
+    ],
+    "checkpoint_mode": [
+      "controller",
+      "leader"
+    ],
+    "batch_rows": [
+      1,
+      8
+    ],
+    "defaults": [
+      "memory",
+      "controller",
+      1
+    ]
+  },
+  "checkpoint_prefix_source_proof": "smoke_tests.rs:2022-2040 firstrow immediate, advance(input_rows_before_checkpoint-1), checkpoint_with_stop flush partialbatch",
+  "new_matrix_configuration": {
+    "selection": "ordinary product aggregate config; forcing test flag absent",
+    "ordinary_env": {
+      "ARROYO__WORKER__AGGREGATE_STATE__KEY_BYTES": "512",
+      "ARROYO__WORKER__AGGREGATE_STATE__VALUE_BYTES": "32768",
+      "ARROYO__WORKER__AGGREGATE_STATE__PAGE_BYTES": "131072",
+      "ARROYO__WORKER__AGGREGATE_STATE__PAGE_ENTRIES": "64",
+      "ARROYO__WORKER__AGGREGATE_STATE__WRITE_BYTES": "2097152",
+      "ARROYO__WORKER__AGGREGATE_STATE__WRITE_OPERATIONS": "128",
+      "ARROYO__WORKER__AGGREGATE_STATE__OVERLAY_BYTES": "2097152",
+      "ARROYO__WORKER__AGGREGATE_STATE__MAX_PENDING_OUTPUT_ROWS": "64",
+      "ARROYO__WORKER__AGGREGATE_STATE__MAX_PENDING_OUTPUT_BYTES": "524288",
+      "ARROYO__WORKER__AGGREGATE_STATE__MAX_RESIDENT_BYTES": "134217728",
+      "ARROYO__WORKER__EXECUTION_RESOURCES__MEMORY_BYTES": "16777216",
+      "ARROYO__WORKER__EXECUTION_RESOURCES__MAX_BATCH_BYTES": "1048576"
+    },
+    "baseline_rerun_required": true,
+    "source_pattern": "/home/jason/qa-evidence/str32-20261010-52391450/combined-pilot-one-mib/aggregate/environment.json",
+    "preserved_batch8_failure": "profile25-memory-controller-batch8-001",
+    "native_selection_proof": "incremental_aggregator.rs:3057 constructor reads config.worker.aggregate_state; NULL TTL and maintained calendar require Some"
+  },
+  "config_source_sha256": {
+    "/home/jason/repos/streamr-str-32-recovery/crates/arroyo-rpc/src/config.rs": "0313a0254779916959b25d2873419cd990cb21c1cb2ec6af2abe0590686c00ba",
+    "/home/jason/repos/streamr-str-32-recovery/crates/arroyo-sql-testing/src/smoke_tests.rs": "d7931319a28095333b5a09d745126fccf88d2f485f8d3149dbbf903905e2969f",
+    "/home/jason/repos/streamr-str-32-recovery/crates/arroyo-worker/src/arrow/incremental_aggregator.rs": "0f255e0bec2df9663a41ca3c2c290ce673d897dd41cc936ac42a33db8361c77f",
+    "/home/jason/repos/streamr-str-32-recovery/crates/arroyo-worker/src/arrow/state_table_runtime.rs": "6d40b2d0710effb52911fc0be9b9a887c25c1ee292954ff96e66d4bb08b102dd"
+  },
+  "guarded_candidate": {
+    "query": "deploy/streamr-native/profile-session-counts/query-guarded.sql",
+    "guards": [
+      "current core snapshot exists",
+      "current session snapshot exists"
+    ],
+    "unverified": [
+      "transient signed retraction may delete previously visible row",
+      "other branch prefix alignment"
+    ],
+    "max_checkpoint_physical_rows": 32,
+    "preserved_failure": "profile25-memory-leader-batch1-002",
+    "oracle_unchanged": true
+  },
+  "rocksdb_conditional_config": {
+    "scan_page_bytes": 5242880,
+    "memory_scan_page_bytes_unchanged": 4194304,
+    "harness_disk_row_bytes": 24576,
+    "derived_checkpoint_page_bytes": 60854,
+    "required_checkpoint_page_bytes": 50176,
+    "native_value_bound_unchanged": 32768,
+    "qualification": "finite fixture only; not full32KiB aggregate values on24KiB backend",
+    "preserved_failure": "profile25-guarded-rocksdb-controller-batch1-001",
+    "remaining": "four RocksDB cells pending"
+  },
+  "rocksdb_queued_config": {
+    "queued_write_bytes": 67108864,
+    "memory_queued_write_bytes_unchanged": 33554432,
+    "encoded_reservation_factor": 5,
+    "five_aggregate_write_limits_bytes": 10485760,
+    "cursor_scope_bytes": 262144,
+    "scope_operations_each": 128,
+    "minimum_without_operation_metadata_bytes": 53739520,
+    "exact_formula": "5*(5*2097152+128*(sizeof(WriteOperation)+32)) + (5*262144+128*(sizeof(WriteOperation)+32))",
+    "preserved_failure": "profile25-guarded-rocksdb-controller-batch1-002",
+    "scope": "finite configured owner concurrency; not measured capacity"
+  },
+  "queued_source_sha256": {
+    "/home/jason/repos/streamr-str-32-recovery/crates/arroyo-worker/src/arrow/aggregate_store.rs": "6708a28029925e2d091945be9b30e10571fd382510c974e298d8ac5d522b0703",
+    "/home/jason/repos/streamr-str-32-recovery/crates/arroyo-state/src/live/write.rs": "f487d61922b553c5c580e38f5bb6443e6969eb5b92a9e50f5e63abeee96fb4a9",
+    "/home/jason/repos/streamr-str-32-recovery/crates/arroyo-state/src/live/typed_table.rs": "71f38c69900761f890013fc439dc5be86cd7d7f93d819c3306796b0d17b153d4",
+    "/home/jason/repos/streamr-str-32-recovery/crates/arroyo-state/src/live/rocks.rs": "c5d81ed241a212df8da6f4d430420279378e5c4fbc6cf49c08108172d7a9bbaf"
+  },
+  "rocksdb_pending_output_config": {
+    "bytes": 131072,
+    "memory_bytes_unchanged": 524288,
+    "overlay_bytes_unchanged": 2097152,
+    "value_bytes_unchanged": 32768,
+    "page_bytes_unchanged": 131072,
+    "five_flush_reservations_bytes": 12943360,
+    "decoded_pool_bytes_unchanged": 16777216,
+    "remaining_bytes": 3833856,
+    "preserved_failure": "profile25-guarded-rocksdb-controller-batch1-003",
+    "scope": "finite tiny fixture; pending runtime admission; not arbitrary32KiB collection/output or capacity"
+  },
+  "matrix_receipts": {
+    "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/profile25-guarded-memory-controller-batch1-001/result.json": "37de8063b91e27d2c054cb2040af70ce589d37a219f7978526d52325215ba468",
+    "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/profile25-guarded-memory-controller-batch8-001/result.json": "911d2b1a0f42107626c53b81483a96777d84039c379ec91be7bda2b3bd017825",
+    "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/profile25-guarded-memory-leader-batch1-001/result.json": "f9a1466fbd4a4c97553b99baa6b7bb57bc91e59762ec1f4c06f0a2a4211dd8c9",
+    "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/profile25-guarded-memory-leader-batch8-001/result.json": "cbd46644a6250dc12506d26a102b37dfdfffe0a5281ab37a64c1947b51237517",
+    "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/profile25-guarded-rocksdb-controller-batch1-004/result.json": "09224059ea8cae918638a5b860e6fc41c885e6f686b1d472b0e005e12b17b360",
+    "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/profile25-guarded-rocksdb-controller-batch8-004/result.json": "947de007c62a6e77dd8681482f899c7e082f17e50c87db0fa5348db31a43bffa",
+    "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/profile25-guarded-rocksdb-leader-batch1-004/result.json": "e0aae692d74fbb78bed7bada5f066f8f2e5f438930c9923c9c8e142c61d8c41e",
+    "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/profile25-guarded-rocksdb-leader-batch8-004/result.json": "7ddc7ad99ca6b515ff36ce65294ae66fa58e6309c1a770c307bfdd3bfb3547c6",
+    "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/profile25-matrix-independent-audit.json": "9112cdfbf4e354169b5850c6a198ab5edd81582f09e822b56cb7dfac48e89da1"
+  },
+  "audit_receipt": "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/profile25-matrix-independent-audit.json",
+  "remaining_qualification": [
+    "timeout-reset and reused-ID-after-closure",
+    "8 lifecycle/emission fields",
+    "capacity/arbitrary32KiB values/collections",
+    "liveKafka fullprofiledeployment"
+  ]
+}

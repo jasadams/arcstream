@@ -1,0 +1,13 @@
+{
+  "base_commit": "c7f4777",
+  "provenance_source": "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/attempt-runs/native-session-20261010/session",
+  "status": "prepared unexecuted; upstream SESSION copied verbatim except sourcepath/view name",
+  "files": {
+    "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/attempt-runs/native-session-20261010/session/query.sql": "a96ea9ac759b94241e91a2be83c2626a88a75cd7c150d2c60c0e5c3e4e393cd2",
+    "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/attempt-runs/native-session-20261010/session/input.jsonl": "9ce1f23ef2313eefa1f1829b2cfec2af80ff4be7695e238d92009f41de2c3c0a",
+    "/home/jason/repos/arcstream-native-profile-session/deploy/streamr-native/session-full-cdc/full-session-plain.sql": "c5d7f24ea3552ed10cb14616292d3bd5c1acf0548b69754a046dec0401777e94",
+    "/home/jason/repos/arcstream-native-profile-session/deploy/streamr-native/session-full-cdc/full-session-cdc.sql": "b3efcfb8c4fa8bcde56a6e545638a18e808fd1bcadefda5aebe4a749d80d4a40",
+    "/home/jason/repos/arcstream-native-profile-session/deploy/streamr-native/session-full-cdc/input.jsonl": "9ce1f23ef2313eefa1f1829b2cfec2af80ff4be7695e238d92009f41de2c3c0a",
+    "/home/jason/repos/arcstream-native-profile-session/test/streamr-reference/session-full-cdc/expected.jsonl": "271a7dd4ec655c1d09d9945114297b4ccd60f2ba9ece3a7b84dccf6fa97004ec"
+  }
+}
