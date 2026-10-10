@@ -1,0 +1,45 @@
+{
+  "app_base": "c7f477799ef7fb716a4b8d3917a671db210deeba",
+  "scope": "caller-side diagnostic exact typed20checkpoint/final bag +sinkCDC; no intermediate whole-event prefix or application emission parity",
+  "source_files": {
+    "/home/jason/repos/arcstream-native-profile-session/deploy/streamr-native/profile-composition/query.sql": "7bf247a516ef8053f60bdb53a10970428eab0d6574f106c306781c6ae96c2f89",
+    "/home/jason/repos/arcstream-native-profile-session/test/streamr-reference/profile-composition/input.jsonl": "e87241ee3fdd686949ff767b4a622cac023be6bdd0dd523fa028e465618f431d",
+    "/home/jason/repos/arcstream-native-profile-session/test/streamr-reference/profile-composition/expected-prefixes.json": "158ce71fa50d3b17a6bc95fb49988c5bd3d0430a467a9046532073e9855cd4eb"
+  },
+  "topology": "5 native aggregate owners plus2updating LEFT JOIN owners",
+  "resource_profile": "decoded16MiB hookcompatible alternative; aggregateoverlay1536KiB/pending128KiB; joins overlay2MiB/pending512KiB; write96MiB scan16MiB 8slots",
+  "decoded_scope_flush_partial_bound_bytes": 14712832,
+  "unverified": [
+    "planner/runtime after STR102merge",
+    "backendread/otherconcurrent admission beyondpartialscopebound",
+    "application intermediate emission policy",
+    "internal join metadata identities not visible in sink"
+  ],
+  "requires_runtime_receipt": "expected40hexmergedsourcecommit +matchingactualELFsha256 +build_exit0",
+  "preparation_source_sha256": {
+    "/home/jason/repos/streamr-worktrees/str-102-updating-joins-20261010/crates/arroyo-worker/src/arrow/updating_join.rs": "041477c88bcd0ce0908031472d7aef25f7aa364e462a53376f221f4bbe81232c",
+    "/home/jason/repos/streamr-worktrees/str-102-updating-joins-20261010/crates/arroyo-worker/src/arrow/aggregate_store.rs": "6708a28029925e2d091945be9b30e10571fd382510c974e298d8ac5d522b0703",
+    "/home/jason/repos/streamr-worktrees/str-102-updating-joins-20261010/crates/arroyo-worker/src/arrow/incremental_aggregator.rs": "0f255e0bec2df9663a41ca3c2c290ce673d897dd41cc936ac42a33db8361c77f",
+    "/home/jason/repos/streamr-worktrees/str-102-updating-joins-20261010/crates/arroyo-worker/src/arrow/calendar_native.rs": "119266c5d2352b9299179d2c2ec2f1a23ab32d4c405252c43424ad92e0670fc0",
+    "/home/jason/repos/streamr-worktrees/str-102-updating-joins-20261010/crates/arroyo-sql-testing/src/smoke_tests.rs": "b4b7cdc45d6a2eb56ab91c7291f8cd08a198b852f4df1cf552ded5c08a2e8a6d",
+    "/home/jason/repos/streamr-worktrees/str-102-updating-joins-20261010/crates/arroyo-state/src/live/write.rs": "f487d61922b553c5c580e38f5bb6443e6969eb5b92a9e50f5e63abeee96fb4a9",
+    "/home/jason/repos/streamr-worktrees/str-102-updating-joins-20261010/crates/arroyo-rpc/src/config.rs": "d60e5f4f36a1fe5f386a3133cb01abca2cd963d1f3d2cb0746bcd0fc48d58ab5"
+  },
+  "artifact_sha256": {
+    "test/streamr-reference/profile-join/input.jsonl": "e87241ee3fdd686949ff767b4a622cac023be6bdd0dd523fa028e465618f431d",
+    "test/streamr-reference/profile-join/expected-prefixes.json": "158ce71fa50d3b17a6bc95fb49988c5bd3d0430a467a9046532073e9855cd4eb",
+    "test/streamr-reference/profile-join/query-original.sql": "7bf247a516ef8053f60bdb53a10970428eab0d6574f106c306781c6ae96c2f89",
+    "test/streamr-reference/profile-join/run.py": "2da937dda18838780f62f036917f3a90f099a37560f2cc9dd12af77cc7a6a7e7",
+    "test/streamr-reference/profile-join/self_test.py": "c7933affda1ed7246f6aacc1df88e56c0f07c907b3c5057b3082497e53bc2a57",
+    "test/streamr-reference/profile-join/README.md": "13d70633a122247bd34c86f31227e40f632f3fe9ccc4648050245a63459b254a"
+  },
+  "oracle_selfchecks": "15 host-only adversarial tests pass; no SQL runtime",
+  "recovery_provenance_guards": [
+    "exact original receipt bytes preserved/rechecked immediately before launch",
+    "integerbuild_exit0 only",
+    "ELF hash and expectedcommit rechecked immediately before launch",
+    "checkpoint physical count equals committed receipt",
+    "independent typed20checkpointbag",
+    "recovered exactcheckpoint byteprefix plus nonempty suffix"
+  ]
+}

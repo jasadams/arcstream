@@ -1,0 +1,102 @@
+[
+  {
+    "tenant_id": "acme",
+    "canonical_id": "profile-1",
+    "first_seen": 1791547200000,
+    "last_seen": 1791547200000,
+    "total_events": 1,
+    "page_views": 1,
+    "clicks": 0,
+    "logins": 0,
+    "feature_uses": 0,
+    "user_id": "known-user",
+    "last_page": "/home",
+    "last_country": "AU",
+    "last_device": "desktop",
+    "last_browser": "Firefox",
+    "events_1d": 1,
+    "events_7d": 1,
+    "events_30d": 1,
+    "events_90d": 1,
+    "top_pages": [
+      "/home"
+    ],
+    "top_features": []
+  },
+  {
+    "tenant_id": "acme",
+    "canonical_id": "profile-1",
+    "first_seen": 1791547200000,
+    "last_seen": 1791547260000,
+    "total_events": 2,
+    "page_views": 1,
+    "clicks": 1,
+    "logins": 0,
+    "feature_uses": 0,
+    "user_id": "known-user",
+    "last_page": "/home",
+    "last_country": "AU",
+    "last_device": "desktop",
+    "last_browser": "Firefox",
+    "events_1d": 2,
+    "events_7d": 2,
+    "events_30d": 2,
+    "events_90d": 2,
+    "top_pages": [
+      "/home"
+    ],
+    "top_features": []
+  },
+  {
+    "tenant_id": "acme",
+    "canonical_id": "profile-1",
+    "first_seen": 1791547200000,
+    "last_seen": 1791547290000,
+    "total_events": 3,
+    "page_views": 1,
+    "clicks": 1,
+    "logins": 0,
+    "feature_uses": 1,
+    "user_id": "known-user",
+    "last_page": "/home",
+    "last_country": "AU",
+    "last_device": "desktop",
+    "last_browser": "Firefox",
+    "events_1d": 3,
+    "events_7d": 3,
+    "events_30d": 3,
+    "events_90d": 3,
+    "top_pages": [
+      "/home"
+    ],
+    "top_features": [
+      "search"
+    ]
+  },
+  {
+    "tenant_id": "acme",
+    "canonical_id": "profile-1",
+    "first_seen": 1791547200000,
+    "last_seen": 1791547320000,
+    "total_events": 4,
+    "page_views": 1,
+    "clicks": 1,
+    "logins": 1,
+    "feature_uses": 1,
+    "user_id": "known-user",
+    "last_page": "/home",
+    "last_country": "AU",
+    "last_device": "desktop",
+    "last_browser": "Firefox",
+    "events_1d": 4,
+    "events_7d": 4,
+    "events_30d": 4,
+    "events_90d": 4,
+    "top_pages": [
+      "/home"
+    ],
+    "top_features": [
+      "search"
+    ]
+  }
+]
