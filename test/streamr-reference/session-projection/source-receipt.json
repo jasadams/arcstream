@@ -1,0 +1,28 @@
+{
+  "base_commit": "c7f4777",
+  "status": "prepared; no engine execution",
+  "input_source": "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/attempt-runs/native-session-20261010/session/output.initial.jsonl",
+  "files": {
+    "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/attempt-runs/native-session-20261010/session/output.initial.jsonl": {
+      "sha256": "c7e9562ddc3f3d2f6bb3eeb5559600956ef2df091c20002e701105ab9f96214e"
+    },
+    "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/full-session-attempt/expected.strict.json": {
+      "sha256": "f897e4c25fdd58ebe92434ccfd55ae4f1cb478b9e3b29a4b4ddbc20bd16b0184"
+    },
+    "/home/jason/repos/arcstream-native-profile-session/deploy/streamr-native/session-projection/scalar-pages.sql": {
+      "sha256": "d2fefb738b16db1e1e0fe00f5eb6f26ab8b98445236f671eee50f503ba524998"
+    },
+    "/home/jason/repos/arcstream-native-profile-session/deploy/streamr-native/session-projection/map-diagnostic.sql": {
+      "sha256": "0456a273f1cf59441a3f419430a3562fada0ace67946e38098568639d34730b7"
+    },
+    "/home/jason/repos/arcstream-native-profile-session/deploy/streamr-native/session-projection/dynamic-counts.sql": {
+      "sha256": "28031003c2c2dacaaa4ad32f820a7a0b6a9109b54d55e443d1701cfebd965592"
+    },
+    "/home/jason/repos/arcstream-native-profile-session/deploy/streamr-native/session-projection/closed-sessions.jsonl": {
+      "sha256": "c7e9562ddc3f3d2f6bb3eeb5559600956ef2df091c20002e701105ab9f96214e"
+    },
+    "/home/jason/repos/arcstream-native-profile-session/test/streamr-reference/session-projection/expected.jsonl": {
+      "sha256": "271a7dd4ec655c1d09d9945114297b4ccd60f2ba9ece3a7b84dccf6fa97004ec"
+    }
+  }
+}

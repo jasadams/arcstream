@@ -1,0 +1,21 @@
+Native 20-field composition passed the finite memory/controller/batch1 fixture on repaired SQL pin `9baf16501c77a5a30bf87c50c2d3693a14986ae92d253731cda5370953e6d2ed`. This is not a qualified full33-field profile or a live Kafka profile deployment.
+
+The current runnable query is `query-union.sql`: native core aggregates and page/feature counts feed a typed tagged UNION ALL, then an outer native aggregate emits the20fields. Retractable outer FIRST_VALUE expressions have explicit ORDER BY total_events ASC; exactly one current core row per key makes that order preserve the selected value. Four aggregate owners require STREAMR_TEST_MAX_OPEN_DATABASES=4; byte budgets are unchanged.
+
+The four-row core input is byte-identical to the passed source-bound core14 fixture. Its sole page and feature avoid tie-policy decisions. Calendar counts use contribution UTC days and the source raw FOR reference date. This fixture establishes composition and checkpoint recovery, not rollover/backfill/quiet-key capacity, multiple-key ownership, tie ordering, or production flush-clock behavior.
+
+Actual evidence: `/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/profile-composition-union-003/result.json` reports exit0, initial1 row/final prefix4, recovered2 rows/final prefix4, exact20typedfields/CDCchains, and committed_rows1 with independently checked checkpoint prefix1. The coordinator reports an independent audit pass. Every observed record is checked against a complete source-prefix oracle; inconsistent cross-branch intermediate values are not normalized away.
+
+Preserved earlier attempts remain meaningful: original LEFT JOIN planner rejected non-inner joins without windows; INNER JOIN planner rejected an updating left side; UNION001 runtime rejected unordered retractable FIRST_VALUE; UNION002 startup rejected the default two-database slot limit for four aggregate owners. Its forced stop is not functional or graceful-shutdown qualification. Those failures do not invalidate UNION003 and are not removed.
+
+Coordinator command (paths mounted unchanged in the Bookworm runtime; use a fresh evidence directory):
+
+```sh
+python3 /home/jason/repos/arcstream-native-profile-session/test/streamr-reference/profile-composition/run.py --binary /home/jason/qa-evidence/str32-20261010-52391450/recovery-admission-repair/bin/sql-testing --query /home/jason/repos/arcstream-native-profile-session/deploy/streamr-native/profile-composition/query-union.sql --run-dir /home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/profile-composition-union-next --execute
+```
+
+Without --execute the runner only prepares rebased SQL and a command plan. Its original default query preserves the rejected LEFT proposal, so select --query explicitly. Existing flags are sanitized, the outer timeout is210seconds, and failures retain context in result.json.
+
+Next qualification is application-owned, preserving policies. Add total_sessions and sessions_1d/7d/30d/90d first: reuse the passed cursor MERGE start flag, carry the source event timestamp, and native SUM start flags with contribution START-day calendar filters. Add this branch to the proven tagged UNION route and retain the20field oracle. This is a25field proposal until planned/run. It must test A,A,B,A,null,empty,A as3starts, checkpoint between transitions, and day rollover. COUNT DISTINCT session_id is not equivalent.
+
+The remaining8fields are avg_session_duration_sec, current_session_active, current_session_duration_sec, updated_at, timestamp, action, trigger, changed_fields. Before claiming them, separately demonstrate timeout-driven cursor clearing and same-ID restart, closedSessionCount denominator with clamped last_seen-minus-start duration, emission-clock active duration, and previous-emitted snapshot comparison. changed_fields tracks the established12fields, with the original5field initial list; per-event OLD/NEW is not a replacement. Periodic flush is approved, but emission metadata/clock behavior and all-idle progress remain unqualified. Native SESSION semantics are settled and are not being reopened; that decision does not silently replace the distinct profile cursor policy. No new engine primitive is proposed or justified by this document.
