@@ -1,0 +1,34 @@
+{
+  "base": "c7f477799ef7fb716a4b8d3917a671db210deeba",
+  "instruction_paths": [
+    "CLAUDE.md",
+    ".claude/build-test.md",
+    ".claude/team.md"
+  ],
+  "scope": "20 typed fields finite memory/controller/batch1 passed UNION003; full33 and production Kafka unqualified",
+  "passed_source": "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/prepared/core",
+  "source_input_sha256": "e87241ee3fdd686949ff767b4a622cac023be6bdd0dd523fa028e465618f431d",
+  "support_receipt": "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/attempt-runs/profile-support-20261010/summary.json",
+  "unverified": [
+    "calendar rollover/backfill/quiet-key composition",
+    "multiple keys and tie policy",
+    "13 remaining profile lifecycle/emission fields",
+    "other backend/checkpoint/batch configurations"
+  ],
+  "sql_binary_sha256": "9baf16501c77a5a30bf87c50c2d3693a14986ae92d253731cda5370953e6d2ed",
+  "artifact_sha256": {
+    "test/streamr-reference/profile-composition/run.py": "aec1dacf18d1ab6c8026033ef3d233ca824a4831b51603ffed605049d7c23183",
+    "test/streamr-reference/profile-composition/input.jsonl": "e87241ee3fdd686949ff767b4a622cac023be6bdd0dd523fa028e465618f431d",
+    "test/streamr-reference/profile-composition/expected-prefixes.json": "158ce71fa50d3b17a6bc95fb49988c5bd3d0430a467a9046532073e9855cd4eb",
+    "deploy/streamr-native/profile-composition/query.sql": "7bf247a516ef8053f60bdb53a10970428eab0d6574f106c306781c6ae96c2f89",
+    "deploy/streamr-native/profile-composition/README.md": "017b7781919c12a1faafb9bb01a00b6a58633ca14c94b93ea677ca883719302b",
+    "deploy/streamr-native/profile-composition/query-inner.sql": "ce6dc69c39b1a8a42a3f91cba7b1912c5d5d0078b21fc2998a8e1dedb8b32abe",
+    "deploy/streamr-native/profile-composition/query-union.sql": "605e69d05db8c69e1f9a5daa76668bdde6b3310a6914647d1b220d456531b72d"
+  },
+  "union_retraction_order": "Outer core16 scalar projections order by total_events ASC; exactly one current core row per key, append-source first_seen unchanged",
+  "execution_receipt": "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/profile-session/profile-composition-union-003/result.json",
+  "ordinary_resource_config": {
+    "STREAMR_TEST_MAX_OPEN_DATABASES": "4",
+    "reason": "four native aggregate owners; byte budgets unchanged"
+  }
+}
