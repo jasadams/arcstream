@@ -1,0 +1,29 @@
+name: Streamr identity reference
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/streamr-native/**'
+      - 'test/streamr-reference/**'
+      - 'flink/identity-resolution/src/test/resources/reference/**'
+      - '.github/workflows/streamr-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  identity-reference:
+    name: Identity reference checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test exact identity fields and merge lineage
+        run: python3 -m unittest discover -s test/streamr-reference -p 'test_*.py' -v
+      - name: Prepare the native state-table fixture
+        run: python3 test/streamr-reference/native_identity_capture.py prepare "$RUNNER_TEMP/native-identity" --runtime-directory /evaluation/identity
+      - name: Check configurable runner arguments
+        run: python3 deploy/streamr-native/fixture-run.py --help
