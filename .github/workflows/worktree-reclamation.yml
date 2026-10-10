@@ -1,0 +1,32 @@
+name: Worktree reclamation
+
+on:
+  pull_request:
+    paths:
+      - '.claude/team.md'
+      - '.claude/build-test.md'
+      - 'scripts/check-ticket-in-flight.sh'
+      - 'scripts/mark-worktree-stranded.sh'
+      - 'scripts/mark-branch-stranded.sh'
+      - 'scripts/lib/ticket_worktrees.py'
+      - 'scripts/tests/test_ticket_worktrees.py'
+      - 'scripts/RECLAMATION.md'
+      - '.github/workflows/worktree-reclamation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  worktree-reclamation:
+    name: Worktree reclamation tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check shell syntax
+        run: bash -n scripts/check-ticket-in-flight.sh scripts/mark-worktree-stranded.sh scripts/mark-branch-stranded.sh
+      - name: Test preservation and claim evidence
+        run: python3 -m unittest discover -s scripts/tests -p test_ticket_worktrees.py -v
