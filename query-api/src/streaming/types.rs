@@ -132,16 +132,16 @@ pub struct LiveEventMessage {
     pub tenant_id: String,
     pub event_time: String,
     pub canonical_id: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::optional_text::deserialize")]
     pub anonymous_id: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::optional_text::deserialize")]
     pub user_id: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::optional_text::deserialize")]
     pub page_url: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::optional_text::deserialize")]
     pub device_type: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::optional_text::deserialize")]
     pub browser: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::optional_text::deserialize")]
     pub country: String,
 }
