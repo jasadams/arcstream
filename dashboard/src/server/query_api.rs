@@ -3,27 +3,6 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use crate::server::AppState;
 use crate::server::QueryStatEntry;
 
-/// Read the `backend` cookie from the current request, defaulting to "pinot".
-/// The dashboard's toggle sets this cookie per-browser; query-api routes on the
-/// forwarded `x-backend` header.
-async fn read_backend_cookie() -> String {
-    leptos_axum::extract::<axum::http::HeaderMap>()
-        .await
-        .ok()
-        .and_then(|h| {
-            h.get("cookie")
-                .and_then(|c| c.to_str().ok())
-                .map(str::to_owned)
-        })
-        .and_then(|cookies| {
-            cookies
-                .split(';')
-                .find_map(|kv| kv.trim().strip_prefix("backend=").map(str::to_owned))
-        })
-        .filter(|b| b == "pinot" || b == "flare" || b == "flaredb")
-        .unwrap_or_else(|| "pinot".to_owned())
-}
-
 #[derive(Serialize)]
 struct GraphQLRequest {
     query: &'static str,
@@ -55,15 +34,11 @@ pub async fn graphql_query_with_stats<T: DeserializeOwned>(
 ) -> Result<(T, Vec<QueryStatEntry>), String> {
     let req = GraphQLRequest { query, variables };
 
-    // Per-browser backend selection: read the `backend` cookie from the current
-    // request (default Pinot) and forward it to query-api as `x-backend`. Each
-    // viewer's browser controls its own backend via the dashboard toggle.
-    let backend = read_backend_cookie().await;
-
+    // The deployed demo has one analytics backend; old selection cookies are ignored.
     let resp = state
         .http
         .post(&state.query_api_url)
-        .header("x-backend", backend)
+        .header("x-backend", "flaredb")
         .json(&req)
         .send()
         .await

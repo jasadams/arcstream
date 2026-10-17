@@ -114,10 +114,10 @@ impl LiveProfileProvider for FlareDBClient {
             "SELECT canonical_id, user_id, tenant_id, first_seen, last_seen, \
              total_events, total_sessions, \
              events_1d, events_7d, events_30d, events_90d, \
-             sessions_1d, sessions_7d, \
-             avg_session_duration_sec, \
+             sessions_1d, sessions_7d, sessions_30d, sessions_90d, \
+             avg_session_duration_sec, current_session_active, current_session_duration_sec, \
              page_views, clicks, logins, feature_uses, \
-             last_page, last_country, last_device, last_browser \
+             last_page, last_country, last_device, last_browser, top_pages, top_features \
              FROM profiles \
              WHERE tenant_id = '{tenant_id}' AND canonical_id = '{canonical_id}' \
              LIMIT 1"
@@ -130,7 +130,13 @@ impl LiveProfileProvider for FlareDBClient {
         }
 
         let mut obj = serde_json::Map::new();
-        for (i, col_name) in resp.result_table.data_schema.column_names.iter().enumerate() {
+        for (i, col_name) in resp
+            .result_table
+            .data_schema
+            .column_names
+            .iter()
+            .enumerate()
+        {
             if let Some(val) = resp.result_table.rows[0].get(i) {
                 obj.insert(col_name.clone(), val.clone());
             }

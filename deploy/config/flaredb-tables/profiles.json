@@ -18,6 +18,8 @@
     {"name": "sessions_30d", "type": "Int64", "nullable": true},
     {"name": "sessions_90d", "type": "Int64", "nullable": true},
     {"name": "avg_session_duration_sec", "type": "Int64", "nullable": true},
+    {"name": "current_session_active", "type": "Boolean", "nullable": true},
+    {"name": "current_session_duration_sec", "type": "Int64", "nullable": true},
     {"name": "page_views", "type": "Int64", "nullable": true},
     {"name": "clicks", "type": "Int64", "nullable": true},
     {"name": "logins", "type": "Int64", "nullable": true},
@@ -26,6 +28,9 @@
     {"name": "last_country", "type": "Utf8", "nullable": true},
     {"name": "last_device", "type": "Utf8", "nullable": true},
     {"name": "last_browser", "type": "Utf8", "nullable": true},
+    {"name": "top_pages", "type": "List(item:Utf8:true)", "nullable": true},
+    {"name": "top_features", "type": "List(item:Utf8:true)", "nullable": true},
+    {"name": "changed_fields", "type": "List(item:Utf8:true)", "nullable": true},
     {"name": "action", "type": "Utf8", "nullable": true},
     {"name": "timestamp", "type": "Timestamp(Millisecond, None)", "nullable": true},
     {"name": "trigger", "type": "Utf8", "nullable": true}

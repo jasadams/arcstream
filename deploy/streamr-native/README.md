@@ -20,6 +20,14 @@ python3 deploy/streamr-native/prepare_mvp.py prepare /tmp/arc-mvp-candidate \
   --clock-mode replay
 ```
 
+To replay an existing retained raw Kafka topic, supply `--raw-topic raw-events`
+with `--clock-mode replay`. Only the identity pipeline input is rebound. The
+existing input is recorded as `external_input_topic` and omitted from the topics
+to create; outputs and consumer groups remain in the new native namespace. This
+option does not create, delete, alter or reset the existing input topic or groups.
+Keep the producer on that same raw topic so new events follow retained history.
+Keep replay mode fixed for this persisted state, including after catch-up.
+
 `live` preserves current observation-clock profile policy; `replay` preserves valid
 historical source timestamps and logical replay duration. Use a new namespace and
 state when changing modes. The normalizer admits every input without a transport
