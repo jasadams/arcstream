@@ -24,6 +24,37 @@ additional correctness/recovery cases. Do not repeat that campaign or interpret
 incidental throughput under machine load as a regression result. These are engine
 results, not Arcstream application acceptance.
 
+## Current application runtime evidence
+
+The isolated eleven-pipeline Kafka graph passed its representative application
+and worker-loss gates at Arcstream source `b2fb06e` (identical frozen file hashes
+recorded by the run). Evidence:
+`/home/jason/qa-evidence/arc17-native-mvp-20261017/kafka-graph-attempt8/`.
+The exact maintained-queue invocation is retained in
+`kafka-graph-attempt8-invocation.json`, queue job `ad06cb291ec8`.
+
+The run checked thirteen complete unified events, two identity merges, five
+active and five closed profiles with all33 fields, four complete12-field session
+summaries, and exact CDC before/after chains. Both native profile and session
+owners restored checkpoint6 after actual SIGKILL; all fourteen committed topic
+prefixes remained unchanged. A fresh fourteenth event retained identity and
+produced the exact nineteenth profile update; native flat publication equalled
+all nineteen CDC after-images. Actual repeated public submission preserved the
+eleven pipeline identities. Engine and isolated broker/network cleanup passed.
+This graph used RocksDB. The identity Kafka owner was not killed: separate
+native CLI identity recovery passed both backends, and the whole graph checked
+canonical continuity through downstream owner recovery.
+
+This runtime pass is bounded application evidence, not production cutover or
+universal Java parity. Independent artifact review and required CI are recorded
+separately in [the validation ledger](arc-17-native-validation.md). The graph
+used the qualified engine executable and the separately pinned repaired generic
+Rust UDF plugin source; their identities remain distinct. Prior twelve policy
+owner/projector cases used the unchanged business scalars before this transport
+revision. The focused current transport feedback owner/projector proof and the
+complete Kafka graph establish the new transport path; do not relabel old runs
+as executions of the new envelope.
+
 ## Reusable application source
 
 | Branch and exact source | Reusable coverage | Limit |
@@ -65,9 +96,10 @@ also writes an internal execution topic; reserved clock controls enter only that
 internal topic. The normalizer writes separate profile and session signal topics.
 Both owners emit scalar outboxes; stateless native projectors expand business
 outputs and timer seeds, and timer pipelines feed controls back into owner signal
-topics. The stateless normalizer has no source watermark: late arrivals and
-live future timestamps must reach Arcstream timestamp assignment before any
-window admission. It parses the original schema event_time explicitly; no
+topics. Nonwindow append sources use a nullable watermark expression to avoid a
+transport-time admission floor: late arrivals and historical timer feedback must
+reach Arcstream policy. The normalizer assigns application timestamps before
+any timer-window admission. It parses the original schema event_time explicitly; no
 wall-clock or watermark value substitutes for that source field. Exact job names
 and sink-marker inventory come from the generated manifest, not this descriptive
 list. Connector commits are independent.
@@ -273,3 +305,47 @@ The smallest application adaptation uses the already supported string input
 contract (`live`/`replay`) while retaining boolean mode in the application payload
 and persisted policy. This avoids an engine capability change. Failed isolated
 attempts are retained separately from any passing graph receipt.
+
+
+## Source admission and technical timer transport
+
+Actual continuous Kafka attempt6 exposed two issues that terminal file fixtures
+did not establish. Profile timer source checkpoints had advanced maximum `AS`
+progress to January1 00:30:54.999 but retained emitted progress at 00:00:07.999:
+the native generator throttles emission using `FOR`, previously advanced by a
+thirty-day deadline. Session timer windows drained correctly, but their
+historical controls encountered the owner's October17 default source admission
+floor before application policy. Raw checkpoint audits and failed outputs remain
+under `kafka-graph-attempt6/`; they are not passing receipts.
+
+The selected existing-interface pattern disables finite source admission
+watermarks on nonwindow append stages using a generated nullable timestamp and
+supported `watermark_field` option. It preserves record transport timestamps and
+all explicit business time. Only timer pipelines emit application progress.
+Native singleton progress state also retains a technical dispatch cursor:
+`max(previous + 2000ms, effective + 31d, source + 31d)` for profiles, raw source
+plus31days for sessions. Returned controls do not advance that cursor.
+
+A native qualified `JSON_OBJECT` owner envelope carries the unchanged business
+payload string plus dispatch and progress. The application scalar
+`timer_outbox.rs` runs in the separate stateless projector and appends a technical
+clock after each frame's business seeds in the same native writer. Clock `FOR`
+uses dispatch; `AS` remains exact declared application progress. Technical clocks
+are excluded from windows and application outputs. An actual attempt7 rejected
+the scalar in the fused owner's sink projection; moving it after the native
+append boundary resolved that restriction without an engine capability change.
+
+The technical cursor is finite, grows two seconds per raw arrival and must fit
+the native nanosecond timestamp range. The scalar rejects exhaustion explicitly;
+unbounded production operation is not established. Event dates, session
+deadlines, replay duration and observation metadata never derive from this
+technical cursor. The unchanged business scalars retain their independent exact
+oracles. The public compiler, native projector, continuous Kafka timers,
+checkpoint recovery and fresh output all passed on the selected path.
+
+Production acceptance still includes the agreed storage/consumer contract and
+operational configuration. The newly published, pinned FlareDB image passed its
+separate startup/SELECT1/restart smoke receipt; that does not establish Kafka
+aborted-transaction ingestion or application materialization. Full-graph memory
+backend execution and identity Kafka-owner loss are not claimed by the RocksDB
+graph receipt. No production traffic was switched.

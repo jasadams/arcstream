@@ -22,8 +22,8 @@ python3 deploy/streamr-native/prepare_mvp.py prepare /tmp/arc-mvp-candidate \
 
 `live` preserves current observation-clock profile policy; `replay` preserves valid
 historical source timestamps and logical replay duration. Use a new namespace and
-state when changing modes. The normalizer admits every input without a source
-watermark, carries the original application `event_time`, and supplies separate
+state when changing modes. The normalizer admits every input without a transport
+admission floor, carries the original application `event_time`, and supplies separate
 profile-assigned and raw session clocks. State owners maintain input progress;
 native TUMBLE pipelines return generation-checked lifecycle controls. Reserved
 trusted clock controls enter only the internal `execution-events` topic using

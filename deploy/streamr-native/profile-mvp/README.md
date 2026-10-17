@@ -139,3 +139,15 @@ The dispatch cursor is finite and must fit Streamr's nanosecond timestamp range;
 the scalar rejects exhaustion explicitly. It grows two seconds per raw arrival
 and can exceed business time substantially. This is an MVP transport bound, not
 an unlimited production clock contract. No engine capability was added.
+
+
+Current transport runtime proof: the focused feedback owner/projector case
+passed with five exact full33 CDCs, twelve business seeds and six additional
+technical clocks, including real checkpoint/worker-loss recovery. The isolated
+whole Kafka graph then passed five active/closed profiles, four session closures,
+fresh post-recovery input and complete committed-prefix checks. See
+`docs/arc-17-native-validation.md` and evidence `kafka-graph-attempt8/` for exact
+source hashes, commands, independent review and scope. This is not production
+cutover evidence. The native owner uses a JSON_OBJECT envelope; the application
+transport scalar executes only in the separate stateless projector, after an
+actual fused-owner scalar admission rejection.
