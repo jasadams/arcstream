@@ -26,8 +26,10 @@ The query API accepts independently configurable application topics and groups:
 Set `KAFKA_BROKERS` to the isolated broker. For the native integration, set
 `KAFKA_EVENTS_TOPIC=arc-native-unified-events` and use an isolated event group.
 Existing defaults are unchanged. A profiles topic setting does not implement a
-profile emitter. The live UI feed retains its existing sampling/buffering and
-commit behavior; it is not the authoritative lossless event audit.
+profile emitter. Both subscriptions use `isolation.level=read_committed` to hide
+aborted transactions. Pending profiles are scoped by tenant and canonical ID.
+The UI feed retains its sampling/buffering and offset commit behavior; it is not
+the authoritative lossless event audit.
 
 ## Storage qualification
 
@@ -56,5 +58,6 @@ See `qualification-20261010.json` for source/binary receipts, exact local gates,
 network/browser results and remaining limitations. The quiet-input nullable probe
 passed the native-topic WebSocket, GraphQL and exact stored-event checks; its
 producer resumed afterward. The first probe under ongoing input timed out and is
-retained as a failure with unresolved cause. Existing sampled, read-uncommitted UI
-behavior is unchanged. Events work; profile/session output is still unqualified.
+retained as a failure with unresolved cause. That historical capture used sampled,
+read-uncommitted UI behavior. The current consumer change to read-committed still
+requires runtime validation. Profile/session output remains unqualified.

@@ -34,10 +34,10 @@ SELECT tenant_id, canonical_id,
   COALESCE(LAST_VALUE(browser)
     FILTER (WHERE browser IS NOT NULL AND browser <> ''), '') AS last_browser
 ,
-  COUNT(*) FILTER (WHERE CAST(event_ts AS DATE) = WATERMARK_DATE()) AS events_1d,
-  COUNT(*) FILTER (WHERE CAST(event_ts AS DATE) BETWEEN WATERMARK_DATE() - INTERVAL '6' DAY AND WATERMARK_DATE()) AS events_7d,
-  COUNT(*) FILTER (WHERE CAST(event_ts AS DATE) BETWEEN WATERMARK_DATE() - INTERVAL '29' DAY AND WATERMARK_DATE()) AS events_30d,
-  COUNT(*) FILTER (WHERE CAST(event_ts AS DATE) BETWEEN WATERMARK_DATE() - INTERVAL '89' DAY AND WATERMARK_DATE()) AS events_90d
+  COUNT(*) FILTER (WHERE CAST(event_ts AS DATE) = EVENT_DATE()) AS events_1d,
+  COUNT(*) FILTER (WHERE CAST(event_ts AS DATE) BETWEEN EVENT_DATE() - INTERVAL '6' DAY AND EVENT_DATE()) AS events_7d,
+  COUNT(*) FILTER (WHERE CAST(event_ts AS DATE) BETWEEN EVENT_DATE() - INTERVAL '29' DAY AND EVENT_DATE()) AS events_30d,
+  COUNT(*) FILTER (WHERE CAST(event_ts AS DATE) BETWEEN EVENT_DATE() - INTERVAL '89' DAY AND EVENT_DATE()) AS events_90d
 FROM profile_events GROUP BY tenant_id, canonical_id;
 
 
@@ -73,10 +73,10 @@ FROM session_applied AS r;
 
 
 CREATE VIEW session_counts AS SELECT tenant_id,canonical_id, SUM(session_started) AS total_sessions,
-SUM(session_started) FILTER (WHERE CAST(event_ts AS DATE) = WATERMARK_DATE()) AS sessions_1d,
-SUM(session_started) FILTER (WHERE CAST(event_ts AS DATE) BETWEEN WATERMARK_DATE() - INTERVAL '6' DAY AND WATERMARK_DATE()) AS sessions_7d,
-SUM(session_started) FILTER (WHERE CAST(event_ts AS DATE) BETWEEN WATERMARK_DATE() - INTERVAL '29' DAY AND WATERMARK_DATE()) AS sessions_30d,
-SUM(session_started) FILTER (WHERE CAST(event_ts AS DATE) BETWEEN WATERMARK_DATE() - INTERVAL '89' DAY AND WATERMARK_DATE()) AS sessions_90d FROM session_flags GROUP BY tenant_id,canonical_id;
+SUM(session_started) FILTER (WHERE CAST(event_ts AS DATE) = EVENT_DATE()) AS sessions_1d,
+SUM(session_started) FILTER (WHERE CAST(event_ts AS DATE) BETWEEN EVENT_DATE() - INTERVAL '6' DAY AND EVENT_DATE()) AS sessions_7d,
+SUM(session_started) FILTER (WHERE CAST(event_ts AS DATE) BETWEEN EVENT_DATE() - INTERVAL '29' DAY AND EVENT_DATE()) AS sessions_30d,
+SUM(session_started) FILTER (WHERE CAST(event_ts AS DATE) BETWEEN EVENT_DATE() - INTERVAL '89' DAY AND EVENT_DATE()) AS sessions_90d FROM session_flags GROUP BY tenant_id,canonical_id;
 CREATE VIEW tagged AS
 SELECT tenant_id,canonical_id,CAST('core' AS TEXT) AS kind, first_seen, last_seen, total_events, page_views, clicks, logins, feature_uses, user_id, last_page, last_country, last_device, last_browser, events_1d, events_7d, events_30d, events_90d, CAST(NULL AS BIGINT) AS total_sessions, CAST(NULL AS BIGINT) AS sessions_1d, CAST(NULL AS BIGINT) AS sessions_7d, CAST(NULL AS BIGINT) AS sessions_30d, CAST(NULL AS BIGINT) AS sessions_90d,CAST(NULL AS TEXT) AS item,CAST(NULL AS BIGINT) AS uses FROM profile_lifetime
 UNION ALL

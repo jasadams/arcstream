@@ -1,5 +1,17 @@
 # Native Streamr identity evaluation
 
+Current MVP work targets Streamr merge
+`ad0a4814d5b7c07d74dce54753f5e6e9aaa7a062`.
+See [the application contract](../../docs/arc-17-native-mvp.md) for the behavior
+mapping, event-clock semantics and outstanding profile lifecycle requirements.
+The guarded profile query uses `EVENT_DATE()`. Historical receipts retain their
+original source pins; they are not current integration acceptance.
+
+Run local compilation through `scripts/dev-build`, which uses the shared queue
+when installed. Runtime qualification must also hold a queue reservation.
+Current runtime attempts are blocked by the host disk guard; these files do not
+yet qualify a complete replacement execution path or production cutover.
+
 These queries resolve identities through tenant-partitioned anonymous-ID and
 user-ID state tables. The identity pipeline writes one capture record per input;
 two downstream pipelines publish unified events and identity merges. The two

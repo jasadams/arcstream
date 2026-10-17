@@ -20,6 +20,7 @@ pub async fn run(
         .set("group.id", group_id)
         .set("auto.offset.reset", "latest")
         .set("enable.auto.commit", "true")
+        .set("isolation.level", "read_committed")
         .set("fetch.wait.max.ms", "500")
         .set("fetch.min.bytes", "1024")
         .set("queued.max.messages.kbytes", "4096")
@@ -34,7 +35,7 @@ pub async fn run(
     eprintln!("Profile update consumer started on topic: {topic}");
 
     let mut stream = consumer.stream();
-    let mut pending: HashMap<String, ProfileUpdateMessage> = HashMap::new();
+    let mut pending: HashMap<(String, String), ProfileUpdateMessage> = HashMap::new();
     let mut last_flush = tokio::time::Instant::now();
 
     loop {
@@ -51,7 +52,7 @@ pub async fn run(
                 if let Some(payload) = msg.payload() {
                     if let Ok(flat) = serde_json::from_slice::<FlatProfileUpdate>(payload) {
                         let update = flat.into_message();
-                        pending.insert(update.canonical_id.clone(), update);
+                        pending.insert((update.tenant_id.clone(), update.canonical_id.clone()), update);
                     }
                 }
                 let _ = consumer.commit_message(&msg, CommitMode::Async);
