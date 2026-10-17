@@ -1,164 +1,42 @@
-# Native Streamr MVP candidate
+# Streamr native SQL integration
 
-The MVP candidate uses Streamr's native SQL/state engine and Arcstream-owned
-identity, profile and session policy. It is isolated from existing deployments.
-See [the application contract](../../docs/arc-17-native-mvp.md) for exact behavior,
-evidence and acceptance limits. Production cutover requires explicit authorization.
+The custom UDF/state-machine MVP graph has been removed. Its generator,
+normalizer, timer feedback, synthetic clocks and nullable watermark bypasses
+are no longer available. There is currently no complete demo deployment graph.
 
-The engine contract is merge `ad0a4814d5b7c07d74dce54753f5e6e9aaa7a062`.
-Official Rust UDF compilation additionally requires the existing-interface export
-annotation repair in [Streamr PR70](https://github.com/jasadams/streamr/pull/70),
-implementation `a86297dc049c0c3a5a85f965c782cc571ae0d2d2`. The candidate
-manifest records these separately; historical executable receipts retain their
-actual source pins.
+See [current integration status and gaps](../../docs/arc-18-native-status.md).
+Native product semantics govern results; the old Flink implementation is not an
+execution specification when its behavior conflicts with those semantics.
 
-Prepare a new isolated candidate with explicit clock policy:
+## Native candidates
 
-```sh
-python3 deploy/streamr-native/prepare_mvp.py prepare /tmp/arc-mvp-candidate \
-  --broker YOUR_ISOLATED_BROKER:9092 --topic-prefix arc-mvp-candidate \
-  --clock-mode replay
-```
+- `identity.sql`, `unified.sql`, `merges.sql`: identity state tables and append
+  publication; payload event_time drives the five-second disorder watermark.
+- `session-native/query.sql`: native SESSION with twelve-field projection,
+  arrival-ordered metadata and native array/map aggregation.
+- Profile composition/session-count SQL directories: partial native candidates,
+  with qualification boundaries recorded in their READMEs; not a complete
+  profile lifecycle or deployable graph.
 
-To replay an existing retained raw Kafka topic, supply `--raw-topic raw-events`
-with `--clock-mode replay`. Only the identity pipeline input is rebound. The
-existing input is recorded as `external_input_topic` and omitted from the topics
-to create; outputs and consumer groups remain in the new native namespace. This
-option does not create, delete, alter or reset the existing input topic or groups.
-Keep the producer on that same raw topic so new events follow retained history.
-Keep replay mode fixed for this persisted state, including after catch-up.
-
-`live` preserves current observation-clock profile policy; `replay` preserves valid
-historical source timestamps and logical replay duration. Use a new namespace and
-state when changing modes. The normalizer admits every input without a transport
-admission floor, carries the original application `event_time`, and supplies separate
-profile-assigned and raw session clocks. State owners maintain input progress;
-native TUMBLE pipelines return generation-checked lifecycle controls. Reserved
-trusted clock controls enter only the internal `execution-events` topic using
-all three reserved identity/type fields listed in the manifest. Never publish
-those controls to the public unified analytics topic.
-
-The manifest contains twelve parallelism-one pipelines and all required
-single-partition topics. Create each topic with its declared cleanup policy;
-commit recovery topics must be compacted and distinct per sink. Use a compatible
-Streamr configuration and its maintained build/run queue. The candidate uses
-complete primary-key lookups and configured native memory or RocksDB state.
-Profile rows can exceed the engine's tiny pilot defaults. Merge the generated
-`worker-configuration-patch.json` into the isolated engine configuration, retaining
-all other explicit resource budgets and setting a dedicated state directory and
-chosen backend. The patch declares candidate row/decode/scan bounds; compare them
-with the accepted runtime receipt and existing admission formulas. It is not a
-production sizing claim, and guards remain enabled.
-
-The `analytics/` directory contains broker/topic-mapped copies of existing backend
-configurations, with explicit committed isolation for Pinot. They are review
-artifacts for a fresh isolated backend catalog/storage. They preserve existing
-schemas and dedup policy: session storage currently has ten scalar fields, and
-Pinot's existing session-ID-only dedup key does not qualify tenant isolation or
-session reuse. The selected FlareDB image is source-bound and startup-tested; actual
-transactional ingestion and backend materialization remain qualification gates. No backend API writes occur during
-preparation or submission.
-
-Submit the prepared candidate only to an isolated Streamr catalog:
+Prepare native session inputs and run fixture checks:
 
 ```sh
-scripts/dev-build python3 deploy/streamr-native/prepare_mvp.py submit \
-  /tmp/arc-mvp-candidate --api-url http://YOUR_ISOLATED_ENGINE/api/v1
+python3 test/streamr-reference/session-native/prepare.py /absolute/new/case --case five-second-cutoff
+python3 -m unittest discover -s test/streamr-reference/session-native -p 'test_*.py' -v
+python3 test/streamr-reference/native_sql_runtime.py --help
 ```
 
-Submission validates native queries, pins query/UDF bytes, and resumes identical
-existing pipelines after partial submission. It refuses conflicting existing
-queries or parallelism. `manifest.json` contains consumer environment settings
-for the unchanged unified-event and full33 profile-update contracts. Each sink
-commits independently; the graph does not provide one transaction across topics.
-CDC before/after chains remain available on `profile-changelog`; the flat adapter
-publishes complete current profiles for existing application consumers.
+Actual native SQL recovery uses `native_sql_runtime.py` in the qualified runtime
+image through the shared build/run queue. Supply a source-bound executable,
+configuration, engine recovery helper and explicit expected results. It always
+submits an empty UDF list. There is no compiler or Cargo-cache setup.
 
-Run lightweight adapter/oracle checks with:
+For the three-session fixture use `--typed-owners 0 --window-owners 3
+--fault-prefix 3 --require-committed-output`. The runner verifies selected
+checkpoint artifacts, actual worker SIGKILL, same-job fresh generation,
+committed-output bytes and fresh complete application results.
 
-```sh
-python3 -m unittest discover -s test/streamr-reference -p 'test_*.py'
-python3 -m unittest discover -s test/streamr-reference/profile-mvp -p 'test_*.py'
-```
-
-Real runtime qualification uses `native_mvp_recovery.py`, `profile_runtime.py` and
-`native_mvp_kafka.py` through the maintained shared queue, with separately pinned
-engine binary, plugin source, image, fixture and oracle. Runtime receipts, exact
-commands and outstanding acceptance are recorded on ARC-17 and in the application
-contract. These tools create isolated resources and do not switch application
-traffic. They do not establish production readiness or throughput regression.
-
-## Earlier identity-only fixture
-
-These queries resolve identities through tenant-partitioned anonymous-ID and
-user-ID state tables. The identity pipeline writes one capture record per input;
-two downstream pipelines publish unified events and identity merges. The two
-output topics commit independently.
-
-Use an isolated broker and Streamr catalog. Create the four `arc-native-*` data
-topics named in the SQL, and the three distinct recovery topics with one partition
-and `cleanup.policy=compact`. Submit each query with parallelism one. The fixture
-relies on the declared input order.
-
-Run the initial fixture against that instance:
-
-```sh
-python3 deploy/streamr-native/fixture-run.py \
-  --api-url http://localhost:18150/api/v1/ \
-  --broker-container YOUR_BROKER_CONTAINER \
-  --evidence-dir /path/to/new-attempt
-```
-
-The runner compares every output field against the reference fixture, allowing
-UUID renaming while preserving identity lineage and merge direction. It verifies
-the first 13 committed unified events and two merges. This initial fixture check
-does not establish absence of extra records, restart correctness, sustained load,
-or profile/session qualification. Recovery validation must additionally scan
-complete committed topics and verify stable literal IDs across checkpoint
-restoration and new input.
-
-Run the adapter and comparator checks with:
-
-```sh
-python3 -m unittest discover -s test/streamr-reference -p 'test_*.py'
-```
-
-No existing application deployment or production topics are changed by these
-files. The original Flink identity fixture remains the comparison oracle.
-
-The reference fixture and comparator were reused from Arcstream commit
-`87d20e52a5690fb7f3b6b93a44afd01f3b4495fa` (ARC-17 reference work). The native
-identity body was preserved from the existing ARC-13 evaluation, with Kafka
-source/sink configuration added here. Existing reference worktrees and PRs remain
-separate; this increment provides the native state-table integration.
-
-The pinned FlareDB image uses a scratch runtime. Compose runs the SQL readiness
-probe in the separate pinned `flaredb-health` curl container; query-api waits for
-its successful `POST /query/sql` with `SELECT 1`. The FlareDB image runs as
-UID/GID `10001:10001`. Before a separately authorized cutover, verify that the
-existing data volume is writable by that identity and preserve its contents;
-this integration does not change volume ownership or restart production.
-Compose sends SIGINT on stop, matching this release's orderly shutdown handler.
-
-## Scalar profile storage for the published FlareDB image
-
-The `profile-storage` pipeline is a stateless native SQL adapter from the unchanged
-`profile-updates` topic to `flaredb-profiles`. It preserves all 33 fields and encodes
-`top_pages`, `top_features`, and `changed_fields` as JSON text in Utf8 columns because
-the published FlareDB managed ingestion does not admit List(Utf8). JSON_OBJECT
-quotes and escapes the JSON_QUERY result; no Rust UDF is added. The Query API
-strictly restores these three columns to string arrays or null on every Flare
-result path. Other string fields are unchanged. Profile timestamps retain their
-original text representation; numeric event counters and clock fields retain their
-types. The application subscription and CDC streams retain their original arrays.
-
-This adds one pipeline and two topics. Existing raw-input replay manifests contain
-12 pipelines and 30 managed topics; isolated-input manifests contain 31 topics.
-Existing stateful queries and their pipeline identities are unchanged.
-
-`flaredb_profile_scalar_fixture.py` validates actual native projection output against
-explicit full33 logical profiles using the published FlareDB image, including
-escaped strings, empty and null arrays, and restart on the same isolated data volume.
-Run it through `scripts/dev-build` with `--input` pointing to actual native SQL
-output and `--expected` to the original logical profile JSONL. Initial backend
-startup/restart fixtures do not qualify full historical materialization.
+`fixture-run.py` remains an isolated Kafka identity fixture tool; its existing
+consumer test and historical receipts do not qualify the changed source-time
+configuration or a full profile/session deployment. Run with `--help` for
+arguments. Never infer production readiness from preparation or compilation.

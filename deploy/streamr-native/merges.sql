@@ -1,4 +1,3 @@
--- Admit historical Kafka timestamps; application policy owns event progress.
 -- Stateless local fan-out. Submit with API parallelism = 1.
 -- Directed merges match the current Flink IdentityMerge output exactly.
 CREATE TABLE identity_capture (
@@ -8,13 +7,13 @@ CREATE TABLE identity_capture (
   user_id TEXT, session_id TEXT, page_url TEXT, referrer TEXT,
   element_id TEXT, feature_name TEXT, device_type TEXT, browser TEXT,
   os TEXT, country TEXT, properties TEXT, merge_old TEXT, user_binding TEXT,
-  admission_progress TIMESTAMP GENERATED ALWAYS AS (CAST(NULL AS TIMESTAMP)) STORED
+  event_ts TIMESTAMP GENERATED ALWAYS AS (CAST(event_time AS TIMESTAMP)) STORED,
+  WATERMARK FOR event_ts AS event_ts - INTERVAL '5 seconds'
 ) WITH (
   connector = 'kafka', bootstrap_servers = 'broker:9092',
   topic = 'arc-native-identity-capture', format = 'json', type = 'source',
   'source.offset' = 'earliest', 'source.group_id' = 'arc-native-identity-merges',
-  'source.read_mode' = 'read_committed',
-  watermark_field = 'admission_progress'
+  'source.read_mode' = 'read_committed'
 );
 
 CREATE TABLE identity_merges (
