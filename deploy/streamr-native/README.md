@@ -38,7 +38,7 @@ trusted clock controls enter only the internal `execution-events` topic using
 all three reserved identity/type fields listed in the manifest. Never publish
 those controls to the public unified analytics topic.
 
-The manifest contains eleven parallelism-one pipelines and all required
+The manifest contains twelve parallelism-one pipelines and all required
 single-partition topics. Create each topic with its declared cleanup policy;
 commit recovery topics must be compacted and distinct per sink. Use a compatible
 Streamr configuration and its maintained build/run queue. The candidate uses
@@ -139,3 +139,26 @@ UID/GID `10001:10001`. Before a separately authorized cutover, verify that the
 existing data volume is writable by that identity and preserve its contents;
 this integration does not change volume ownership or restart production.
 Compose sends SIGINT on stop, matching this release's orderly shutdown handler.
+
+## Scalar profile storage for the published FlareDB image
+
+The `profile-storage` pipeline is a stateless native SQL adapter from the unchanged
+`profile-updates` topic to `flaredb-profiles`. It preserves all 33 fields and encodes
+`top_pages`, `top_features`, and `changed_fields` as JSON text in Utf8 columns because
+the published FlareDB managed ingestion does not admit List(Utf8). JSON_OBJECT
+quotes and escapes the JSON_QUERY result; no Rust UDF is added. The Query API
+strictly restores these three columns to string arrays or null on every Flare
+result path. Other string fields are unchanged. Profile timestamps retain their
+original text representation; numeric event counters and clock fields retain their
+types. The application subscription and CDC streams retain their original arrays.
+
+This adds one pipeline and two topics. Existing raw-input replay manifests contain
+12 pipelines and 30 managed topics; isolated-input manifests contain 31 topics.
+Existing stateful queries and their pipeline identities are unchanged.
+
+`flaredb_profile_scalar_fixture.py` validates actual native projection output against
+explicit full33 logical profiles using the published FlareDB image, including
+escaped strings, empty and null arrays, and restart on the same isolated data volume.
+Run it through `scripts/dev-build` with `--input` pointing to actual native SQL
+output and `--expected` to the original logical profile JSONL. Initial backend
+startup/restart fixtures do not qualify full historical materialization.

@@ -130,6 +130,11 @@ def prepare(directory, broker, prefix, clock_mode, raw_topic=None):
     query = query.replace("{{SINK}}", connection("profile-updates", "profile-flat", sink=True, raw=True))
     add("profile-flat", query)
 
+    query = (HERE / "profile-storage.sql").read_text()
+    query = query.replace("{{SOURCE}}", connection("profile-updates", "profile-storage", raw=True))
+    query = query.replace("{{SINK}}", connection("flaredb-profiles", "profile-storage", sink=True, raw=True))
+    add("profile-storage", query)
+
     query = (HERE / "profile-mvp/timers.sql").read_text()
     query = replace_file(query, "{{INPUT}}", connection("profile-timer-seeds", "profile-timers"))
     query = replace_file(query, "{{OUTPUT}}", connection("profile-signals", "profile-timers", sink=True))
@@ -177,7 +182,7 @@ def prepare(directory, broker, prefix, clock_mode, raw_topic=None):
         for table, suffix in topic_map.items():
             config = json.loads((HERE.parent / "config" / (backend + "-tables") / (table + ".json")).read_text())
             if backend == "flaredb":
-                config["ingestionConfig"].update(topic=prefix + "-" + suffix, brokers=broker)
+                config["ingestionConfig"].update(topic=prefix + "-" + ("flaredb-profiles" if table == "profiles" else suffix), brokers=broker)
             else:
                 streams = config["ingestionConfig"]["streamIngestionConfig"]["streamConfigMaps"]
                 for stream in streams:
