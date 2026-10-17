@@ -32,6 +32,12 @@ jobs:
         run: python3 deploy/streamr-native/fixture-run.py --help
       - name: Check native recovery runner arguments
         run: python3 test/streamr-reference/native_mvp_recovery.py --help
+      - name: Check complete profile fixture oracles
+        run: python3 -m unittest discover -s test/streamr-reference/profile-mvp -p 'test_*.py' -v
+      - name: Check complete session fixture oracles
+        run: python3 -m unittest discover -s test/streamr-reference/session-mvp -p 'test_*.py' -v
+      - name: Check full graph supervisor arguments
+        run: python3 test/streamr-reference/native_mvp_kafka.py --help
 
   query-api:
     name: Query API consumer checks

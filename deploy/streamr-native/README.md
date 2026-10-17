@@ -1,16 +1,74 @@
-# Native Streamr identity evaluation
+# Native Streamr MVP candidate
 
-Current MVP work targets Streamr merge
-`ad0a4814d5b7c07d74dce54753f5e6e9aaa7a062`.
-See [the application contract](../../docs/arc-17-native-mvp.md) for the behavior
-mapping, event-clock semantics and outstanding profile lifecycle requirements.
-The guarded profile query uses `EVENT_DATE()`. Historical receipts retain their
-original source pins; they are not current integration acceptance.
+The MVP candidate uses Streamr's native SQL/state engine and Arcstream-owned
+identity, profile and session policy. It is isolated from existing deployments.
+See [the application contract](../../docs/arc-17-native-mvp.md) for exact behavior,
+evidence and acceptance limits. Production cutover requires explicit authorization.
 
-Run local compilation through `scripts/dev-build`, which uses the shared queue
-when installed. Runtime qualification must also hold a queue reservation.
-Current runtime attempts are blocked by the host disk guard; these files do not
-yet qualify a complete replacement execution path or production cutover.
+The engine contract is merge `ad0a4814d5b7c07d74dce54753f5e6e9aaa7a062`.
+Official Rust UDF compilation additionally requires the existing-interface export
+annotation repair in [Streamr PR70](https://github.com/jasadams/streamr/pull/70),
+implementation `a86297dc049c0c3a5a85f965c782cc571ae0d2d2`. The candidate
+manifest records these separately; historical executable receipts retain their
+actual source pins.
+
+Prepare a new isolated candidate with explicit clock policy:
+
+```sh
+python3 deploy/streamr-native/prepare_mvp.py prepare /tmp/arc-mvp-candidate \
+  --broker YOUR_ISOLATED_BROKER:9092 --topic-prefix arc-mvp-candidate \
+  --clock-mode replay
+```
+
+`live` preserves current observation-clock profile policy; `replay` preserves valid
+historical source timestamps and logical replay duration. Use a new namespace and
+state when changing modes. The normalizer admits every input without a source
+watermark, carries the original application `event_time`, and supplies separate
+profile-assigned and raw session clocks. State owners maintain input progress;
+native TUMBLE pipelines return generation-checked lifecycle controls. Reserved
+trusted clock controls enter only the internal `execution-events` topic using
+all three reserved identity/type fields listed in the manifest. Never publish
+those controls to the public unified analytics topic.
+
+The manifest contains eleven parallelism-one pipelines and all required
+single-partition topics. Create each topic with its declared cleanup policy;
+commit recovery topics must be compacted and distinct per sink. Use a compatible
+Streamr configuration and its maintained build/run queue. The candidate uses
+complete primary-key lookups and configured native memory or RocksDB state.
+Profile rows can exceed the engine's tiny pilot defaults: configure explicit row,
+decode and scan bounds according to the evidence receipt and existing resource
+admission formulas, rather than disabling guards.
+
+Submit the prepared candidate only to an isolated Streamr catalog:
+
+```sh
+scripts/dev-build python3 deploy/streamr-native/prepare_mvp.py submit \
+  /tmp/arc-mvp-candidate --api-url http://YOUR_ISOLATED_ENGINE/api/v1
+```
+
+Submission validates native queries, pins query/UDF bytes, and resumes identical
+existing pipelines after partial submission. It refuses conflicting existing
+queries or parallelism. `manifest.json` contains consumer environment settings
+for the unchanged unified-event and full33 profile-update contracts. Each sink
+commits independently; the graph does not provide one transaction across topics.
+CDC before/after chains remain available on `profile-changelog`; the flat adapter
+publishes complete current profiles for existing application consumers.
+
+Run lightweight adapter/oracle checks with:
+
+```sh
+python3 -m unittest discover -s test/streamr-reference -p 'test_*.py'
+python3 -m unittest discover -s test/streamr-reference/profile-mvp -p 'test_*.py'
+```
+
+Real runtime qualification uses `native_mvp_recovery.py`, `profile_runtime.py` and
+`native_mvp_kafka.py` through the maintained shared queue, with separately pinned
+engine binary, plugin source, image, fixture and oracle. Runtime receipts, exact
+commands and outstanding acceptance are recorded on ARC-17 and in the application
+contract. These tools create isolated resources and do not switch application
+traffic. They do not establish production readiness or throughput regression.
+
+## Earlier identity-only fixture
 
 These queries resolve identities through tenant-partitioned anonymous-ID and
 user-ID state tables. The identity pipeline writes one capture record per input;

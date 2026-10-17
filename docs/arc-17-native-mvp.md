@@ -152,3 +152,93 @@ Production acceptance is separate: consumer/storage compatibility, full agreed
 profile lifecycle semantics, deployment configuration, operational recovery and
 explicit cutover authorization remain gates. Do not deploy, switch traffic, or
 claim application parity based on engine qualification or partial fixtures.
+
+## Full33 native-owner implementation candidate
+
+`deploy/streamr-native/profile-mvp/` now contains application Rust scalar policy,
+native state-table owner SQL, and native exact-deadline TUMBLE SQL. The scalar
+keeps no external durable state: the native state row owns all profile counters,
+daily contributions, sessions, ranked item counts, timer generations and previous
+emitted snapshots. Full33 raw JSON CDC output preserves exact `before`/`after`
+state and create/update actions. This candidate implements the formerly remaining
+eight fields; preparation is not current runtime qualification.
+
+The owner now emits a scalar native outbox frame per input. `project.sql` reads
+that append connector and performs actual native UNNEST expansion into CDC and
+timer-seed sinks. This boundary follows an actual planner rejection of
+`UnnestExec` in the state-table fusion region; Python projection is not counted
+as native projector evidence. Single CASE/UNNEST paths preserve seed/clock order
+and one writer per output sink. Generated keyed lookups use qualified ANSI
+JSON_VALUE, after the older extraction scalar was rejected by fusion bounds.
+
+Actual current-engine composition attempts in evidence
+`application-fixtures/retry1/` rejected updating aggregate -> MERGE (`native
+MERGE source must be an append event stream, not a changelog`) and SESSION ->
+MERGE (`unsupported SessionWindowAggregate between related state accesses`).
+The candidate uses an append connector boundary instead of adding capabilities.
+The normalizer's `source_ms` is distinct from profile `effective_ms`: live source
+timestamp assignment clamps only values over 60 seconds future, while live
+business state also clamps values older than 91 days. Replay preserves valid
+historical values for both. Existing profile state rejects mode changes.
+
+Native singleton input-progress state tracks maximum source time at fixed MVP
+parallelism one; timers receive that maximum minus 5,001 ms. The extra millisecond
+comes from the pinned Flink 1.20.1 implementation of
+[BoundedOutOfOrdernessWatermarks](https://raw.githubusercontent.com/apache/flink/release-1.20.1/flink-core/src/main/java/org/apache/flink/api/common/eventtime/BoundedOutOfOrdernessWatermarks.java).
+This delayed progress is used only to schedule timers, not EVENT_DATE or replay
+business duration. The incoming timestamp still sets session deadline while
+maximum last_seen sets decay deadlines. Exact future deadlines enter native
+one-millisecond TUMBLE; overdue deadlines take an immediate append branch to
+avoid native-window late-row suppression. Stale generations cannot reset a newer
+session, duplicates cannot close it twice, and switched session IDs do not
+prematurely contribute closed duration.
+
+Runnable timer attempts retained in local `timer-review/` first showed native
+SESSION dropping the late-base requested deadline. The first TUMBLE attempt
+preserved the two future deadlines but dropped an overdue input at source
+watermark admission. Its corrected transport timestamp is the greater of
+deadline-minus-1ns and progress-plus-1ns; the logical deadline remains unchanged.
+The third TUMBLE attempt passed all three exact future/late/overdue controls and
+checkpoint recovery through the existing native engine. No timer engine feature
+was added for these cases.
+
+Before a raw event mutates a profile, the UDF catches up through the PRIOR
+persisted stream watermark, not the current event's newly advanced progress.
+This prevents delayed connector feedback from cancelling an already-due old
+timeout/reset. The independent feedback fixture specifies A at 00:00, B at
+01:00, then A at 01:01 with the same session ID before delayed old controls:
+old A closes once, A starts its second session and duplicate stale controls do
+not change it. The boundary fixture separately keeps a deadline-plus-two-second
+other-key event behind the original five-second watermark, allowing a late
+same-session event to cancel the old timer first.
+
+The live policy preserves valid-time clamping, observation-time duration,
+observation-date pruning and observation metadata. Replay bypasses wall-clock
+clamping/pruning, computes duration using logical reference time, and preserves
+historical daily contributions. `timestamp` and `updated_at` remain observation
+metadata in both modes. Invalid timestamps reject explicitly. Current candidate
+emits per-event snapshots plus due lifecycle snapshots; exact five-second
+processing-time debounce cadence is not claimed.
+
+The independent expected fixture in `test/streamr-reference/profile-mvp/` contains
+fifteen full33 replay snapshots and four live snapshots, including signed future
+duration, late incoming timer, same-ID reuse after closure, duplicate/stale
+controls, top-count ties, two tenants sharing canonical ID, UTC midnight and
+1/7/30-day decay. Comparator tests reject type drift, broken before-state chains,
+missing/duplicate outputs and wall-clock substitution. Four comparator tests
+pass; this establishes the oracle tooling only. Public API UDF compilation,
+real owner/recovery, native timer stage and complete connector-cycle execution
+are separately required. The first official UDF runtime attempt exposed an
+edition-2024 export-annotation error in the generic compiler/plugin; source and
+precise runtime evidence are tracked by the coordinator before any engine fix.
+
+Whole-graph evaluation uses an isolated broker and private container network.
+`native_mvp_kafka.py` validates every generated public query before submission,
+uses complete read-committed finite offset scans, captures native source/sink
+checkpoint positions and typed artifacts, kills the actual profile and session
+owner workers, requires new generations/restored epochs and audits committed
+topic prefixes before fresh inputs. An independently authored oracle specifies
+all five profile roles and four complete session summaries from the thirteen
+identity events. Reserved clock controls enter internal execution topics only;
+the public unified stream remains business events. The harness and oracle need
+actual passing runtime evidence before any whole-graph readiness statement.
