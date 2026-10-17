@@ -79,7 +79,7 @@ pub fn provide_stream_contexts() {
     provide_context(EventStream(event_signal));
 }
 
-const PROFILE_FIELDS: &str = "canonicalId tenantId profile { canonicalId userId tenantId firstSeen lastSeen totalEvents totalSessions events1D events7D events30D events90D sessions1D sessions7D avgSessionDurationSec currentSessionActive currentSessionDurationSec pageViews clicks logins featureUses lastPage lastCountry lastDevice lastBrowser topPages topFeatures } changedFields timestamp trigger action";
+const PROFILE_FIELDS: &str = "canonicalId tenantId profile { canonicalId userId tenantId firstSeen lastSeen totalEvents totalSessions events1D events7D events30D events90D sessions1D sessions7D sessions30D sessions90D avgSessionDurationSec currentSessionActive currentSessionDurationSec pageViews clicks logins featureUses lastPage lastCountry lastDevice lastBrowser topPages topFeatures } changedFields timestamp trigger action";
 
 const EVENT_FIELDS: &str = "eventId eventType tenantId eventTime canonicalId anonymousId userId pageUrl deviceType browser country";
 

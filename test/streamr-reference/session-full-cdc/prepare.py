@@ -113,7 +113,7 @@ def main():
         assert len(re.findall(r'test result: ok\. 1 passed; 0 failed;', log)) == 1, 'expected exactly one passed test'
         assert re.search(r'CAPTURE_RESULT phase=initial rows=3 ', log), 'missing initial capture proof'
         assert re.search(r'CAPTURE_RESULT phase=recovered checkpoint=1 input_rows_before_checkpoint=' + str(source_prefix_rows) + r' committed_rows=' + str(checkpoint_expected) + r' rows=3 ', log), 'missing recovery/source-prefix proof'
-        assert f'CAPTURE_CONFIG backend={args.backend} checkpoint_mode={args.checkpoint_mode} ' in log, 'configuration receipt differs'
+        assert re.search(r'^CAPTURE_CONFIG backend=' + re.escape(args.backend) + r' checkpoint_mode=' + re.escape(args.checkpoint_mode) + r'$', log, re.MULTILINE), 'configuration receipt differs'
         metadata_type = 'CheckpointManifest' if args.checkpoint_mode == 'leader' else 'CheckpointMetadata'
         assert re.search(r'CAPTURE_CHECKPOINT path=.+ metadata=' + metadata_type + r' \{.*epoch: 1', log), 'missing selected protocol checkpoint proof'
         if args.case == 'full-session-windowed-plain':

@@ -79,6 +79,8 @@ pub fn UserListPage() -> impl IntoView {
                     user.events_90d = update.profile.events_90d;
                     user.sessions_1d = update.profile.sessions_1d;
                     user.sessions_7d = update.profile.sessions_7d;
+                    user.sessions_30d = update.profile.sessions_30d;
+                    user.sessions_90d = update.profile.sessions_90d;
                 });
             } else if update.action == "create"
                 && page.get_untracked() == 0
@@ -107,8 +109,8 @@ pub fn UserListPage() -> impl IntoView {
                             events_90d: update.profile.events_90d,
                             sessions_1d: update.profile.sessions_1d,
                             sessions_7d: update.profile.sessions_7d,
-                            sessions_30d: 0,
-                            sessions_90d: 0,
+                            sessions_30d: update.profile.sessions_30d,
+                            sessions_90d: update.profile.sessions_90d,
                             total_closed_sessions: 0,
                             avg_session_duration_sec: update.profile.avg_session_duration_sec,
                         };

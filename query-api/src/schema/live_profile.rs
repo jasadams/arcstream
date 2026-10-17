@@ -29,11 +29,15 @@ pub struct LiveProfile {
     #[serde(default)]
     pub sessions_7d: u64,
     #[serde(default)]
+    pub sessions_30d: u64,
+    #[serde(default)]
+    pub sessions_90d: u64,
+    #[serde(default)]
     pub avg_session_duration_sec: u64,
     #[serde(default)]
     pub current_session_active: bool,
     #[serde(default)]
-    pub current_session_duration_sec: u64,
+    pub current_session_duration_sec: i64,
     #[serde(default)]
     pub page_views: u64,
     #[serde(default)]

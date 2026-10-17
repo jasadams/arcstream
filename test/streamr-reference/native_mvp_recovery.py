@@ -9,6 +9,7 @@ import argparse
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import signal
 import shutil
@@ -114,13 +115,14 @@ def main():
                'arc17-native-identity', '--parallelism', '1', '--state-dir',
                str(case/'checkpoints'), str(case/'query.sql')]
     h.enable_subreaper()
+    env = dict(os.environ, RUST_LOG='info')
     result = dict(status='failed', command=command, backend=a.backend,
                   binary_sha256=h.sha(a.binary.resolve()), harness_sha256=h.sha(Path(__file__)))
     owned, timeline, fault, replacement, committed = {}, [], None, None, None
     started = time.monotonic()
     with (case/'runtime.log').open('wb') as log:
         child = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT,
-                                 start_new_session=True, cwd=case)
+                                 start_new_session=True, cwd=case, env=env)
         try:
             while time.monotonic()-started < a.timeout:
                 ps = h.session_processes(child.pid)
@@ -189,6 +191,11 @@ def main():
                             (case/'actual.jsonl').write_text(''.join(json.dumps(x, sort_keys=True)+'\n' for x in actual))
                             expected = Path(__file__).resolve().parents[2]/'flink/identity-resolution/src/test/resources/reference/identity-expected.jsonl'
                             oracle = compare(read_records(expected), actual)
+                            runtime_text = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', (case/'runtime.log').read_text(errors='replace'))
+                            restore_lines = [line for line in runtime_text.splitlines() if 'restoring checkpoint' in line.lower() and fault['worker']['job'] in line]
+                            restored_epochs = [int(match.group(1)) for line in restore_lines if (match := re.search(r'epoch=(\d+)', line))]
+                            h.require(fault['checkpoint']['epoch'] in restored_epochs, 'selected epoch not confirmed in actual controller restore log')
+                            result.update(confirmed_restored_epoch=fault['checkpoint']['epoch'], restore_log_lines=restore_lines)
                             result.update(status='passed', fault=fault, replacement=replacement,
                                           oracle=oracle, fresh_recovered_events=len(fresh_ids), fresh_recovered_event_ids=fresh_ids,
                                           committed_prefix_sha256=h.sha(case/'committed-prefix.jsonl'))

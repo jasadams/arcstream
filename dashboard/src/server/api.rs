@@ -100,6 +100,10 @@ pub struct LiveProfile {
     pub sessions_1d: u64,
     #[serde(default, alias = "sessions7D", alias = "sessions7d")]
     pub sessions_7d: u64,
+    #[serde(default, alias = "sessions30D", alias = "sessions30d")]
+    pub sessions_30d: u64,
+    #[serde(default, alias = "sessions90D", alias = "sessions90d")]
+    pub sessions_90d: u64,
     #[serde(default, alias = "events1D", alias = "events1d")]
     pub events_1d: u64,
     #[serde(default, alias = "events7D", alias = "events7d")]
@@ -113,7 +117,7 @@ pub struct LiveProfile {
     #[serde(default, alias = "currentSessionActive")]
     pub current_session_active: bool,
     #[serde(default, alias = "currentSessionDurationSec")]
-    pub current_session_duration_sec: u64,
+    pub current_session_duration_sec: i64,
     #[serde(default, alias = "pageViews")]
     pub page_views: u64,
     #[serde(default)]
