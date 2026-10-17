@@ -60,6 +60,7 @@ def main():
             raise ValueError('owned volume label differs')
         (case/'volume.json').write_text(json.dumps(volume_info,indent=2)+'\n')
         command(['podman', 'run', '-d', '--cidfile', str(cidfile), '--network', 'bridge',
+                 '--stop-signal', 'SIGINT',
                  '--memory', '1g', '-v', volume+':/data', '-p', '127.0.0.1::8099', inspected['Id'],
                  '--data-dir', '/data', '--http', '0.0.0.0:8099',
                  '--memory-limit', '512M'])
@@ -86,7 +87,12 @@ def main():
             result['query'] = json.load(response)
         if result['query']['result_table']['rows'] != [[1]]:
             raise ValueError('SELECT1 result differs')
-        command(['podman','restart',cid])
+        command(['podman','stop',cid])
+        stopped = json.loads(command(['podman','inspect',cid]))[0]['State']
+        result['stopped_state'] = stopped
+        if stopped['Status'] != 'exited' or stopped['ExitCode'] != 0 or stopped.get('OOMKilled'):
+            raise ValueError('FlareDB did not stop cleanly with SIGINT')
+        command(['podman','start',cid])
         deadline = time.monotonic()+90
         while True:
             try:

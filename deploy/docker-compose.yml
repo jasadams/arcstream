@@ -120,6 +120,7 @@ services:
 
   flaredb:
     image: ghcr.io/jasadams/flaredb:arcstream-2026-10-17-95b58cb@sha256:3c8ea585571f4e12f24761356febc071ee018600bc0a58a1848c44312f913a91
+    stop_signal: SIGINT
     command: >
       --data-dir /data
       --http 0.0.0.0:8099

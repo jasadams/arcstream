@@ -130,3 +130,4 @@ its successful `POST /query/sql` with `SELECT 1`. The FlareDB image runs as
 UID/GID `10001:10001`. Before a separately authorized cutover, verify that the
 existing data volume is writable by that identity and preserve its contents;
 this integration does not change volume ownership or restart production.
+Compose sends SIGINT on stop, matching this release's orderly shutdown handler.

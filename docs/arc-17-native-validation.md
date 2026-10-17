@@ -10,7 +10,8 @@ full backend parity and the broader ARC-17 live acceptance are separate gates.
 Arcstream fetched base: `c7f477799ef7fb716a4b8d3917a671db210deeba`.
 Application implementation and initial reviewed runner/config fixes:
 `7f4ed57b974eecbe75cdbac92afde59196df9947`.
-Corrected transport and final runtime configuration: `b2fb06e`.
+Corrected transport and final runtime configuration:
+`b2fb06e6887e2a8563aaf821a670be5ebe692c97`.
 Instruction sources: `CLAUDE.md`, `.claude/build-test.md`, `.claude/team.md` and
 the user's current AGENTS instructions; no repository AGENTS file was present.
 Original checkout changes were preserved in the separate task worktree.
@@ -143,6 +144,17 @@ The accepted finite configuration separates 8 MiB working-event allowance,
 1 MiB write scope and 16 MiB typed resident budget; the shared decoded pool
 remains 16 MiB. Earlier rejected guard configurations remain recorded.
 
+Two further current-transport fixture pairs passed to check the different clock
+domains: live profile clamp/signed duration (four full33 CDC outputs, sixteen
+business seeds/twenty projected seeds) and full session edges including pre-epoch
+time, late arrivals, tenant isolation and ID reuse (five full12 summaries,
+eleven business seeds/twenty-eight projected seeds). All four stages include
+real checkpoint/SIGKILL restoration, committed-prefix preservation, fresh outputs
+and cleanup. The coordinator independently recomputed complete typed outputs,
+timer oracles, source hashes, prefixes and recovery identities in
+`review/current-time-domains-root-audit.json`: **APPROVE**. Exact per-case commands
+and frozen fixtures are under `profile-runtime/*-rocksdb-technical3-*`.
+
 The full graph is run from the task worktree through the maintained queue:
 
 ```sh
@@ -204,7 +216,15 @@ Actual queued `flaredb-image-smoke1` passed nonroot startup, exact HTTP image_ta
 resource cleanups. Source, inspected image, command list, HTTP outputs and logs
 are retained under the evidence root; independent runtime review approves this
 narrow scope. The restart used the container runtime's eventual kill after its
-stop timeout. There were zero tables: this is not ingestion, data persistence,
+stop timeout. This exposed the published source's SIGINT-only orderly shutdown
+handler (`src/main.rs:667`). Compose now sets `stop_signal: SIGINT`.
+Current queued `flaredb-image-smoke2` passed explicit SIGINT stop with exited
+status, exit code0 and no OOM kill, then same-container/same-volume start,
+exact image_tag, SQL result and both cleanups. Result SHA256:
+`86c668bb4c9029cda46df82b704eeffb4b21b229043df1d6daf84e56e97b3fd7`.
+Independent review: `review/flaredb-sigint-review.md`; exact maintained command:
+`review/flaredb-smoke2-command.json`. This supersedes smoke1 for orderly lifecycle
+acceptance. There were zero tables: this is not ingestion, data persistence,
 transaction-abort visibility or backend parity evidence. Existing deployment
 services and volume ownership were not changed.
 
