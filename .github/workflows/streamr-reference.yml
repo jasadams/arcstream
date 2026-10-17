@@ -1,0 +1,80 @@
+name: Streamr identity reference
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/streamr-native/**'
+      - 'deploy/docker-compose.yml'
+      - 'test/streamr-reference/**'
+      - 'query-api/**'
+      - 'dashboard/**'
+      - 'scripts/dev-build'
+      - 'flink/identity-resolution/src/test/resources/reference/**'
+      - '.github/workflows/streamr-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  identity-reference:
+    name: Identity reference checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test exact identity fields and merge lineage
+        run: python3 -m unittest discover -s test/streamr-reference -p 'test_*.py' -v
+      - name: Prepare the native state-table fixture
+        run: python3 test/streamr-reference/native_identity_capture.py prepare "$RUNNER_TEMP/native-identity" --runtime-directory /evaluation/identity
+      - name: Check configurable runner arguments
+        run: python3 deploy/streamr-native/fixture-run.py --help
+      - name: Check native recovery runner arguments
+        run: python3 test/streamr-reference/native_mvp_recovery.py --help
+      - name: Check complete profile fixture oracles
+        run: python3 -m unittest discover -s test/streamr-reference/profile-mvp -p 'test_*.py' -v
+      - name: Check complete session fixture oracles
+        run: python3 -m unittest discover -s test/streamr-reference/session-mvp -p 'test_*.py' -v
+      - name: Check full graph supervisor arguments
+        run: python3 test/streamr-reference/native_mvp_kafka.py --help
+      - name: Check pinned FlareDB smoke arguments
+        run: python3 test/streamr-reference/flaredb_image_smoke.py --help
+      - name: Validate scratch-aware service readiness configuration
+        run: docker compose -f deploy/docker-compose.yml config --quiet
+
+  query-api:
+    name: Query API consumer checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Kafka native build headers
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+      - name: Test application consumers
+        run: scripts/dev-build cargo test --locked --manifest-path query-api/Cargo.toml
+
+  dashboard:
+    name: Dashboard ${{ matrix.features }} checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        include:
+          - features: ssr
+            target: x86_64-unknown-linux-gnu
+          - features: hydrate
+            target: wasm32-unknown-unknown
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Check profile transport in dashboard
+        run: scripts/dev-build cargo check --locked --manifest-path dashboard/Cargo.toml --features ${{ matrix.features }} --target ${{ matrix.target }}

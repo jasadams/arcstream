@@ -1,0 +1,583 @@
+[
+  {
+    "source_prefix": 1,
+    "reference_UTC_day": "2026-10-09",
+    "rows": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "shared-profile",
+        "first_seen": 1791589800000,
+        "last_seen": 1791589800000,
+        "total_events": 1,
+        "total_sessions": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "known-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 1,
+        "sessions_1d": 1,
+        "events_7d": 1,
+        "sessions_7d": 1,
+        "events_30d": 1,
+        "sessions_30d": 1,
+        "events_90d": 1,
+        "sessions_90d": 1,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search"
+        ]
+      }
+    ]
+  },
+  {
+    "source_prefix": 2,
+    "reference_UTC_day": "2026-10-09",
+    "rows": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "shared-profile",
+        "first_seen": 1791589800000,
+        "last_seen": 1791589800000,
+        "total_events": 1,
+        "total_sessions": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "known-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 1,
+        "sessions_1d": 1,
+        "events_7d": 1,
+        "sessions_7d": 1,
+        "events_30d": 1,
+        "sessions_30d": 1,
+        "events_90d": 1,
+        "sessions_90d": 1,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search"
+        ]
+      },
+      {
+        "tenant_id": "tenant-b",
+        "canonical_id": "shared-profile",
+        "first_seen": 1791589860000,
+        "last_seen": 1791589860000,
+        "total_events": 1,
+        "total_sessions": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "known-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 1,
+        "sessions_1d": 1,
+        "events_7d": 1,
+        "sessions_7d": 1,
+        "events_30d": 1,
+        "sessions_30d": 1,
+        "events_90d": 1,
+        "sessions_90d": 1,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search"
+        ]
+      }
+    ]
+  },
+  {
+    "source_prefix": 3,
+    "reference_UTC_day": "2026-10-09",
+    "rows": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "shared-profile",
+        "first_seen": 1791589800000,
+        "last_seen": 1791589920000,
+        "total_events": 2,
+        "total_sessions": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "known-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 2,
+        "sessions_1d": 1,
+        "events_7d": 2,
+        "sessions_7d": 1,
+        "events_30d": 2,
+        "sessions_30d": 1,
+        "events_90d": 2,
+        "sessions_90d": 1,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search"
+        ]
+      },
+      {
+        "tenant_id": "tenant-b",
+        "canonical_id": "shared-profile",
+        "first_seen": 1791589860000,
+        "last_seen": 1791589860000,
+        "total_events": 1,
+        "total_sessions": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "known-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 1,
+        "sessions_1d": 1,
+        "events_7d": 1,
+        "sessions_7d": 1,
+        "events_30d": 1,
+        "sessions_30d": 1,
+        "events_90d": 1,
+        "sessions_90d": 1,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search"
+        ]
+      }
+    ]
+  },
+  {
+    "source_prefix": 4,
+    "reference_UTC_day": "2026-10-09",
+    "rows": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "shared-profile",
+        "first_seen": 1791589800000,
+        "last_seen": 1791589980000,
+        "total_events": 3,
+        "total_sessions": 2,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 3,
+        "user_id": "known-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 3,
+        "sessions_1d": 2,
+        "events_7d": 3,
+        "sessions_7d": 2,
+        "events_30d": 3,
+        "sessions_30d": 2,
+        "events_90d": 3,
+        "sessions_90d": 2,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search"
+        ]
+      },
+      {
+        "tenant_id": "tenant-b",
+        "canonical_id": "shared-profile",
+        "first_seen": 1791589860000,
+        "last_seen": 1791589860000,
+        "total_events": 1,
+        "total_sessions": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "known-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 1,
+        "sessions_1d": 1,
+        "events_7d": 1,
+        "sessions_7d": 1,
+        "events_30d": 1,
+        "sessions_30d": 1,
+        "events_90d": 1,
+        "sessions_90d": 1,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search"
+        ]
+      }
+    ]
+  },
+  {
+    "source_prefix": 5,
+    "reference_UTC_day": "2026-10-10",
+    "rows": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "shared-profile",
+        "first_seen": 1791589800000,
+        "last_seen": 1791590400000,
+        "total_events": 4,
+        "total_sessions": 3,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 4,
+        "user_id": "known-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 1,
+        "sessions_1d": 1,
+        "events_7d": 4,
+        "sessions_7d": 3,
+        "events_30d": 4,
+        "sessions_30d": 3,
+        "events_90d": 4,
+        "sessions_90d": 3,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search"
+        ]
+      },
+      {
+        "tenant_id": "tenant-b",
+        "canonical_id": "shared-profile",
+        "first_seen": 1791589860000,
+        "last_seen": 1791589860000,
+        "total_events": 1,
+        "total_sessions": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "known-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 0,
+        "sessions_1d": 0,
+        "events_7d": 1,
+        "sessions_7d": 1,
+        "events_30d": 1,
+        "sessions_30d": 1,
+        "events_90d": 1,
+        "sessions_90d": 1,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search"
+        ]
+      }
+    ]
+  },
+  {
+    "source_prefix": 6,
+    "reference_UTC_day": "2026-10-10",
+    "rows": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "shared-profile",
+        "first_seen": 1791589800000,
+        "last_seen": 1791590460000,
+        "total_events": 5,
+        "total_sessions": 3,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 5,
+        "user_id": "known-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 2,
+        "sessions_1d": 1,
+        "events_7d": 5,
+        "sessions_7d": 3,
+        "events_30d": 5,
+        "sessions_30d": 3,
+        "events_90d": 5,
+        "sessions_90d": 3,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search"
+        ]
+      },
+      {
+        "tenant_id": "tenant-b",
+        "canonical_id": "shared-profile",
+        "first_seen": 1791589860000,
+        "last_seen": 1791589860000,
+        "total_events": 1,
+        "total_sessions": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "known-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 0,
+        "sessions_1d": 0,
+        "events_7d": 1,
+        "sessions_7d": 1,
+        "events_30d": 1,
+        "sessions_30d": 1,
+        "events_90d": 1,
+        "sessions_90d": 1,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search"
+        ]
+      }
+    ]
+  },
+  {
+    "source_prefix": 7,
+    "reference_UTC_day": "2026-10-10",
+    "rows": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "shared-profile",
+        "first_seen": 1791589800000,
+        "last_seen": 1791590520000,
+        "total_events": 6,
+        "total_sessions": 3,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 6,
+        "user_id": "known-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 3,
+        "sessions_1d": 1,
+        "events_7d": 6,
+        "sessions_7d": 3,
+        "events_30d": 6,
+        "sessions_30d": 3,
+        "events_90d": 6,
+        "sessions_90d": 3,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search"
+        ]
+      },
+      {
+        "tenant_id": "tenant-b",
+        "canonical_id": "shared-profile",
+        "first_seen": 1791589860000,
+        "last_seen": 1791589860000,
+        "total_events": 1,
+        "total_sessions": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "known-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 0,
+        "sessions_1d": 0,
+        "events_7d": 1,
+        "sessions_7d": 1,
+        "events_30d": 1,
+        "sessions_30d": 1,
+        "events_90d": 1,
+        "sessions_90d": 1,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search"
+        ]
+      }
+    ]
+  },
+  {
+    "source_prefix": 8,
+    "reference_UTC_day": "2026-10-10",
+    "rows": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "shared-profile",
+        "first_seen": 1791589800000,
+        "last_seen": 1791590580000,
+        "total_events": 7,
+        "total_sessions": 3,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 7,
+        "user_id": "known-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 4,
+        "sessions_1d": 1,
+        "events_7d": 7,
+        "sessions_7d": 3,
+        "events_30d": 7,
+        "sessions_30d": 3,
+        "events_90d": 7,
+        "sessions_90d": 3,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search"
+        ]
+      },
+      {
+        "tenant_id": "tenant-b",
+        "canonical_id": "shared-profile",
+        "first_seen": 1791589860000,
+        "last_seen": 1791589860000,
+        "total_events": 1,
+        "total_sessions": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "known-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 0,
+        "sessions_1d": 0,
+        "events_7d": 1,
+        "sessions_7d": 1,
+        "events_30d": 1,
+        "sessions_30d": 1,
+        "events_90d": 1,
+        "sessions_90d": 1,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search"
+        ]
+      }
+    ]
+  },
+  {
+    "source_prefix": 9,
+    "reference_UTC_day": "2026-10-10",
+    "rows": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "shared-profile",
+        "first_seen": 1791589800000,
+        "last_seen": 1791590580000,
+        "total_events": 7,
+        "total_sessions": 3,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 7,
+        "user_id": "known-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 4,
+        "sessions_1d": 1,
+        "events_7d": 7,
+        "sessions_7d": 3,
+        "events_30d": 7,
+        "sessions_30d": 3,
+        "events_90d": 7,
+        "sessions_90d": 3,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search"
+        ]
+      },
+      {
+        "tenant_id": "tenant-b",
+        "canonical_id": "shared-profile",
+        "first_seen": 1791589860000,
+        "last_seen": 1791590640000,
+        "total_events": 2,
+        "total_sessions": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "known-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 1,
+        "sessions_1d": 0,
+        "events_7d": 2,
+        "sessions_7d": 1,
+        "events_30d": 2,
+        "sessions_30d": 1,
+        "events_90d": 2,
+        "sessions_90d": 1,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search"
+        ]
+      }
+    ]
+  }
+]

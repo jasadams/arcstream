@@ -2,7 +2,19 @@
 
 A real-time Customer Data Platform built for high-throughput analytics workloads. Ingests raw events, performs stateful identity resolution, maintains live user profiles, computes session summaries, and serves everything through a GraphQL API with WebSocket subscriptions — all running on Kubernetes.
 
-## Quick Start
+## Native Streamr MVP
+
+The current MVP integration is prepared through
+[`deploy/streamr-native/prepare_mvp.py`](deploy/streamr-native/README.md).
+It replaces identity, profile and session execution with native SQL/state tables,
+while Arcstream retains its schemas and application functions. Prepare an
+isolated candidate with explicit `live` or `replay` clock policy; the generated
+manifest contains all pipelines, Kafka topics and application consumer settings.
+See the [application evidence contract](docs/arc-17-native-mvp.md) and
+[cutover/rollback runbook](docs/arc-17-cutover-runbook.md) for acceptance limits.
+Existing deployments have not been switched.
+
+## Existing Flink stack quick start
 
 Run the entire stack locally with one command (requires [Docker](https://docs.docker.com/get-docker/) and ~12GB RAM):
 
@@ -18,7 +30,7 @@ Logs:    cd arcstream && docker compose logs -f
 Reset:   cd arcstream && docker compose down -v
 ```
 
-## Architecture
+## Existing Flink stack architecture
 
 ```
                                 ┌──────────────────────────────────────────────────────────────┐
@@ -128,7 +140,7 @@ docker/                  Multi-stage Dockerfiles for Rust services
 k8s/                     Kubernetes manifests (gitignored, cluster-specific)
 ```
 
-## Deployment
+## Existing Flink deployment
 
 This runs on Kubernetes. The `k8s/` directory is gitignored because it contains cluster-specific configuration. To deploy on your own cluster:
 

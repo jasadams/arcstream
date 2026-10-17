@@ -21,11 +21,11 @@ pub struct FlatProfileUpdate {
     #[serde(default)]
     pub user_id: String,
     #[serde(default)]
-    pub first_seen: u64,
+    pub first_seen: i64,
     #[serde(default)]
-    pub last_seen: u64,
+    pub last_seen: i64,
     #[serde(default)]
-    pub updated_at: u64,
+    pub updated_at: i64,
     #[serde(default)]
     pub total_events: u64,
     #[serde(default)]
@@ -48,6 +48,10 @@ pub struct FlatProfileUpdate {
     pub sessions_90d: u64,
     #[serde(default)]
     pub avg_session_duration_sec: u64,
+    #[serde(default)]
+    pub current_session_active: bool,
+    #[serde(default)]
+    pub current_session_duration_sec: i64,
     #[serde(default)]
     pub page_views: u64,
     #[serde(default)]
@@ -78,8 +82,8 @@ pub struct FlatProfileUpdate {
     pub trigger: String,
 }
 
-fn format_epoch_millis(ms: u64) -> String {
-    chrono::DateTime::from_timestamp_millis(ms as i64)
+fn format_epoch_millis(ms: i64) -> String {
+    chrono::DateTime::from_timestamp_millis(ms)
         .map(|dt| dt.format("%Y-%m-%d %H:%M:%S%.3f").to_string())
         .unwrap_or_default()
 }
@@ -103,9 +107,11 @@ impl FlatProfileUpdate {
                 events_90d: self.events_90d,
                 sessions_1d: self.sessions_1d,
                 sessions_7d: self.sessions_7d,
+                sessions_30d: self.sessions_30d,
+                sessions_90d: self.sessions_90d,
                 avg_session_duration_sec: self.avg_session_duration_sec,
-                current_session_active: false,
-                current_session_duration_sec: 0,
+                current_session_active: self.current_session_active,
+                current_session_duration_sec: self.current_session_duration_sec,
                 page_views: self.page_views,
                 clicks: self.clicks,
                 logins: self.logins,
@@ -132,16 +138,16 @@ pub struct LiveEventMessage {
     pub tenant_id: String,
     pub event_time: String,
     pub canonical_id: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::optional_text::deserialize")]
     pub anonymous_id: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::optional_text::deserialize")]
     pub user_id: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::optional_text::deserialize")]
     pub page_url: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::optional_text::deserialize")]
     pub device_type: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::optional_text::deserialize")]
     pub browser: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::optional_text::deserialize")]
     pub country: String,
 }

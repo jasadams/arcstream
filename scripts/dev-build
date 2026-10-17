@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Use the shared machine queue locally and ordinary commands in CI.
+set -euo pipefail
+if [[ $# -eq 0 ]]; then
+    echo "Usage: scripts/dev-build <command> [arguments...]" >&2
+    exit 2
+fi
+if command -v rust-build >/dev/null 2>&1; then
+    exec rust-build "$@"
+fi
+if [[ ${CI:-} == true ]]; then
+    exec "$@"
+fi
+echo "rust-build is required for local builds; install the shared queue." >&2
+exit 1

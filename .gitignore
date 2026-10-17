@@ -6,6 +6,8 @@ k8s/
 
 # Build artifacts
 **/target/
+__pycache__/
+*.pyc
 dashboard/dist/
 
 # Maven

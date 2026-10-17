@@ -21,6 +21,7 @@ pub async fn run(
         .set("group.id", group_id)
         .set("auto.offset.reset", "latest")
         .set("enable.auto.commit", "true")
+        .set("isolation.level", "read_committed")
         .set("fetch.wait.max.ms", "500")
         .set("fetch.min.bytes", "1024")
         .set("queued.max.messages.kbytes", "4096")

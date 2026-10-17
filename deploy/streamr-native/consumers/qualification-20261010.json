@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-10",
+  "scope": "Arcstream event storage/API/live UI integration; Streamr code and SESSION semantics unchanged",
+  "application_base": "c7f477799ef7fb716a4b8d3917a671db210deeba",
+  "binary": {
+    "binary": "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/analytics-native-20261010/bin/query-api",
+    "sha256": "b7b5465dd6c0337fe398140a409c5f87a27717f0de112b2bc22a3a393e88a76f",
+    "source_hash_manifest": "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/analytics-native-20261010/consumer-validation-source-hashes.json",
+    "base": "c7f477799ef7fb716a4b8d3917a671db210deeba",
+    "cargo_validation_exit": 0,
+    "runtime_image": "a95d0ca27fc16ae428c9b0df8d02b603dacab71ebf3a915aad85c94b422cf9ab"
+  },
+  "gates": {
+    "cargo_check_locked": "passed",
+    "cargo_test_locked": {
+      "library": 7,
+      "binary": 10,
+      "integration": 45,
+      "failed": 0
+    },
+    "cargo_clippy_locked_all_targets": "passed with existing dead-code and integration-test type-complexity warnings; not a -D warnings gate",
+    "cargo_build_locked": "passed",
+    "python_comparator_sensitivity_tests": 7
+  },
+  "analytics_prefix": {
+    "rows": 1389,
+    "fields": 17,
+    "queries": 11,
+    "result": "exact match; original nulls/properties and multiplicity preserved",
+    "scope": "declared historical event IDs, not complete live population"
+  },
+  "nullable_live_probe": {
+    "status": "passed",
+    "event_id": "str32-ui-null-8ab3f50f-ed6b-4101-abf8-99eaa101a9a3",
+    "websocket": "native topic via same-origin gateway",
+    "graphql": "event present, optional display strings blank",
+    "storage": "one exact 17-field event, original nulls/properties preserved",
+    "scope": "single finite event; existing sampled/read-uncommitted UI behavior is not lossless transaction recovery qualification"
+  },
+  "browser": {
+    "url": "http://192.168.1.200:18152/events",
+    "backend_cookie": "flare",
+    "http_status": 200,
+    "live_event_frames": 6,
+    "page_errors": []
+  },
+  "preserved_failures": [
+    "First specific nullable-event WebSocket probe timed out after 90s; reason unqualified, GraphQL and storage presence separately confirmed.",
+    "Baseline cached API did not stop on SIGTERM and was force-stopped by the container manager; no graceful-shutdown qualification claimed."
+  ],
+  "limitations": [
+    "Existing UI feed starts at latest, samples up to five pending events per flush, and reads uncommitted Kafka records; no lossless or transaction-recovery UI guarantee.",
+    "Profiles/session emitters and full application parity remain unqualified.",
+    "No standalone 24-hour soak or new capacity/fault/backfill qualification."
+  ],
+  "evidence_root": "/home/jason/qa-evidence/str32-20261010-52391450/arcstream-integration/analytics-native-20261010",
+  "independent_reviews": [
+    "final-application-runtime-review.md",
+    "nullable-presentation-source-review.md",
+    "http-prefix-topic-config-review.md"
+  ]
+}
