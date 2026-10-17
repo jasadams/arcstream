@@ -243,3 +243,35 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod published_http_tests {
+    use super::*;
+    use crate::schema::{event::Event, live_profile::LiveProfile, user_profile::UserProfileRow};
+
+    #[test]
+    fn published_uncast_profile_response_deserializes_application_models() {
+        let response: FlareDBResponse =
+            serde_json::from_str(include_str!("fixtures/flaredb-profile-scalar-http.json"))
+                .unwrap();
+        let jsonl = table_to_jsonl(&response.result_table).unwrap();
+        let users = crate::db::pinot::parse_jsonl::<UserProfileRow>(&jsonl);
+        assert_eq!(users.len(), 3);
+        assert_eq!(users[0].first_seen, "2026-01-01 00:00:01.000");
+        assert_eq!(users[0].total_events, 1);
+        // Row b has the application's nonnullable array contract; rows a/c additionally test storage null preservation.
+        let decoded =
+            decode_result_row(&response.result_table, &response.result_table.rows[1]).unwrap();
+        let profile: LiveProfile =
+            serde_json::from_value(serde_json::Value::Object(decoded.clone())).unwrap();
+        assert_eq!(profile.first_seen, users[1].first_seen);
+        assert_eq!(profile.top_pages, Vec::<String>::new());
+        assert_eq!(profile.top_features, vec!["x\"\\☃"]);
+        let event: Event = serde_json::from_value(serde_json::json!({
+            "event_id":"fixture-event", "event_type":"page_view", "tenant_id":"fixture-tenant",
+            "canonical_id":"fixture-b", "event_time": decoded["first_seen"],
+            "anonymous_id":null,"user_id":null,"page_url":null,"device_type":null,"browser":null,"country":null
+        })).unwrap();
+        assert_eq!(event.event_time, "2026-01-01 00:00:01.000");
+    }
+}

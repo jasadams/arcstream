@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Ingest native scalar-profile output into published FlareDB and restart it."""
 import argparse
+import hashlib
 from datetime import datetime, timezone, timedelta
 import json
 import os
@@ -24,7 +25,10 @@ def main():
         raise ValueError('run through scripts/dev-build shared queue')
     a.case.mkdir(parents=True, exist_ok=False)
     commands, containers, network, volume = [], [], None, None
-    result = {'status': 'failed', 'image': FLARE}
+    result = {'status': 'failed', 'image': FLARE,
+              'input_sha256': hashlib.sha256(a.input.read_bytes()).hexdigest(),
+              'expected_sha256': hashlib.sha256(a.expected.read_bytes()).hexdigest(),
+              'supervisor_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}
 
     def command(argv, data=None):
         p = subprocess.run(argv, input=data, capture_output=True, text=True, timeout=120)
@@ -78,15 +82,15 @@ def main():
             raise ValueError('private broker not ready')
         command(['podman','exec',broker,'rpk','topic','create','profiles-scalar','--partitions','1','--replicas','1'])
         configdir = a.case/'config';configdir.mkdir()
-        schema['ingestionConfig'].update(topic='profiles-scalar',brokers='broker:9092',maxRowsPerSegment=1)
+        schema['ingestionConfig'].update(topic='profiles-scalar',brokers='broker:9092',maxRowsPerSegment=1000)
         (configdir/'profiles.json').write_text(json.dumps(schema,indent=2)+'\n')
-        flare = command(['podman','run','-d','--network',network,'--stop-signal','SIGINT','--memory','1536m',
+        flare = command(['podman','run','-d','--security-opt','label=disable','--network',network,'--stop-signal','SIGINT','--memory','1536m',
             '-v',volume+':/data','-v',str(configdir.resolve())+':/config:ro','-p','127.0.0.1::8099',flare_image['Id'],
             '--data-dir','/data','--http','0.0.0.0:8099','--load-tables','/config','--memory-limit','512M'])
         containers.append(flare)
         base = 'http://'+command(['podman','port',flare,'8099/tcp']).splitlines()[0]
         command(['podman','exec','-i',broker,'rpk','topic','produce','profiles-scalar'],a.input.read_text())
-        observations = []
+        observations, uncast_observations = [], []
         def verify():
             deadline = time.monotonic()+90
             while time.monotonic()<deadline:
@@ -98,8 +102,11 @@ def main():
                         for field in ARRAYS:
                             if isinstance(row[field], str):
                                 row[field] = json.loads(row[field])
+                    result['last_actual'] = actual
                     if actual == expected:
+                        result.pop('last_observation_error', None)
                         observations.append(response)
+                        uncast_observations.append(query(base, 'SELECT '+', '.join(columns)+' FROM profiles ORDER BY canonical_id'))
                         return
                 except Exception as error:
                     result['last_observation_error'] = str(error)
@@ -110,7 +117,7 @@ def main():
         command(['podman','start',flare])
         base = 'http://'+command(['podman','port',flare,'8099/tcp']).splitlines()[0]
         verify()
-        result.update(status='passed', profiles=len(expected), columns=len(columns), observations=observations)
+        result.update(status='passed', profiles=len(expected), columns=len(columns), observations=observations, uncast_observations=uncast_observations)
     finally:
         if containers:
             try:
