@@ -58,8 +58,8 @@ class NativeManifestTests(unittest.TestCase):
                 self.assertNotIn("single_file", body["query"])
                 requests.append(body)
                 markers.extend(re.findall(r"'sink.recovery_topic'\s*=\s*'([^']+)'", body["query"]))
-            self.assertEqual(len(markers), 15)
-            self.assertEqual(len(set(markers)), 15)
+            self.assertEqual(len(markers), 16)
+            self.assertEqual(len(set(markers)), 16)
             topics = {topic["name"]: topic for topic in manifest["topics"]}
             for marker in markers:
                 self.assertEqual(topics[marker]["cleanup.policy"], "compact")
@@ -75,6 +75,29 @@ class NativeManifestTests(unittest.TestCase):
             self.assertIn("arc-mvp-test-session-signals", sessions["query"])
             self.assertIn("session_progress", sessions["query"])
 
+    def test_flaredb_storage_projection_preserves_application_stream_and_full_schema(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary) / "candidate"
+            manifest = prepare_mvp.prepare(directory, "broker:9092", "arc-mvp-scalar", "replay", "raw-events")
+            self.assertEqual(len(manifest["pipelines"]), 12)
+            self.assertEqual(len(manifest["topics"]), 30)
+            storage = json.loads((directory / "profile-storage.json").read_text())
+            self.assertEqual(storage["udfs"], [])
+            self.assertIn("'timestamp' VALUE JSON_VALUE(value, '$.timestamp')", storage["query"])
+            self.assertNotIn("'timestamp' VALUE CAST", storage["query"])
+            self.assertIn("arc-mvp-scalar-profile-updates", storage["query"])
+            self.assertIn("arc-mvp-scalar-flaredb-profiles", storage["query"])
+            self.assertEqual(manifest["consumer_environment"]["KAFKA_PROFILES_TOPIC"], "arc-mvp-scalar-profile-updates")
+            schema = json.loads((directory / "analytics/flaredb/profiles.json").read_text())["schema"]
+            self.assertEqual(len(schema), 33)
+            self.assertEqual(set(re.findall(r"'([^']+)' VALUE", storage["query"])), {f["name"] for f in schema})
+            for name in ["top_pages", "top_features", "changed_fields"]:
+                self.assertEqual(next(f["type"] for f in schema if f["name"] == name), "Utf8")
+                self.assertIn(f"'{name}' VALUE JSON_QUERY(value, '$.{name}')", storage["query"])
+            flat = (directory / "profile-flat.sql").read_text()
+            self.assertIn("$.after", flat)
+            self.assertNotIn("JSON_OBJECT", flat)
+
     def test_analytics_templates_use_isolated_topics_and_preserve_schema_limits(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary) / "candidate"
@@ -83,7 +106,7 @@ class NativeManifestTests(unittest.TestCase):
                 for table, suffix in {"events": "unified-events", "profiles": "profile-updates", "sessions": "sessions"}.items():
                     config = json.loads((directory / "analytics" / backend / (table + ".json")).read_text())
                     if backend == "flaredb":
-                        self.assertEqual(config["ingestionConfig"], {"topic": "arc-mvp-storage-" + suffix, "brokers": "isolated:9092"})
+                        self.assertEqual(config["ingestionConfig"], {"topic": "arc-mvp-storage-" + ("flaredb-profiles" if table == "profiles" else suffix), "brokers": "isolated:9092"})
                     else:
                         streams = config["ingestionConfig"]["streamIngestionConfig"]["streamConfigMaps"]
                         for stream in streams:
@@ -140,7 +163,7 @@ class NativeManifestTests(unittest.TestCase):
             ):
                 result = prepare_mvp.submit(directory, "http://unit-test/api/v1")
             self.assertEqual(result["status"], "submitted")
-            self.assertEqual(len(result["pipelines"]), 11)
+            self.assertEqual(len(result["pipelines"]), 12)
 
     def test_same_tags_cannot_hide_different_existing_sql(self):
         with tempfile.TemporaryDirectory() as temporary:
