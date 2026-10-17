@@ -37,6 +37,8 @@ jobs:
         run: python3 -m unittest discover -s test/streamr-reference/profile-mvp -p 'test_*.py' -v
       - name: Check complete session fixture oracles
         run: python3 -m unittest discover -s test/streamr-reference/session-mvp -p 'test_*.py' -v
+      - name: Check native SESSION compatibility oracles
+        run: python3 -m unittest discover -s test/streamr-reference/session-native -p 'test_*.py' -v
       - name: Check full graph supervisor arguments
         run: python3 test/streamr-reference/native_mvp_kafka.py --help
       - name: Check pinned FlareDB smoke arguments

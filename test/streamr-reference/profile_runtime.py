@@ -18,6 +18,7 @@ import signal
 import subprocess
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 
@@ -62,25 +63,29 @@ def checkpoint(h, case, owner, epoch):
     cp = h.wire((base/'metadata').read_bytes())
     h.require(h.one(cp, 1) == owner['job'].encode() and h.one(cp, 2) == epoch,
               'checkpoint identity mismatch')
-    globals_, artifacts, typed = {}, [], []
+    globals_, artifacts, typed, windows = {}, [], [], []
     for name in cp.get(6, []):
-        op = h.wire((base/f'operator-{name.decode()}'/'metadata').read_bytes())
+        # Object-store checkpoint paths encode reserved operator-name characters
+        # (for example SESSION's `SessionWindow<1800s>`).
+        operator_path = urllib.parse.quote(name.decode(), safe='')
+        op = h.wire((base/f'operator-{operator_path}'/'metadata').read_bytes())
         for table, encoded in h.pairs(op, 13).items():
             state = h.wire(encoded)
             kind, payload = h.one(state, 1, 0), h.wire(h.one(state, 2, b''))
-            if kind == 4:
+            if kind in (3, 4):
                 subs = h.pairs(payload, 2, numeric=True)
                 h.require(set(subs) == {0}, 'typed ownership mismatch')
                 sub = h.wire(subs[0]); h.require(h.one(sub, 7, 0) == epoch, 'typed epoch mismatch')
                 files = []
                 for item in sub.get(9, []):
                     descriptor = h.wire(item)
-                    relative = h.one(descriptor, 1).decode()
+                    relative = urllib.parse.quote(h.one(descriptor, 1).decode(), safe='/')
                     path = case/'checkpoints'/relative
                     h.require(path.stat().st_size == h.one(descriptor, 2), 'artifact size mismatch')
                     h.require(bytes.fromhex(digest(path)) == h.one(descriptor, 3), 'artifact checksum mismatch')
                     artifacts.append(relative); files.append(relative)
-                typed.append({'operator': name.decode(), 'namespace': table.decode(), 'files': files})
+                entry = {'operator': name.decode(), 'namespace': table.decode(), 'files': files}
+                (windows if kind == 3 else typed).append(entry)
             elif kind == 1 and table == b'f':
                 for relative in payload.get(1, []):
                     path = case/'checkpoints'/relative.decode(); artifacts.append(relative.decode())
@@ -97,7 +102,7 @@ def checkpoint(h, case, owner, epoch):
     data = (case/'output.jsonl').read_bytes()[:offset]
     h.require(len(data) == offset and (not data or data.endswith(b'\n')), 'incomplete committed output')
     return {'epoch': epoch, 'source_lines': source, 'sink_offset': offset,
-            'typed_owners': typed, 'artifacts': artifacts,
+            'typed_owners': typed, 'window_owners': windows, 'artifacts': artifacts,
             'timers_offset':globals_.get(str(case/'timers.jsonl'))}, data
 
 
@@ -126,7 +131,9 @@ def main():
     p.add_argument('--scope-bytes',type=int)
     p.add_argument('--typed-resident-bytes',type=int)
     p.add_argument('--typed-owners',type=int,default=1)
+    p.add_argument('--window-owners',type=int,default=0)
     p.add_argument('--fault-prefix', type=int, default=2)
+    p.add_argument('--require-committed-output', action='store_true')
     p.add_argument('--port', type=int, default=18419)
     p.add_argument('--timeout', type=int, default=1200)
     p.add_argument('--compile-only', action='store_true')
@@ -241,11 +248,14 @@ def main():
                     if completed:
                         selected,data=checkpoint(h,case,workers[0],completed[0]['epoch'])
                         h.require(len(selected['typed_owners'])==a.typed_owners,'typed owner inventory mismatch')
+                        h.require(len(selected['window_owners'])==a.window_owners,'window owner inventory mismatch')
                         h.require(selected['source_lines']<=a.fault_prefix,'missed fault source prefix')
                         if selected['source_lines']==a.fault_prefix:
                             checkpoint_dir=case/'checkpoints'/workers[0]['job']/'checkpoints'/f"checkpoint-{selected['epoch']:07}"
                             shutil.copytree(checkpoint_dir,case/'selected-checkpoint-metadata')
                             prefix=data; (case/'committed-prefix.jsonl').write_bytes(data)
+                            if a.require_committed_output:
+                                h.require(bool(prefix), 'selected checkpoint has no committed output')
                             if a.expected_timers and not a.timer_array_field:
                                 h.require(selected['timers_offset'] is not None,'timer sink checkpoint offset absent')
                                 timer_prefix=(case/'timers.jsonl').read_bytes()[:selected['timers_offset']]
