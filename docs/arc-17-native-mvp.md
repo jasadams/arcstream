@@ -1,3 +1,9 @@
+> Historical ARC-17 record. The UDF-backed graph and its deployment tools were
+> removed under ARC-18. Commands and acceptance claims below describe the old
+> implementation and must not be used as current run/deployment instructions.
+> See [current native status](arc-18-native-status.md). Source-bound evidence is
+> retained; legacy Flink behavior does not override native product semantics.
+
 # ARC-17 native MVP integration contract
 
 ## Provenance and status

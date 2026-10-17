@@ -1,3 +1,8 @@
+Current probe inputs use ordinary empty-session events for finite source progress,
+with the same five-second disorder watermark. Dedicated clock flags were removed
+under ARC-18. Historical execution receipts remain bound to their original source;
+these revised probes require fresh execution before any capability conclusion.
+
 # Native lifecycle composition probes
 
 Prepared 2026-10-17 against Streamr target `ad0a4814d5b7c07d74dce54753f5e6e9aaa7a062`.
