@@ -50,11 +50,13 @@ def replace_file(query, token, connection):
     return query
 
 
-def prepare(directory, broker, prefix, clock_mode):
+def prepare(directory, broker, prefix, clock_mode, raw_topic=None):
     if not re.fullmatch(r"arc-mvp-[a-z0-9][a-z0-9-]{0,45}", prefix):
         raise ValueError("topic prefix must be an isolated arc-mvp-<name> namespace")
     if clock_mode not in {"live", "replay"}:
         raise ValueError("clock mode must be live or replay")
+    if raw_topic is not None and (not re.fullmatch(r"[A-Za-z0-9._-]{1,249}", raw_topic) or raw_topic in {".", ".."}):
+        raise ValueError("raw topic must be a valid Kafka topic name")
     directory.mkdir(parents=True, exist_ok=False)
     pipelines = []
     topics = set()
@@ -87,6 +89,11 @@ def prepare(directory, broker, prefix, clock_mode):
     for name in ["identity", "unified", "merges"]:
         query = (HERE / (name + ".sql")).read_text().replace("'broker:9092'", literal(broker))
         query = query.replace("arc-native-", prefix + "-")
+        if name == "identity" and raw_topic is not None:
+            query, count = re.subn(r"topic\s*=\s*" + re.escape(literal(prefix + "-raw-events")),
+                                   "topic = " + literal(raw_topic), query)
+            if count != 1:
+                raise ValueError("expected exactly one raw source topic in identity query")
         if name == "unified":
             fields = re.search(r"CREATE TABLE unified_events\s*(\(.*?\))\s*WITH", query, re.DOTALL)
             if fields is None:
@@ -97,7 +104,8 @@ def prepare(directory, broker, prefix, clock_mode):
         add(name, query)
     for suffix in ["raw-events", "identity-capture", "unified-events", "identity-merges",
                    "identity-commits", "unified-commits", "merges-commits"]:
-        topic(suffix)
+        if suffix != "raw-events" or raw_topic is None:
+            topic(suffix)
 
     query = (HERE / "profile-events.sql").read_text()
     query = query.replace("{{SOURCE}}", connection("execution-events", "profile-events", raw=True))
@@ -155,6 +163,10 @@ def prepare(directory, broker, prefix, clock_mode):
                     "KAFKA_EVENTS_GROUP_ID": prefix + "-api-events",
                     "KAFKA_PROFILES_TOPIC": prefix + "-profile-updates",
                     "KAFKA_PROFILES_GROUP_ID": prefix + "-api-profiles"}}
+    if raw_topic is not None:
+        if raw_topic in topics:
+            raise ValueError("external raw input must not be a managed output or recovery topic")
+        manifest["external_input_topic"] = raw_topic
     # Reviewable isolated analytics templates; no backend API writes occur here.
     # Existing schemas/dedup policy are preserved, with limitations explicit.
     topic_map = {"events": "unified-events", "profiles": "profile-updates", "sessions": "sessions"}
@@ -272,13 +284,14 @@ def main():
     prepare_cmd.add_argument("directory", type=Path)
     prepare_cmd.add_argument("--broker", required=True)
     prepare_cmd.add_argument("--topic-prefix", required=True)
+    prepare_cmd.add_argument("--raw-topic", help="existing raw Kafka input; never created or modified by preparation")
     prepare_cmd.add_argument("--clock-mode", choices=["live", "replay"], default="live")
     submit_cmd = commands.add_parser("submit")
     submit_cmd.add_argument("directory", type=Path)
     submit_cmd.add_argument("--api-url", required=True, help="isolated Streamr API /api/v1 URL")
     args = parser.parse_args()
     if args.command == "prepare":
-        result = prepare(args.directory.resolve(), args.broker, args.topic_prefix, args.clock_mode)
+        result = prepare(args.directory.resolve(), args.broker, args.topic_prefix, args.clock_mode, args.raw_topic)
     else:
         result = submit(args.directory.resolve(), args.api_url)
     print(json.dumps(result, indent=2))

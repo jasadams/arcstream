@@ -15,6 +15,35 @@ spec.loader.exec_module(prepare_mvp)
 
 
 class NativeManifestTests(unittest.TestCase):
+    def test_external_raw_input_replays_history_without_creating_or_rewiring_other_topics(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            default = Path(temporary) / "default"
+            external = Path(temporary) / "external"
+            original = prepare_mvp.prepare(default, "broker:9092", "arc-mvp-history", "replay")
+            replay = prepare_mvp.prepare(external, "broker:9092", "arc-mvp-history", "replay", "raw-events")
+            self.assertEqual(replay["external_input_topic"], "raw-events")
+            self.assertEqual(replay["clock_mode"], "replay")
+            self.assertEqual(replay["topics"], [topic for topic in original["topics"]
+                if topic["name"] != "arc-mvp-history-raw-events"])
+            self.assertNotIn("raw-events", {topic["name"] for topic in replay["topics"]})
+            identity = json.loads((external / "identity.json").read_text())
+            self.assertIn("topic = 'raw-events'", identity["query"])
+            self.assertIn("'source.offset' = 'earliest'", identity["query"])
+            self.assertIn("'source.group_id' = 'arc-mvp-history-identity-owner'", identity["query"])
+            self.assertNotIn("arc-mvp-history-raw-events", identity["query"])
+            for pipeline in replay["pipelines"]:
+                if pipeline["name"] != "identity":
+                    self.assertEqual((external / pipeline["request"]).read_bytes(),
+                                     (default / pipeline["request"]).read_bytes())
+
+    def test_external_input_rejects_invalid_names_and_managed_topic_cycles(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            for index, name in enumerate([".", "..", "bad/name", "bad'topic", "a" * 250,
+                                          "arc-mvp-history-unified-events"]):
+                with self.subTest(name=name), self.assertRaises(ValueError):
+                    prepare_mvp.prepare(Path(temporary) / str(index), "broker:9092",
+                                        "arc-mvp-history", "replay", name)
+
     def test_feedback_sinks_have_independent_compact_recovery_topics(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary) / "candidate"
