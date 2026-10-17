@@ -137,7 +137,7 @@ async fn native_profile_reaches_graphql_with_session_state_and_all_window_counte
         .unwrap()
         .unwrap();
     let (sender, _) = broadcast::channel::<ProfileUpdateMessage>(16);
-    let schema = Schema::build(QueryRoot, EmptyMutation, SubscriptionRoot)
+    let schema = Schema::build(QueryRoot::default(), EmptyMutation, SubscriptionRoot)
         .data(sender.clone())
         .finish();
     let mut stream = Box::pin(schema.execute_stream(
