@@ -1,4 +1,4 @@
-FROM rust:1.89-bookworm AS builder
+FROM docker.io/library/rust:1.96.0-bookworm@sha256:5e2214abe154fe26e39f64488952e5c991eeed1d6d6da7cc8381ae83927f0cfc AS builder
 RUN rustup target add x86_64-unknown-linux-musl wasm32-unknown-unknown && \
     apt-get update && apt-get install -y --no-install-recommends musl-tools brotli && \
     rm -rf /var/lib/apt/lists/*
@@ -12,7 +12,7 @@ COPY dashboard/ .
 
 # Build server binary (static musl)
 ENV CC_x86_64_unknown_linux_musl=musl-gcc
-RUN cargo build --release --features ssr --bin dashboard-server --target x86_64-unknown-linux-musl
+RUN cargo build --locked --release --features ssr --bin dashboard-server --target x86_64-unknown-linux-musl
 
 # Build WASM frontend (skip wasm-opt — rustc -Oz is sufficient)
 ENV TRUNK_TOOLS_WASM_OPT=skip
