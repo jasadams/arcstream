@@ -17,6 +17,7 @@ import urllib.parse
 HERE = Path(__file__).resolve().parent
 STREAMR = "ad0a4814d5b7c07d74dce54753f5e6e9aaa7a062"
 UDF_PLUGIN = "a86297dc049c0c3a5a85f965c782cc571ae0d2d2"
+FLAREDB_IMAGE = "ghcr.io/jasadams/flaredb:arcstream-2026-10-17-95b58cb@sha256:3c8ea585571f4e12f24761356febc071ee018600bc0a58a1848c44312f913a91"
 
 
 def digest(data):
@@ -71,10 +72,12 @@ def prepare(directory, broker, prefix, clock_mode):
         return connector(broker, name, prefix + "-" + pipeline, sink, raw, recovery)
 
     def add(name, query, udf=None):
-        definition = (HERE / udf).read_text() if udf else None
+        definitions = [(HERE / path).read_text() for path in
+                       (udf if isinstance(udf, list) else [udf] if udf else [])]
+        definition = "\n".join(definitions)
         body = {"name": prefix + "-" + name, "query": query, "parallelism": 1,
                 "checkpoint_interval_micros": 2_000_000,
-                "udfs": [{"definition": definition, "language": "rust"}] if definition else []}
+                "udfs": [{"definition": source, "language": "rust"} for source in definitions]}
         body["tags"] = {"arcstream_namespace": prefix, "query_sha256": digest(query),
                         "udf_sha256": digest(definition or "")}
         (directory / (name + ".sql")).write_text(query)
@@ -112,7 +115,7 @@ def prepare(directory, broker, prefix, clock_mode):
     query = replace_file(query, "{{INPUT}}", connection("profile-outbox", "profile-project", raw=True))
     query = replace_file(query, "{{OUTPUT}}", connection("profile-changelog", "profile-project", sink=True, raw=True))
     query = replace_file(query, "{{TIMERS}}", connection("profile-timer-seeds", "profile-project", sink=True, raw=True))
-    add("profile-project", query)
+    add("profile-project", query, "timer_outbox.rs")
 
     query = (HERE / "profile-flat.sql").read_text()
     query = query.replace("{{SOURCE}}", connection("profile-changelog", "profile-flat", raw=True))
@@ -134,7 +137,7 @@ def prepare(directory, broker, prefix, clock_mode):
         query = replace_file(query, "{{OUTPUT}}", connection(output, name, sink=True, raw=template != "timers"))
         if timer:
             query = replace_file(query, "{{TIMERS}}", connection(timer, name, sink=True, raw=True))
-        add(name, query, "session-mvp/session_transition.rs" if template == "owner" else None)
+        add(name, query, "session-mvp/session_transition.rs" if template == "owner" else "timer_outbox.rs" if template == "project" else None)
 
     manifest = {"streamr_merge": STREAMR, "namespace": prefix, "broker": broker,
                 "udf_plugin_source": {"commit": UDF_PLUGIN, "ticket": "STR-143",
@@ -173,11 +176,11 @@ def prepare(directory, broker, prefix, clock_mode):
                 (destination / (table + "-schema.json")).write_text(schema.read_text())
             (destination / (table + ".json")).write_text(json.dumps(config, indent=2) + "\n")
     manifest["analytics_configuration"] = {
-        "directory": "analytics", "scope": "isolated review templates; backend runtime qualification pending",
+        "directory": "analytics", "flaredb_image": FLAREDB_IMAGE, "scope": "isolated review templates; backend runtime qualification pending",
         "requires": "fresh backend catalog/storage; exact image and transactional consumer binding",
         "limitations": ["Existing session schemas store ten scalar fields of the full twelve-field Kafka contract",
                         "Existing Pinot session-id-only dedup policy does not establish tenant isolation or reused-session preservation",
-                        "FlareDB default committed isolation verified in current library; exact image still requires binding and aborted-transaction QA"],
+                        "FlareDB selected image is source-bound and startup-tested; actual aborted-transaction ingestion and materialization remain unqualified"],
     }
 
     # Explicit caller contract for this finite candidate; do not reuse tiny
@@ -186,7 +189,9 @@ def prepare(directory, broker, prefix, clock_mode):
         "disk-sql-state": {"max-row-bytes": 32768},
         "typed-sql-state": {"row-bytes": 32768, "decoded-bytes": 262144,
                             "scope-bytes": 1048576, "page-entries": 16,
-                            "max-working-event-bytes": 1048576},
+                            "max-working-event-bytes": 8388608, "max-resident-bytes": 16777216},
+        "window-state": {"partial-bytes": 262144, "page-bytes": 524288,
+                         "write-bytes": 2097152, "page-entries": 16},
         "live-state-resources": {"max-open-databases": 8, "max-snapshots": 8,
                                  "scan-page-bytes": 8388608,
                                  "queued-write-bytes": 67108864},

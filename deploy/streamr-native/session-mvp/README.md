@@ -43,3 +43,19 @@ prefix is six signals. These are expectations, not a runtime receipt. Actual
 public compiler/owner/project/recovery and whole Kafka graph results must be
 recorded separately on ARC-17. Invalid source timestamps reject explicitly;
 wall-clock parse fallback and production cutover are not claimed.
+
+Technical transport clocks are separate from logical session time: append owner
+and projector sources declare a nullable admission watermark, and a native
+progress column advances dispatch by at least two seconds per raw event/clock,
+with a 31-day lead. The owner emits a native JSON envelope holding the untouched decision string
+and transport metadata. The stateless projector calls pure shared `arc_timer_outbox`
+to add one bounded technical clock per frame; the projector appends it after that frame's business timer seeds
+in the same ordered sink. Timer source admission uses its dispatch time, while
+the declared watermark remains raw source progress minus 5,001 milliseconds.
+Technical clocks are filtered from session windows and output controls. They do
+not advance business progress, create sessions or change the five summary oracle.
+The shared helper rejects timestamps outside the native nanosecond horizon; this
+finite transport scheme requires an operational horizon check before cutover.
+Fixture preparation also writes `expected-project-timers.jsonl`: eleven business
+seeds plus seventeen technical clocks in exact order. New graph evidence must
+validate this transport; earlier file-owner recovery receipts alone do not.

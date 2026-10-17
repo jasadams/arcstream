@@ -1,3 +1,4 @@
+-- Admit historical Kafka timestamps; application policy owns event progress.
 -- Stateless local fan-out. Submit with API parallelism = 1.
 -- Its independent consumer group reads every committed identity-owner row.
 CREATE TABLE identity_capture (
@@ -6,12 +7,14 @@ CREATE TABLE identity_capture (
   canonical_id TEXT NOT NULL, anonymous_id TEXT NOT NULL,
   user_id TEXT, session_id TEXT, page_url TEXT, referrer TEXT,
   element_id TEXT, feature_name TEXT, device_type TEXT, browser TEXT,
-  os TEXT, country TEXT, properties TEXT, merge_old TEXT, user_binding TEXT
+  os TEXT, country TEXT, properties TEXT, merge_old TEXT, user_binding TEXT,
+  admission_progress TIMESTAMP GENERATED ALWAYS AS (CAST(NULL AS TIMESTAMP)) STORED
 ) WITH (
   connector = 'kafka', bootstrap_servers = 'broker:9092',
   topic = 'arc-native-identity-capture', format = 'json', type = 'source',
   'source.offset' = 'earliest', 'source.group_id' = 'arc-native-identity-unified',
-  'source.read_mode' = 'read_committed'
+  'source.read_mode' = 'read_committed',
+  watermark_field = 'admission_progress'
 );
 
 CREATE TABLE unified_events (

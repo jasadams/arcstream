@@ -150,8 +150,9 @@ def inner(a):
     config['pipeline'].update({'source-batch-size':1,'source-batch-linger':'50ms','update-aggregate-flush-interval':'100ms'})
     config['worker']['sql-state-backend']=a.backend
     config['worker']['disk-sql-state'].update({'directory':str(case/'live-state'),'max-row-bytes':32768})
-    config['worker']['typed-sql-state'].update({'row-bytes':32768,'decoded-bytes':262144,'scope-bytes':1048576,'page-entries':16,'max-working-event-bytes':1048576})
+    config['worker']['typed-sql-state'].update({'row-bytes':32768,'decoded-bytes':262144,'scope-bytes':1048576,'page-entries':16,'max-working-event-bytes':8388608,'max-resident-bytes':16777216})
     config['worker']['live-state-resources'].update({'max-open-databases':8,'max-snapshots':8,'scan-page-bytes':8388608,'queued-write-bytes':67108864})
+    config['worker']['window-state'].update({'partial-bytes':262144,'page-bytes':524288,'write-bytes':2097152,'page-entries':16})
     build=case/'udf-build';build.mkdir();shutil.copy2('/app/Cargo.lock',build/'Cargo.lock')
     (build/'target').symlink_to('/app/target/milestone2-runtime',target_is_directory=True)
     config['compiler']={'bind-address':'127.0.0.1','rpc-port':9190,'install-rustc':False,'install-clang':False,
@@ -165,9 +166,10 @@ def inner(a):
                 plugin_source_files={str(path):sha(path) for path in [Path('/app/Cargo.toml'),Path('/app/Cargo.lock'),*sorted(Path('/app/crates/arroyo-udf').rglob('*')),*sorted(Path('/app/crates/arroyo-compiler-service').rglob('*'))] if path.is_file()})
     owned={};started=time.monotonic();h.enable_subreaper();timeline=[]
     counters=Counter()
-    def snapshot(suffix,label):
+    def snapshot(suffix,label,committed=True):
         topic=a.namespace+'-'+suffix
-        output=broker('topic','consume',topic,'--read-committed','--offset',':end',
+        read_options=['--read-committed'] if committed else []
+        output=broker('topic','consume',topic,*read_options,'--offset',':end',
                       '--fetch-max-wait','500ms','--format','%p\t%o\t%v\n')
         counters[label]+=1
         path=case/'topics'/f'{label}-{counters[label]:04}.tsv';path.parent.mkdir(exist_ok=True)
@@ -313,6 +315,10 @@ def inner(a):
                 _,data,_=snapshot(suffix,'recovered-'+suffix)
                 require(data.startswith(prefix),'committed topic prefix changed: '+suffix)
                 after_recovery[suffix]=dict(prefix_sha256=hashlib.sha256(prefix.encode()).hexdigest(),prefix_bytes=len(prefix.encode()),recovered_bytes=len(data.encode()))
+            result['completed_gates']=dict(identity=identity,profiles_active=active,
+                profile_checkpoint=proof,profile_replacement=replacement,
+                session_checkpoint=session_proof,session_replacement=session_replacement,
+                topic_continuity=after_recovery)
             # Reserved controls enter internal execution only. Public unified
             # analytics remain the exact thirteen business records.
             marker=dict(events[-1],event_id='arc-clock-close',event_type='__arc_clock__',
@@ -390,6 +396,17 @@ def inner(a):
                           pipeline_count=len(pipelines),scope='Native Kafka application graph correctness/worker-loss; no production cutover or throughput claim')
         except BaseException as error:
             result['error']=repr(error)
+            diagnostics=[]
+            for topic in data_topics:
+                suffix=topic.removeprefix(a.namespace+'-')
+                for committed in [True,False]:
+                    label='failure-'+('committed-' if committed else 'uncommitted-')+suffix
+                    try:
+                        rows,raw,offset=snapshot(suffix,label,committed=committed)
+                        diagnostics.append(dict(topic=topic,committed=committed,rows=len(rows),last_offset=offset))
+                    except BaseException as diagnostic_error:
+                        diagnostics.append(dict(topic=topic,committed=committed,error=repr(diagnostic_error)))
+            result['failure_topic_diagnostics']=diagnostics
             raise
         finally:
             result['cleanup']=h.cleanup(child,owned)

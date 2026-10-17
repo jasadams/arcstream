@@ -5,11 +5,12 @@
 CREATE TABLE timer_seeds (
   tenant_id TEXT NOT NULL,canonical_id TEXT NOT NULL,generation TEXT NOT NULL,
   kind TEXT NOT NULL,deadline_time TEXT NOT NULL,progress_time TEXT NOT NULL,
-  observed_ms BIGINT,replay_mode BOOLEAN NOT NULL,
+  observed_ms BIGINT,replay_mode BOOLEAN NOT NULL,dispatch_time TEXT,
   deadline_ts TIMESTAMP GENERATED ALWAYS AS (CAST(deadline_time AS TIMESTAMP)) STORED,
   event_ts TIMESTAMP GENERATED ALWAYS AS
-    (GREATEST(CAST(deadline_time AS TIMESTAMP)-INTERVAL '1 nanosecond',
-              CAST(progress_time AS TIMESTAMP)+INTERVAL '1 nanosecond')) STORED,
+    (CASE WHEN kind='clock' AND dispatch_time IS NOT NULL THEN CAST(dispatch_time AS TIMESTAMP)
+      ELSE GREATEST(CAST(deadline_time AS TIMESTAMP)-INTERVAL '1 nanosecond',
+              CAST(progress_time AS TIMESTAMP)+INTERVAL '1 nanosecond') END) STORED,
   progress_ts TIMESTAMP GENERATED ALWAYS AS (CAST(progress_time AS TIMESTAMP)) STORED,
   WATERMARK FOR event_ts AS CAST(progress_time AS TIMESTAMP)
 ) WITH(connector='single_file',path='{{INPUT}}',format='json',type='source',wait_for_control='true');

@@ -8,22 +8,25 @@ CREATE TABLE profile_signals (
   kind TEXT GENERATED ALWAYS AS (JSON_VALUE(value, '$.kind')) STORED,
   effective_ms BIGINT GENERATED ALWAYS AS (CAST(JSON_VALUE(value,'$.effective_ms') AS BIGINT)) STORED,
   source_ms BIGINT GENERATED ALWAYS AS (CAST(JSON_VALUE(value,'$.source_ms') AS BIGINT)) STORED,
-  scope TEXT GENERATED ALWAYS AS ('mvp') STORED
-) WITH(connector='single_file',path='{{INPUT}}',format='raw_string',type='source',wait_for_control='true');
+  scope TEXT GENERATED ALWAYS AS ('mvp') STORED,
+  admission_progress TIMESTAMP GENERATED ALWAYS AS (CAST(NULL AS TIMESTAMP)) STORED
+) WITH(connector='single_file',path='{{INPUT}}',format='raw_string',type='source',wait_for_control='true',watermark_field='admission_progress');
 
 -- Fixed parallelism one: the constant scope makes stream progress and all
 -- profiles share the same fused owner. This is application input progress, not
 -- EVENT_TIMESTAMP and not a substituted calendar reference date.
-CREATE STATE TABLE input_progress(scope TEXT,progress_ms BIGINT NOT NULL,PRIMARY KEY(scope)) PARTITION BY scope;
+CREATE STATE TABLE input_progress(scope TEXT,progress_ms BIGINT NOT NULL,dispatch_ms BIGINT NOT NULL,PRIMARY KEY(scope)) PARTITION BY scope;
 CREATE VIEW progressed AS MERGE INTO input_progress AS target USING profile_signals AS source
 ON target.scope=source.scope
 WHEN MATCHED AND source.kind IN ('event','clock')
-THEN UPDATE SET progress_ms=GREATEST(target.progress_ms,source.source_ms)
+THEN UPDATE SET progress_ms=GREATEST(target.progress_ms,source.source_ms),
+ dispatch_ms=GREATEST(target.dispatch_ms+CAST(2000 AS BIGINT),source.effective_ms+CAST(2678400000 AS BIGINT),source.source_ms+CAST(2678400000 AS BIGINT))
 WHEN NOT MATCHED AND source.kind IN ('event','clock')
-THEN INSERT(scope,progress_ms) VALUES(source.scope,source.source_ms)
+THEN INSERT(scope,progress_ms,dispatch_ms) VALUES(source.scope,source.source_ms,
+ GREATEST(source.effective_ms,source.source_ms)+CAST(2678400000 AS BIGINT))
 RETURNING source AS source,old AS old,new AS new,action AS action;
 CREATE VIEW clocked AS SELECT r.source.value AS value,r.source.tenant_id AS tenant_id,
-  r.source.canonical_id AS canonical_id,r.source.kind AS kind,r.source.scope AS scope,
+  r.source.canonical_id AS canonical_id,r.source.kind AS kind,r.source.scope AS scope,r.new.dispatch_ms AS dispatch_ms,
   r.new.progress_ms-CAST(5001 AS BIGINT) AS progress_ms,
   COALESCE(r.old.progress_ms,r.new.progress_ms)-CAST(5001 AS BIGINT) AS previous_progress_ms FROM progressed r;
 
@@ -45,5 +48,6 @@ RETURNING source AS source,old AS old,new AS new,action AS action;
 -- projection runs in project.sql after an ordinary append-source boundary.
 CREATE TABLE profile_outbox(value TEXT) WITH(connector='single_file',path='{{OUTPUT}}',format='raw_string',type='sink');
 INSERT INTO profile_outbox
-SELECT CASE WHEN r.source.kind='clock' THEN r.source.value ELSE r.new.payload END AS value
+SELECT JSON_OBJECT('payload' VALUE CASE WHEN r.source.kind='clock' THEN r.source.value ELSE r.new.payload END,
+ 'dispatch_ms' VALUE r.source.dispatch_ms,'progress_ms' VALUE r.source.progress_ms) AS value
 FROM applied r WHERE r.new.payload IS NOT NULL OR r.source.kind='clock';

@@ -118,3 +118,24 @@ the coordinator. The separate STR-143 compatibility repair at
 production engine execution code is unchanged. Source pins must distinguish the
 qualified engine binary from the plugin used by the public compiler. Do not
 describe unexecuted application SQL as passing because the fixture exists.
+
+Raw append stages explicitly use a nullable source watermark expression through
+Streamr's current `watermark_field` option. This preserves record transport time
+without admitting a default wall-clock-derived lateness floor: historical native
+timer controls must reach the application policy. Source/business progress still
+comes exclusively from the native singleton input-progress table.
+
+That table also owns a technical dispatch cursor, advanced only by raw events or
+explicit clock markers: `max(previous + 2000ms, effective + 31d, source + 31d)`.
+The shared `timer_outbox.rs` scalar adds a technical clock outside persisted
+business state. The native projector emits it after each frame's business seeds
+in the same ordered sink. Timer `FOR` uses this separate dispatch timestamp for
+technical clocks; `AS` remains the unchanged declared application progress.
+Clock rows cannot become windows or application controls. This avoids the
+existing source generator's `FOR` interval throttle suppressing a nearer logical
+watermark after a far-future deadline. It changes no business date or deadline.
+
+The dispatch cursor is finite and must fit Streamr's nanosecond timestamp range;
+the scalar rejects exhaustion explicitly. It grows two seconds per raw arrival
+and can exceed business time substantially. This is an MVP transport bound, not
+an unlimited production clock contract. No engine capability was added.

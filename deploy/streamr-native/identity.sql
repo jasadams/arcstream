@@ -1,3 +1,4 @@
+-- Admit historical Kafka timestamps; application policy owns event progress.
 -- Isolated native Kafka identity owner; submit with API parallelism = 1.
 -- Application-owned identity evaluation through Streamr's native state tables.
 -- Both state tables are partitioned by tenant, so their accesses share an owner.
@@ -6,12 +7,14 @@ CREATE TABLE raw_events (
   tenant_id TEXT NOT NULL, event_time TEXT NOT NULL,
   anonymous_id TEXT NOT NULL, user_id TEXT, session_id TEXT,
   page_url TEXT, referrer TEXT, element_id TEXT, feature_name TEXT,
-  device_type TEXT, browser TEXT, os TEXT, country TEXT, properties TEXT
+  device_type TEXT, browser TEXT, os TEXT, country TEXT, properties TEXT,
+  admission_progress TIMESTAMP GENERATED ALWAYS AS (CAST(NULL AS TIMESTAMP)) STORED
 ) WITH (
   connector = 'kafka', bootstrap_servers = 'broker:9092',
   topic = 'arc-native-raw-events', format = 'json', type = 'source',
   'source.offset' = 'earliest', 'source.group_id' = 'arc-native-identity-owner',
-  'source.read_mode' = 'read_committed'
+  'source.read_mode' = 'read_committed',
+  watermark_field = 'admission_progress'
 );
 
 CREATE TABLE identity_capture (

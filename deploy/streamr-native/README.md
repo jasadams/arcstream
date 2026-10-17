@@ -47,8 +47,8 @@ configurations, with explicit committed isolation for Pinot. They are review
 artifacts for a fresh isolated backend catalog/storage. They preserve existing
 schemas and dedup policy: session storage currently has ten scalar fields, and
 Pinot's existing session-ID-only dedup key does not qualify tenant isolation or
-session reuse. FlareDB's exact image/transaction binding and actual backend
-materialization remain qualification gates. No backend API writes occur during
+session reuse. The selected FlareDB image is source-bound and startup-tested; actual
+transactional ingestion and backend materialization remain qualification gates. No backend API writes occur during
 preparation or submission.
 
 Submit the prepared candidate only to an isolated Streamr catalog:
@@ -123,3 +123,10 @@ The reference fixture and comparator were reused from Arcstream commit
 identity body was preserved from the existing ARC-13 evaluation, with Kafka
 source/sink configuration added here. Existing reference worktrees and PRs remain
 separate; this increment provides the native state-table integration.
+
+The pinned FlareDB image uses a scratch runtime. Compose runs the SQL readiness
+probe in the separate pinned `flaredb-health` curl container; query-api waits for
+its successful `POST /query/sql` with `SELECT 1`. The FlareDB image runs as
+UID/GID `10001:10001`. Before a separately authorized cutover, verify that the
+existing data volume is writable by that identity and preserve its contents;
+this integration does not change volume ownership or restart production.

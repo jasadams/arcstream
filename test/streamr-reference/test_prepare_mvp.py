@@ -64,7 +64,8 @@ class NativeManifestTests(unittest.TestCase):
             self.assertTrue(manifest["analytics_configuration"]["limitations"])
             patch = json.loads((directory / "worker-configuration-patch.json").read_text())["worker"]
             self.assertEqual(patch, manifest["worker_configuration_patch"])
-            self.assertEqual(patch["typed-sql-state"]["max-working-event-bytes"], 1048576)
+            self.assertEqual(patch["typed-sql-state"]["max-working-event-bytes"], 8388608)
+            self.assertEqual(patch["typed-sql-state"]["max-resident-bytes"], 16777216)
 
     def test_live_and_replay_are_explicit_separate_manifests(self):
         with tempfile.TemporaryDirectory() as temporary:

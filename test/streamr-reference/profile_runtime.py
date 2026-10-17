@@ -36,7 +36,16 @@ def request(port, path, payload=None, timeout=600):
         raise RuntimeError(f'API {path}: HTTP {error.code}: {error.read().decode()}') from error
 
 
-def images(rows, field):
+def images(rows, field, payload_field=None):
+    if payload_field is not None:
+        decoded=[]
+        for row in rows:
+            payload=row.get(payload_field)
+            if not isinstance(payload,str): raise ValueError('declared outbox payload is not a JSON string')
+            payload=json.loads(payload)
+            if not isinstance(payload,dict): raise ValueError('declared outbox payload is not an object')
+            decoded.append(payload)
+        rows=decoded
     if field is None: return rows
     result=[]
     for row in rows:
@@ -107,12 +116,15 @@ def main():
     p.add_argument('--expected-timers', type=Path)
     p.add_argument('--backend', choices=['memory', 'rocksdb'], default='rocksdb')
     p.add_argument('--result-array-field')
+    p.add_argument('--outbox-payload-field')
     p.add_argument('--timer-array-field')
     p.add_argument('--expected-raw-rows',type=int)
     p.add_argument('--state-row-bytes',type=int)
     p.add_argument('--scan-page-bytes',type=int)
     p.add_argument('--typed-decoded-bytes',type=int)
     p.add_argument('--working-event-bytes',type=int)
+    p.add_argument('--scope-bytes',type=int)
+    p.add_argument('--typed-resident-bytes',type=int)
     p.add_argument('--typed-owners',type=int,default=1)
     p.add_argument('--fault-prefix', type=int, default=2)
     p.add_argument('--port', type=int, default=18419)
@@ -149,7 +161,12 @@ def main():
     if a.working_event_bytes is not None:
         h.require(a.working_event_bytes>0,'working event limit must be positive')
         config['worker']['typed-sql-state']['max-working-event-bytes']=a.working_event_bytes
-        config['worker']['typed-sql-state']['scope-bytes']=a.working_event_bytes
+    if a.scope_bytes is not None:
+        h.require(a.scope_bytes>0,'scope limit must be positive')
+        config['worker']['typed-sql-state']['scope-bytes']=a.scope_bytes
+    if a.typed_resident_bytes is not None:
+        h.require(a.typed_resident_bytes>0,'typed resident limit must be positive')
+        config['worker']['typed-sql-state']['max-resident-bytes']=a.typed_resident_bytes
     build = case/'udf-build'; build.mkdir()
     # Official compiler reads build-dir/target/release/libudf.so. This symlink
     # preserves its supported path while reusing the canonical shared target.
@@ -166,7 +183,7 @@ def main():
     engine_receipt=json.loads(a.binary_receipt.read_text()) if a.binary_receipt else None
     if engine_receipt:
         h.require(engine_receipt['production_binary_sha256']==digest(a.binary),'production binary receipt mismatch')
-    result = {'status':'failed','plugin_source_commit':a.plugin_source_commit,'engine_receipt':engine_receipt,'command':command,'backend':a.backend,
+    result = {'status':'failed','plugin_source_commit':a.plugin_source_commit,'engine_receipt':engine_receipt,'command':command,'backend':a.backend,'outbox_payload_field':a.outbox_payload_field,
               'prepared_files':{str(case/name):digest(case/name) for name in ['config.yaml','query.sql','input.jsonl','expected.jsonl','supervisor.py']},
               'binary_sha256':digest(a.binary),'compiler_profile':'release (existing official compiler contract)',
               'plugin_source':{str(path):digest(path) for path in Path('/app/crates/arroyo-udf').rglob('*') if path.is_file()},
@@ -247,7 +264,7 @@ def main():
                             expected_count=len((case/'expected.jsonl').read_bytes().splitlines())
                             if a.result_array_field:
                                 h.require(not physical or physical.endswith(b'\n'),'partial physical outbox record at pause')
-                                physical_result_slots=len(images([json.loads(x) for x in physical.splitlines()],a.result_array_field))
+                                physical_result_slots=len(images([json.loads(x) for x in physical.splitlines()],a.result_array_field,a.outbox_payload_field))
                             else:physical_result_slots=physical_slots
                             h.require(physical_result_slots<expected_count,'no fresh physical result slot remains')
                             (case/'physical-before-loss.jsonl').write_bytes(physical)
@@ -266,13 +283,13 @@ def main():
                         h.require(data.startswith(prefix),'committed output bytes changed')
                         raw=[json.loads(x) for x in data.splitlines()]
                         if a.expected_raw_rows is not None:h.require(len(raw)==a.expected_raw_rows,'raw outbox cardinality differs')
-                        actual=images(raw,a.result_array_field)
+                        actual=images(raw,a.result_array_field,a.outbox_payload_field)
                         expected=[json.loads(x) for x in (case/'expected.jsonl').read_text().splitlines()]
                         h.require(json.dumps(actual,sort_keys=True)==json.dumps(expected,sort_keys=True),'exact application output differs')
                         h.require(len(raw)>fault['physical_record_slots'],'no physically fresh recovered raw records')
                         h.require(len(actual)>fault['physical_result_slots'],'no physically fresh recovered application records')
                         if a.expected_timers:
-                            if a.timer_array_field:actual_timers=images(raw,a.timer_array_field)
+                            if a.timer_array_field:actual_timers=images(raw,a.timer_array_field,a.outbox_payload_field)
                             else:
                                 timer_data=(case/'timers.jsonl').read_bytes()
                                 h.require(timer_data.startswith((case/'committed-timers-prefix.jsonl').read_bytes()),'committed timer bytes changed')
