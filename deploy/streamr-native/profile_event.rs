@@ -9,7 +9,14 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 // Arcstream carries its explicit source event_time through this stateless adapter.
 // Native progress belongs to the downstream owner; normalization never drops late arrivals.
 #[udf]
-fn arc_profile_signal(raw: &str, event_timestamp: &str, replay_mode: bool) -> String {
+fn arc_profile_signal(raw: &str, event_timestamp: &str, clock_mode: &str) -> String {
+    // Use the existing String UDF ABI; Boolean input lowering is unsupported
+    // in the current plugin. The application payload policy remains Boolean.
+    let replay_mode = match clock_mode {
+        "live" => false,
+        "replay" => true,
+        _ => panic!("Arcstream clock_mode must be live or replay"),
+    };
     let mut event: serde_json::Value =
         serde_json::from_str(raw).expect("invalid unified event JSON");
     let event = event

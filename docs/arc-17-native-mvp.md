@@ -41,17 +41,36 @@ receipts are inputs to current-source validation, not replacement evidence.
 | --- | --- | --- |
 | Identity | Two `CREATE STATE TABLE` owners partitioned by tenant, source lookup and dependent `MERGE ... RETURNING` | Anonymous first event allocates canonical ID; first login reuses anonymous identity; known user on new device reuses user identity; established user wins conflict and emits directed loser-to-winner merge |
 | Input/output schema | SQL source/sink definitions in Arcstream | Preserve all unified event fields, null versus empty text and original properties JSON text; null/empty user ID means anonymous |
-| Profile lifetime | Native keyed COUNT, filtered COUNT, FIRST/LAST/MAX | Arrival-first first_seen, maximum last_seen, total and event-type counters, last nonempty descriptive fields |
-| Profile calendar | Native COUNT/SUM calendar FILTER with EVENT_DATE | UTC current date plus previous N-1 dates for 1/7/30/90-day totals; retained contribution date remains separate from triggering date |
-| Session starts | Cursor state-table MERGE plus SUM | A,A,B,A,null,empty,A produces three starts before timeout; null/empty does not reset current session |
-| Ranked collections | Native per-item COUNT and ordered ARRAY_AGG | Top five pages/top three features; explicit deterministic tie rule requires fixture coverage |
-| Closed sessions | Native SESSION plus ARRAY_AGG/UNNEST/count/map composition | Thirty-minute inactivity; arrival-first canonical/start, maximum end, deduplicated pages, arbitrary event-type counts, last nonempty device/browser/country |
-| State lookups/recovery | Native state-table lookup and checkpoint interfaces | Restored anonymous/user/session cursor bindings must influence fresh events after restart |
+| Profile lifetime and calendar | Arcstream scalar transition stored by native STATE TABLE/MERGE | Arrival-first first_seen, maximum last_seen, event-type counters and UTC 1/7/30/90-day daily contributions; live/replay clock policies below |
+| Session starts and lifecycle | Arcstream scalar cursor policy, native keyed state and exact-deadline TUMBLE feedback | A,A,B,A,null,empty,A counts three starts; incoming-event timeout, same-ID reuse after closure, generation guards and prior-watermark catchup |
+| Ranked collections | Arcstream scalar item-count policy persisted in native state | Top five pages/top three features with explicit deterministic count/key tie ordering |
+| Profile updates | Native append outbox and stateless UNNEST projector | All33 fields, exact CDC before/after chains, action/changed_fields, observation metadata and lifecycle triggers |
+| Complete session summaries | Separate Arcstream session scalar owner, native STATE TABLE/MERGE, outbox/projector and TUMBLE feedback | Preserve Java late-arrival processing and thirty-minute inactivity, first-arrival canonical/start, maximum end, deduplicated pages, event-type counts and last nonempty attributes |
+| State lookups/recovery | Native state-table lookup and checkpoint interfaces | Restored anonymous/user/profile/session bindings must influence fresh events after restart |
 
-Keep complete SESSION window lineage through both downstream aggregate stages;
-flattening to start/end alone was a historical rejected query. Existing session
-fixture has seventeen input rows and three expected closures. Validate real
-source batching rather than borrowing its batch-specific committed-row count.
+The former COUNT/FILTER/calendar/ARRAY_AGG profile queries and complete native
+SESSION query are historical diagnostic fixtures, not the selected production
+execution path. They remain useful source-bound qualification evidence. Actual
+native SESSION probes dropped a late-base event before application processing;
+Java processes that arrival and updates its session timer. The selected separate
+session owner therefore receives unwatermarked append signals and implements
+Arcstream policy with native durable state and existing TUMBLE scheduling. No
+application-specific behavior is added to Streamr.
+
+The generated graph currently has eleven pipelines: identity, unified event
+publication, profile/session event normalization, profile owner, profile
+projector, profile timers, profile flat publication, session owner, session
+projector, session timers, and identity-merge publication. Unified publication
+also writes an internal execution topic; reserved clock controls enter only that
+internal topic. The normalizer writes separate profile and session signal topics.
+Both owners emit scalar outboxes; stateless native projectors expand business
+outputs and timer seeds, and timer pipelines feed controls back into owner signal
+topics. The stateless normalizer has no source watermark: late arrivals and
+live future timestamps must reach Arcstream timestamp assignment before any
+window admission. It parses the original schema event_time explicitly; no
+wall-clock or watermark value substitutes for that source field. Exact job names
+and sink-marker inventory come from the generated manifest, not this descriptive
+list. Connector commits are independent.
 
 Identity merges do not automatically rewrite historical profiles or all other
 anonymous aliases in the existing Java policy. Do not invent transitive merging.
@@ -78,13 +97,14 @@ their contribution-date expressions; do not add EVENT_DATE to the outer composed
 profile projection. Source inspection establishes this contract; application
 fixture execution must still establish results and recovery.
 
-Replay conflicts requiring explicit application resolution:
+Historical replay conflicts, resolved by the explicit live/replay contract below:
 
 - Java profile clamps timestamps more than 91 days old or 60 seconds future to
   wall clock, prunes buckets by today's UTC date, and falls back to wall clock
   after timestamp parse errors. This changes historical replay results. A native
   replay contract should preserve valid input event time and reject invalid time;
-  this is a proposed policy until explicitly accepted and tested.
+  the selected replay mode preserves valid time and rejects invalid time; live
+  mode retains the documented clamps.
 - Java debounce is processing-time five seconds, while session close/decay uses
   event-time timers. Do not claim identical intermediate emission cadence from a
   maintained SQL snapshot. Specify accepted emission behavior separately.
@@ -96,14 +116,15 @@ Replay conflicts requiring explicit application resolution:
   jobs. A thirty-minute delayed watermark must not silently shift a midnight
   profile reference date. Out-of-order and midnight fixtures must make this visible.
 
-## Remaining eight profile fields: investigation contract
+## Historical investigation of the remaining eight profile fields
 
 The reused query emits 25 of the Java ProfileUpdate's 33 fields. The remainder is
 `updated_at`, `avg_session_duration_sec`, `current_session_active`,
 `current_session_duration_sec`, `action`, `changed_fields`, `timestamp`, `trigger`.
 Do not populate them with plausible constants to claim parity.
 
-Smallest native candidates to attempt, without engine changes:
+The initial investigation considered these native candidates without engine
+changes. The implemented scalar/state/outbox path below supersedes them:
 
 1. Feed closed-session native SQL results into SUM(duration)/COUNT for average
    completed duration; compare integer seconds/truncation with Java.
@@ -242,3 +263,13 @@ all five profile roles and four complete session summaries from the thirteen
 identity events. Reserved clock controls enter internal execution topics only;
 the public unified stream remains business events. The harness and oracle need
 actual passing runtime evidence before any whole-graph readiness statement.
+
+The whole-graph preflight also invokes the official Rust `udfs/validate` endpoint
+for every inline UDF before creating any pipeline: SQL `validate_query` alone did
+not compile Rust. The first boolean normalizer mode argument exposed the existing
+plugin's `PrimitiveArray<BooleanType>` compilation error (E0277/E0308/E0599),
+retained in `kafka-graph-attempt3/pipelines/profile-events-udf-0-validation.json`.
+The smallest application adaptation uses the already supported string input
+contract (`live`/`replay`) while retaining boolean mode in the application payload
+and persisted policy. This avoids an engine capability change. Failed isolated
+attempts are retained separately from any passing graph receipt.

@@ -1,4 +1,6 @@
 import importlib.util
+import io
+import urllib.error
 import json
 from pathlib import Path
 import re
@@ -44,6 +46,26 @@ class NativeManifestTests(unittest.TestCase):
             self.assertIn("arc-mvp-test-session-signals", sessions["query"])
             self.assertIn("session_progress", sessions["query"])
 
+    def test_analytics_templates_use_isolated_topics_and_preserve_schema_limits(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary) / "candidate"
+            manifest = prepare_mvp.prepare(directory, "isolated:9092", "arc-mvp-storage", "replay")
+            for backend in ["flaredb", "pinot"]:
+                for table, suffix in {"events": "unified-events", "profiles": "profile-updates", "sessions": "sessions"}.items():
+                    config = json.loads((directory / "analytics" / backend / (table + ".json")).read_text())
+                    if backend == "flaredb":
+                        self.assertEqual(config["ingestionConfig"], {"topic": "arc-mvp-storage-" + suffix, "brokers": "isolated:9092"})
+                    else:
+                        streams = config["ingestionConfig"]["streamIngestionConfig"]["streamConfigMaps"]
+                        for stream in streams:
+                            self.assertEqual(stream["stream.kafka.topic.name"], "arc-mvp-storage-" + suffix)
+                            self.assertEqual(stream["stream.kafka.broker.list"], "isolated:9092")
+                            self.assertEqual(stream["stream.kafka.isolation.level"], "read_committed")
+            self.assertTrue(manifest["analytics_configuration"]["limitations"])
+            patch = json.loads((directory / "worker-configuration-patch.json").read_text())["worker"]
+            self.assertEqual(patch, manifest["worker_configuration_patch"])
+            self.assertEqual(patch["typed-sql-state"]["max-working-event-bytes"], 1048576)
+
     def test_live_and_replay_are_explicit_separate_manifests(self):
         with tempfile.TemporaryDirectory() as temporary:
             for mode in ["live", "replay"]:
@@ -51,7 +73,14 @@ class NativeManifestTests(unittest.TestCase):
                 manifest = prepare_mvp.prepare(directory, "isolated:9092", "arc-mvp-" + mode, mode)
                 self.assertEqual(manifest["clock_mode"], mode)
                 query = (directory / "profile-events.sql").read_text()
-                self.assertIn("'$.event_time'), " + ("true" if mode == "replay" else "false") + ")", query)
+                self.assertIn("'$.event_time'), '" + mode + "')", query)
+
+    def test_submission_error_preserves_native_diagnostics(self):
+        error = urllib.error.HTTPError("http://unit-test/api/v1/pipelines", 400,
+                                       "Bad Request", {}, io.BytesIO(b'{"error":"native UDF failed"}'))
+        with patch.object(prepare_mvp.urllib.request, "urlopen", side_effect=error):
+            with self.assertRaisesRegex(RuntimeError, "HTTP 400: .*native UDF failed"):
+                prepare_mvp.api("http://unit-test/api/v1", "pipelines", {"query": "SELECT 1"})
 
     def test_existing_application_topic_namespace_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:

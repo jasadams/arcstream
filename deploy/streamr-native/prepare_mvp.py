@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import re
+import urllib.error
 import urllib.request
 import urllib.parse
 
@@ -51,6 +52,8 @@ def replace_file(query, token, connection):
 def prepare(directory, broker, prefix, clock_mode):
     if not re.fullmatch(r"arc-mvp-[a-z0-9][a-z0-9-]{0,45}", prefix):
         raise ValueError("topic prefix must be an isolated arc-mvp-<name> namespace")
+    if clock_mode not in {"live", "replay"}:
+        raise ValueError("clock mode must be live or replay")
     directory.mkdir(parents=True, exist_ok=False)
     pipelines = []
     topics = set()
@@ -97,7 +100,7 @@ def prepare(directory, broker, prefix, clock_mode):
     query = query.replace("{{SOURCE}}", connection("execution-events", "profile-events", raw=True))
     query = query.replace("{{SINK}}", connection("profile-signals", "profile-events", sink=True, raw=True))
     query = query.replace("{{SESSION_SINK}}", connection("session-signals", "profile-events", sink=True, raw=True))
-    query = query.replace("{{REPLAY}}", "true" if clock_mode == "replay" else "false")
+    query = query.replace("{{CLOCK_MODE}}", literal(clock_mode))
     add("profile-events", query, "profile_event.rs")
 
     query = (HERE / "profile-mvp/owner.sql").read_text()
@@ -149,6 +152,47 @@ def prepare(directory, broker, prefix, clock_mode):
                     "KAFKA_EVENTS_GROUP_ID": prefix + "-api-events",
                     "KAFKA_PROFILES_TOPIC": prefix + "-profile-updates",
                     "KAFKA_PROFILES_GROUP_ID": prefix + "-api-profiles"}}
+    # Reviewable isolated analytics templates; no backend API writes occur here.
+    # Existing schemas/dedup policy are preserved, with limitations explicit.
+    topic_map = {"events": "unified-events", "profiles": "profile-updates", "sessions": "sessions"}
+    analytics = directory / "analytics"
+    for backend in ["flaredb", "pinot"]:
+        destination = analytics / backend
+        destination.mkdir(parents=True)
+        for table, suffix in topic_map.items():
+            config = json.loads((HERE.parent / "config" / (backend + "-tables") / (table + ".json")).read_text())
+            if backend == "flaredb":
+                config["ingestionConfig"].update(topic=prefix + "-" + suffix, brokers=broker)
+            else:
+                streams = config["ingestionConfig"]["streamIngestionConfig"]["streamConfigMaps"]
+                for stream in streams:
+                    stream.update({"stream.kafka.topic.name": prefix + "-" + suffix,
+                                   "stream.kafka.broker.list": broker,
+                                   "stream.kafka.isolation.level": "read_committed"})
+                schema = HERE.parent / "config/pinot-schemas" / (table + ".json")
+                (destination / (table + "-schema.json")).write_text(schema.read_text())
+            (destination / (table + ".json")).write_text(json.dumps(config, indent=2) + "\n")
+    manifest["analytics_configuration"] = {
+        "directory": "analytics", "scope": "isolated review templates; backend runtime qualification pending",
+        "requires": "fresh backend catalog/storage; exact image and transactional consumer binding",
+        "limitations": ["Existing session schemas store ten scalar fields of the full twelve-field Kafka contract",
+                        "Existing Pinot session-id-only dedup policy does not establish tenant isolation or reused-session preservation",
+                        "FlareDB default committed isolation verified in current library; exact image still requires binding and aborted-transaction QA"],
+    }
+
+    # Explicit caller contract for this finite candidate; do not reuse tiny
+    # engine pilot defaults or silently disable resource admission guards.
+    manifest["worker_configuration_patch"] = {
+        "disk-sql-state": {"max-row-bytes": 32768},
+        "typed-sql-state": {"row-bytes": 32768, "decoded-bytes": 262144,
+                            "scope-bytes": 1048576, "page-entries": 16,
+                            "max-working-event-bytes": 1048576},
+        "live-state-resources": {"max-open-databases": 8, "max-snapshots": 8,
+                                 "scan-page-bytes": 8388608,
+                                 "queued-write-bytes": 67108864},
+    }
+    (directory / "worker-configuration-patch.json").write_text(
+        json.dumps({"worker": manifest["worker_configuration_patch"]}, indent=2) + "\n")
     (directory / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     return manifest
 
@@ -157,8 +201,12 @@ def api(base, path, payload=None):
     request = urllib.request.Request(base.rstrip("/") + "/" + path,
         data=json.dumps(payload).encode() if payload is not None else None,
         headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(request, timeout=1200) as response:
-        return json.load(response)
+    try:
+        with urllib.request.urlopen(request, timeout=1200) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode(errors="replace")
+        raise RuntimeError(f"Streamr {path}: HTTP {error.code}: {detail}") from error
 
 
 def submit(directory, api_url):

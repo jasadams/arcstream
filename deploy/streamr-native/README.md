@@ -35,9 +35,21 @@ single-partition topics. Create each topic with its declared cleanup policy;
 commit recovery topics must be compacted and distinct per sink. Use a compatible
 Streamr configuration and its maintained build/run queue. The candidate uses
 complete primary-key lookups and configured native memory or RocksDB state.
-Profile rows can exceed the engine's tiny pilot defaults: configure explicit row,
-decode and scan bounds according to the evidence receipt and existing resource
-admission formulas, rather than disabling guards.
+Profile rows can exceed the engine's tiny pilot defaults. Merge the generated
+`worker-configuration-patch.json` into the isolated engine configuration, retaining
+all other explicit resource budgets and setting a dedicated state directory and
+chosen backend. The patch declares candidate row/decode/scan bounds; compare them
+with the accepted runtime receipt and existing admission formulas. It is not a
+production sizing claim, and guards remain enabled.
+
+The `analytics/` directory contains broker/topic-mapped copies of existing backend
+configurations, with explicit committed isolation for Pinot. They are review
+artifacts for a fresh isolated backend catalog/storage. They preserve existing
+schemas and dedup policy: session storage currently has ten scalar fields, and
+Pinot's existing session-ID-only dedup key does not qualify tenant isolation or
+session reuse. FlareDB's exact image/transaction binding and actual backend
+materialization remain qualification gates. No backend API writes occur during
+preparation or submission.
 
 Submit the prepared candidate only to an isolated Streamr catalog:
 

@@ -86,7 +86,7 @@ def checkpoint(h, case, owner, epoch):
     source, offset = globals_.get(str(case/'input.jsonl')), globals_.get(str(case/'output.jsonl'))
     h.require(source is not None and offset is not None, 'source/sink checkpoint missing')
     data = (case/'output.jsonl').read_bytes()[:offset]
-    h.require(len(data) == offset and data.endswith(b'\n'), 'incomplete committed output')
+    h.require(len(data) == offset and (not data or data.endswith(b'\n')), 'incomplete committed output')
     return {'epoch': epoch, 'source_lines': source, 'sink_offset': offset,
             'typed_owners': typed, 'artifacts': artifacts,
             'timers_offset':globals_.get(str(case/'timers.jsonl'))}, data
@@ -112,6 +112,7 @@ def main():
     p.add_argument('--state-row-bytes',type=int)
     p.add_argument('--scan-page-bytes',type=int)
     p.add_argument('--typed-decoded-bytes',type=int)
+    p.add_argument('--working-event-bytes',type=int)
     p.add_argument('--typed-owners',type=int,default=1)
     p.add_argument('--fault-prefix', type=int, default=2)
     p.add_argument('--port', type=int, default=18419)
@@ -145,6 +146,10 @@ def main():
     if a.scan_page_bytes is not None:
         h.require(a.scan_page_bytes>0,'scan page pool must be positive')
         config['worker']['live-state-resources']['scan-page-bytes']=a.scan_page_bytes
+    if a.working_event_bytes is not None:
+        h.require(a.working_event_bytes>0,'working event limit must be positive')
+        config['worker']['typed-sql-state']['max-working-event-bytes']=a.working_event_bytes
+        config['worker']['typed-sql-state']['scope-bytes']=a.working_event_bytes
     build = case/'udf-build'; build.mkdir()
     # Official compiler reads build-dir/target/release/libudf.so. This symlink
     # preserves its supported path while reusing the canonical shared target.
@@ -181,7 +186,17 @@ def main():
                 except (urllib.error.URLError, RuntimeError, ConnectionError): time.sleep(.2)
             else: raise ValueError('API startup timeout')
             for i, udf in enumerate(udfs):
-                validation = request(a.port, 'udfs/validate', udf)
+                compiler_deadline = time.monotonic()+90
+                while True:
+                    h.require(child.poll() is None, 'cluster exited before compiler ready')
+                    try:
+                        validation = request(a.port, 'udfs/validate', udf)
+                        break
+                    except RuntimeError as error:
+                        if 'HTTP 503:' not in str(error) or 'compiler-service not available' not in str(error) or time.monotonic() >= compiler_deadline:
+                            raise
+                        timeline.append({'event':'compiler_not_ready','seconds':time.monotonic()-started})
+                        time.sleep(.2)
                 h.write(case/f'udf-{i}-validation.json', validation)
                 h.require(not validation['errors'], 'official Rust UDF validation failed')
             validation = request(a.port, 'pipelines/validate_query', {'query':query,'udfs':udfs})

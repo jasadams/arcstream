@@ -46,11 +46,17 @@ def api(port, path, body=None, timeout=1200):
     request=urllib.request.Request(f'http://127.0.0.1:{port}/api/v1/{path}',
         data=None if body is None else json.dumps(body).encode(),
         headers={'Content-Type':'application/json'})
-    try:
-        with urllib.request.urlopen(request,timeout=timeout) as response:
-            return json.load(response)
-    except urllib.error.HTTPError as error:
-        raise RuntimeError(f'{path}: HTTP{error.code}: {error.read().decode()}') from error
+    compiler_deadline=time.monotonic()+90
+    while True:
+        try:
+            with urllib.request.urlopen(request,timeout=timeout) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as error:
+            detail=error.read().decode()
+            if path in ('udfs/validate','pipelines/validate_query') and error.code==503 and 'compiler-service not available' in detail and time.monotonic()<compiler_deadline:
+                time.sleep(.5)
+                continue
+            raise RuntimeError(f'{path}: HTTP{error.code}: {detail}') from error
 
 
 def run(command, **kwargs):
@@ -144,7 +150,7 @@ def inner(a):
     config['pipeline'].update({'source-batch-size':1,'source-batch-linger':'50ms','update-aggregate-flush-interval':'100ms'})
     config['worker']['sql-state-backend']=a.backend
     config['worker']['disk-sql-state'].update({'directory':str(case/'live-state'),'max-row-bytes':32768})
-    config['worker']['typed-sql-state'].update({'row-bytes':32768,'decoded-bytes':262144,'scope-bytes':1048576})
+    config['worker']['typed-sql-state'].update({'row-bytes':32768,'decoded-bytes':262144,'scope-bytes':1048576,'page-entries':16,'max-working-event-bytes':1048576})
     config['worker']['live-state-resources'].update({'max-open-databases':8,'max-snapshots':8,'scan-page-bytes':8388608,'queued-write-bytes':67108864})
     build=case/'udf-build';build.mkdir();shutil.copy2('/app/Cargo.lock',build/'Cargo.lock')
     (build/'target').symlink_to('/app/target/milestone2-runtime',target_is_directory=True)
@@ -156,7 +162,7 @@ def inner(a):
                 files={str(path):sha(path) for path in [Path(__file__),a.engine_helper,a.config_template,case/'config.yaml',case/'oracle.py',
                        case/'identity-input.json',case/'identity-expected.jsonl',case/'rpk',
                        ROOT/'deploy/streamr-native/prepare_mvp.py',*sorted((ROOT/'deploy/streamr-native').rglob('*.rs')),*sorted((ROOT/'deploy/streamr-native').rglob('*.sql'))]},
-                plugin_source_files={str(path):sha(path) for path in sorted(Path('/app/crates/arroyo-udf').rglob('*')) if path.is_file()})
+                plugin_source_files={str(path):sha(path) for path in [Path('/app/Cargo.toml'),Path('/app/Cargo.lock'),*sorted(Path('/app/crates/arroyo-udf').rglob('*')),*sorted(Path('/app/crates/arroyo-compiler-service').rglob('*'))] if path.is_file()})
     owned={};started=time.monotonic();h.enable_subreaper();timeline=[]
     counters=Counter()
     def snapshot(suffix,label):
@@ -207,6 +213,10 @@ def inner(a):
             wait(api_ready,'API',90)
             for item in manifest['pipelines']:
                 payload=json.loads((prepared/item['request']).read_text())
+                for index,udf in enumerate(payload['udfs']):
+                    validation=api(a.port,'udfs/validate',udf)
+                    write(prepared/(item['name']+f'-udf-{index}-validation.json'),validation)
+                    require(not validation.get('errors'),'official Rust UDF rejected: '+item['name'])
                 response=api(a.port,'pipelines/validate_query',dict(query=payload['query'],udfs=payload['udfs']))
                 write(prepared/(item['name']+'-validation.json'),response)
                 require(not response.get('errors') and response.get('graph'),'query rejected: '+item['name'])
@@ -214,6 +224,20 @@ def inner(a):
             pipelines=submitted['pipelines']
             require(set(pipelines)=={row['name'] for row in manifest['pipelines']},'submitted native graph differs from manifest')
             wait(lambda: all(job['state']=='Running' for job in jobs(pipelines).values()),'all jobs Running',180)
+            def inventory():
+                rows=[];cursor=None
+                while True:
+                    page=api(a.port,'pipelines?limit=100'+('&starting_after='+urllib.parse.quote(cursor,safe='') if cursor else ''))
+                    rows.extend(page['data'])
+                    require(len({row['id'] for row in rows})==len(rows),'repeated pipeline pagination identity')
+                    if not page.get('has_more',False):return rows
+                    require(page['data'],'pipeline pagination did not advance')
+                    cursor=page['data'][-1]['id']
+            initial_ids=sorted(row['id'] for row in inventory())
+            repeated=prepare.submit(prepared,f'http://127.0.0.1:{a.port}/api/v1')
+            require({key:row['id'] for key,row in repeated['pipelines'].items()}=={key:row['id'] for key,row in pipelines.items()},'repeated submission changed pipeline identities')
+            require(sorted(row['id'] for row in inventory())==initial_ids,'repeated submission created pipelines')
+            write(case/'repeated-submission.json',dict(status='passed',pipeline_ids=initial_ids,pipelines=repeated['pipelines']))
             broker('topic','produce',a.namespace+'-raw-events',data=''.join(json.dumps(event)+'\n' for event in events[:10]))
             await_rows('unified-events',10,'initial-unified')
             await_rows('profile-updates',10,'initial-profile-flat')
@@ -246,7 +270,7 @@ def inner(a):
             write(case/'fault.json',dict(worker=target,checkpoint=proof))
             def recovered():
                 job=jobs(pipelines)['profiles']
-                workers=[w for p in h.session_processes(child.pid) if (w:=h.worker(p,a.binary.resolve())) and w['pipeline']==profile_id and w['generation']>target['generation']]
+                workers=[w for p in h.session_processes(child.pid) if (w:=h.worker(p,a.binary.resolve())) and w['pipeline']==profile_id and w['generation']>target['generation'] and w['job']==target['job'] and h.identity(w)!=h.identity(target)]
                 return workers[0] if workers and job['state']=='Running' else None
             replacement=wait(recovered,'replacement profile worker',180)
             # The session owner is a separate stateful application pipeline.
@@ -272,7 +296,7 @@ def inner(a):
             require(h.terminate_identity(session_target,signal.SIGKILL),'session worker vanished before SIGKILL')
             def session_recovered():
                 job=jobs(pipelines)['sessions']
-                workers=[w for p in h.session_processes(child.pid) if (w:=h.worker(p,a.binary.resolve())) and w['pipeline']==session_pipeline and w['generation']>session_target['generation']]
+                workers=[w for p in h.session_processes(child.pid) if (w:=h.worker(p,a.binary.resolve())) and w['pipeline']==session_pipeline and w['generation']>session_target['generation'] and w['job']==session_target['job'] and h.identity(w)!=h.identity(session_target)]
                 return workers[0] if workers and job['state']=='Running' else None
             session_replacement=wait(session_recovered,'replacement session worker',180)
             broker('topic','produce',a.namespace+'-raw-events',data=''.join(json.dumps(event)+'\n' for event in events[10:]))
@@ -356,9 +380,9 @@ def inner(a):
             require(len(snapshot('identity-merges','final-merges')[0])==2,'extra identity merge')
             runtime=re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]','',(case/'runtime.log').read_text(errors='replace'))
             restore=[line for line in runtime.splitlines() if 'restoring checkpoint' in line.lower() and target['job'] in line]
-            require(any(f"epoch={proof['epoch']}" in line for line in restore),'selected checkpoint restoration not confirmed')
+            require(any(re.search(r"\bepoch="+str(proof['epoch'])+r"\b",line) for line in restore),'selected checkpoint restoration not confirmed')
             session_restore=[line for line in runtime.splitlines() if 'restoring checkpoint' in line.lower() and session_target['job'] in line]
-            require(any(f"epoch={session_proof['epoch']}" in line for line in session_restore),'session checkpoint restoration not confirmed')
+            require(any(re.search(r"\bepoch="+str(session_proof['epoch'])+r"\b",line) for line in session_restore),'session checkpoint restoration not confirmed')
             result.update(status='passed',identity=identity,profiles_active=active,profiles_closed=closed['verdict'],sessions=session_result,
                           checkpoint=proof,fault_worker=target,replacement=replacement,restore_log_lines=restore,
                           session_recovery=dict(checkpoint=session_proof,fault_worker=session_target,replacement=session_replacement,restore_log_lines=session_restore),
@@ -390,28 +414,39 @@ def host(a):
         return process.stdout
     source=command(['git','-C',str(a.engine_source),'rev-parse','HEAD']).strip()
     require(source==a.plugin_source_commit,'UDF source checkout differs')
+    require(not command(['git','-C',str(a.engine_source),'status','--porcelain']).strip(),'UDF source checkout is dirty')
     receipt=json.loads(a.binary_receipt.read_text());require(sha(a.binary)==receipt['production_binary_sha256'],'qualified binary hash differs')
+    engine_image=json.loads(command(['podman','image','inspect',a.image]))[0]
+    broker_image=json.loads(command(['podman','image','inspect',a.broker_image]))[0]
     write(case/'host-source.json',dict(engine_plugin_source=source,binary_sha256=sha(a.binary),
-          binary_receipt=receipt,image_id=command(['podman','image','inspect','--format','{{.Id}}',a.image]).strip(),
-          broker_image_id=command(['podman','image','inspect','--format','{{.Id}}',a.broker_image]).strip()))
+          binary_receipt=receipt,image_id=engine_image['Id'],broker_image_id=broker_image['Id'],
+          engine_image=engine_image,broker_image=broker_image))
+    # Resolve mutable references once, then execute precisely the inspected images.
+    a.image=engine_image['Id'];a.broker_image=broker_image['Id']
     shutil.copy2(Path(__file__),case/'supervisor.py');shutil.copy2(a.oracle,case/'oracle.py')
     reference=ROOT/'flink/identity-resolution/src/test/resources/reference'
     shutil.copy2(reference/'identity-input.json',case/'identity-input.json');shutil.copy2(reference/'identity-expected.jsonl',case/'identity-expected.jsonl')
-    started=False
+    for kind,name in [('network',network),('container',broker),('container',engine)]:
+        require(subprocess.run(['podman',kind,'exists',name],capture_output=True).returncode==1,'isolated resource already exists: '+name)
+    started=False;created_network=None;network_id=None;broker_id=None;engine_cid=case/'engine.cid'
     try:
-        command(['podman','network','create',network])
-        command(['podman','run','-d','--name',broker,'--network',network,'--network-alias','broker',
+        created_network=command(['podman','network','create',network]).strip()
+        network_receipt=json.loads(command(['podman','network','inspect',created_network]))[0]
+        network_id=network_receipt.get('id',network_receipt.get('Id'))
+        require(network_id,'created network has no resource ID')
+        write(case/'network-source.json',network_receipt)
+        broker_id=command(['podman','run','-d','--name',broker,'--network',network,'--network-alias','broker',
                  '--entrypoint','/usr/bin/rpk',a.broker_image,'redpanda','start','--mode=dev-container',
                  '--smp=1','--memory=512M','--reserve-memory=0M','--overprovisioned',
-                 '--kafka-addr=internal://0.0.0.0:9092','--advertise-kafka-addr=internal://broker:9092'])
+                 '--kafka-addr=internal://0.0.0.0:9092','--advertise-kafka-addr=internal://broker:9092']).strip()
         started=True
         for _ in range(90):
             response=subprocess.run(['podman','exec',broker,'rpk','cluster','info','-X','brokers=localhost:9092'],capture_output=True,text=True)
             if response.returncode==0:break
             time.sleep(1)
         else:raise ValueError('isolated broker did not start')
-        command(['podman','cp',broker+':/usr/bin/rpk',str(case/'rpk')])
-        argv=['podman','run','--rm','--name',engine,'--network',network,'--security-opt','label=disable',
+        command(['podman','cp',broker+':/opt/redpanda/libexec/rpk',str(case/'rpk')])
+        argv=['podman','run','--rm','--cidfile',str(engine_cid),'--name',engine,'--network',network,'--security-opt','label=disable',
               '-v',str(ROOT)+':'+str(ROOT)+':ro','-v',str(case)+':'+str(case)+':rw',
               '-v',str(a.qualification_root)+':'+str(a.qualification_root)+':ro',
               '-v',str(a.engine_source)+':/app:ro','-v','/home/jason/repos/streamr/target:/app/target:rw',
@@ -431,16 +466,18 @@ def host(a):
     finally:
         if started:
             logs=subprocess.run(['podman','logs',broker],capture_output=True,text=True);(case/'broker.log').write_text(logs.stdout+logs.stderr)
-        cleanup=[]
-        for name in [engine,broker]:
-            process=subprocess.run(['podman','rm','-f',name],capture_output=True,text=True)
-            cleanup.append(dict(resource=name,exit=process.returncode,stdout=process.stdout,stderr=process.stderr))
-        process=subprocess.run(['podman','network','rm',network],capture_output=True,text=True)
-        cleanup.append(dict(resource=network,exit=process.returncode,stdout=process.stdout,stderr=process.stderr))
-        remaining=[]
-        for name in [engine,broker]:
-            if subprocess.run(['podman','container','exists',name]).returncode==0:remaining.append(name)
-        if subprocess.run(['podman','network','exists',network]).returncode==0:remaining.append(network)
+        cleanup=[];remaining=[]
+        if created_network and not network_id:
+            remaining.append('created network identity unresolved: '+created_network)
+        owned_containers=[value for value in [engine_cid.read_text().strip() if engine_cid.exists() else None,broker_id] if value]
+        for container_id in owned_containers:
+            process=subprocess.run(['podman','rm','-f',container_id],capture_output=True,text=True)
+            cleanup.append(dict(resource=container_id,exit=process.returncode,stdout=process.stdout,stderr=process.stderr))
+            if subprocess.run(['podman','container','exists',container_id],capture_output=True).returncode==0:remaining.append(container_id)
+        if network_id:
+            process=subprocess.run(['podman','network','rm',network_id],capture_output=True,text=True)
+            cleanup.append(dict(resource=network_id,exit=process.returncode,stdout=process.stdout,stderr=process.stderr))
+            if subprocess.run(['podman','network','exists',network_id],capture_output=True).returncode==0:remaining.append(network_id)
         write(case/'host-cleanup.json',dict(actions=cleanup,remaining=remaining,complete=not remaining))
         require(not remaining,'isolated Kafka graph resources remain after cleanup')
 

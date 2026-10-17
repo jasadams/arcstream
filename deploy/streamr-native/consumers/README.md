@@ -1,8 +1,10 @@
 # Application consumers for the native event integration
 
 This directory supplies the same-origin proxy for an isolated Arcstream event UI.
-The engine has no knowledge of Arcstream schemas or policies. Profiles and session
-summaries remain unqualified; an events UI is not full application qualification.
+The engine has no knowledge of Arcstream schemas or policies. The current
+[full MVP candidate](../README.md) produces complete profile after-images and
+session summaries. Historical receipts below qualify only their stated event-UI
+scope; current integration and storage evidence is recorded separately on ARC-17.
 
 The gateway resolves `native-query-api:8080` and `native-dashboard:3000` on its
 container network. Mount `nginx.conf` as `/etc/nginx/nginx.conf`, and publish the
@@ -24,9 +26,9 @@ The query API accepts independently configurable application topics and groups:
 | `KAFKA_PROFILES_GROUP_ID` | `query-api-subscriptions` |
 
 Set `KAFKA_BROKERS` to the isolated broker. For the native integration, set
-`KAFKA_EVENTS_TOPIC=arc-native-unified-events` and use an isolated event group.
-Existing defaults are unchanged. A profiles topic setting does not implement a
-profile emitter. Both subscriptions use `isolation.level=read_committed` to hide
+the consumer environment from the generated `manifest.json`, including isolated
+event/profile topics and groups. The candidate pipelines supply the full33 profile
+emitter and flat after-image adapter; topic configuration alone does not start them. Both subscriptions use `isolation.level=read_committed` to hide
 aborted transactions. Pending profiles are scoped by tenant and canonical ID.
 The UI feed retains its sampling/buffering and offset commit behavior; it is not
 the authoritative lossless event audit.

@@ -3,10 +3,10 @@
 CREATE TABLE unified_input(value TEXT) WITH({{SOURCE}});
 CREATE TABLE signals(value TEXT) WITH({{SINK}});
 INSERT INTO signals
-SELECT arc_profile_signal(value, JSON_VALUE(value, '$.event_time'), {{REPLAY}})
+SELECT arc_profile_signal(value, JSON_VALUE(value, '$.event_time'), {{CLOCK_MODE}})
 FROM unified_input;
 
 CREATE TABLE session_signals(value TEXT) WITH({{SESSION_SINK}});
 INSERT INTO session_signals
-SELECT arc_profile_signal(value, JSON_VALUE(value, '$.event_time'), {{REPLAY}})
+SELECT arc_profile_signal(value, JSON_VALUE(value, '$.event_time'), {{CLOCK_MODE}})
 FROM unified_input;
