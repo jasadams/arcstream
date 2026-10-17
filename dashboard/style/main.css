@@ -135,8 +135,8 @@ header a[aria-current="page"] { color: var(--text); }
     border-color: var(--accent);
 }
 
-/* Analytics backend toggle in the nav (Pinot default / FlareDB) */
-.backend-toggle {
+/* Analytics backend indicator in the nav */
+.backend-indicator {
     display: inline-flex;
     align-items: center;
     padding: 3px 10px;
@@ -150,13 +150,6 @@ header a[aria-current="page"] { color: var(--text); }
     font-weight: 600;
     letter-spacing: 0.03em;
     text-transform: uppercase;
-    cursor: pointer;
-    transition: color 150ms, border-color 150ms;
-}
-
-.backend-toggle:hover {
-    color: var(--accent);
-    border-color: var(--accent);
 }
 
 /* Dev panel below header */

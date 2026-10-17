@@ -338,7 +338,7 @@ pub fn StatsPage() -> impl IntoView {
 
         <div class="live-callout">
             <span class="live-dot"></span>
-            "Showing live results from hundreds of millions of rows \u{2014} events stream through Redpanda, processed by Flink, delivered by Pinot in sub-second."
+            "Live events stream through Redpanda, are processed by Streamr, and reach these charts through FlareDB."
         </div>
 
         <div class="metric-cards">

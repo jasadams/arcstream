@@ -9,10 +9,10 @@ use crate::server::api::get_dashboard_stats;
 enum ArchNode {
     Producer,
     Redpanda,
-    Flink,
-    ScyllaDB,
-    Pinot,
-    Iceberg,
+    Streamr,
+    LiveUpdates,
+    FlareDB,
+    NativeState,
     QueryApi,
     Dashboard,
 }
@@ -22,10 +22,10 @@ impl ArchNode {
         match self {
             Self::Producer => "Event Producer",
             Self::Redpanda => "Redpanda",
-            Self::Flink => "Apache Flink",
-            Self::ScyllaDB => "ScyllaDB",
-            Self::Pinot => "Apache Pinot",
-            Self::Iceberg => "Apache Iceberg",
+            Self::Streamr => "Streamr",
+            Self::LiveUpdates => "Live Updates",
+            Self::FlareDB => "FlareDB",
+            Self::NativeState => "Native State",
             Self::QueryApi => "Query API",
             Self::Dashboard => "Dashboard",
         }
@@ -33,60 +33,59 @@ impl ArchNode {
 
     fn description(&self) -> &'static str {
         match self {
-            Self::Producer => "Simulates realistic clickstream traffic from multiple game studios. Generates page views, clicks, signups, logins, and feature usage across tenants. Users follow behavioral personas \u{2014} power users, regulars, casuals, tourists \u{2014} each with distinct session patterns, think times, and conversion probability.",
-            Self::Redpanda => "The event bus connecting every component in the pipeline. All data flows through Redpanda topics \u{2014} raw events from the producer, unified events after identity resolution, profile updates to the Query API, and session summaries to Pinot. Kafka-compatible, built on the Seastar framework.",
-            Self::Flink => "The brain of the pipeline. Four jobs transform raw events into usable data: identity resolution merges anonymous and known users, the profile updater maintains rolling window counters in ScyllaDB, sessionization groups events into 30-minute timeout sessions, and the Iceberg writer archives everything to cold storage.",
-            Self::ScyllaDB => "Source of truth for live user profiles. Flink's Profile Updater writes directly here on every event \u{2014} rolling window counters, session state, device history. The Query API reads individual profiles with sub-millisecond latency. Also the sole store for PII (email, name), keeping it out of the analytics tier for GDPR compliance.",
-            Self::Pinot => "Serves every dashboard chart \u{2014} event counts, time series, breakdowns by device/browser/country, and paginated user lists. Star-tree indexes pre-compute aggregations at ingestion time, so each query is an index lookup rather than a scan. Sub-millisecond latency at 10,000+ concurrent queries.",
-            Self::Iceberg => "Cold storage for offline and ad-hoc analysis. Every unified event is archived here in Parquet format on MinIO, partitioned by tenant. When events age out of Pinot's 90-day hot tier, Iceberg retains them indefinitely for historical queries via Trino or Spark \u{2014} ML training, compliance audits, long-range trend analysis.",
-            Self::QueryApi => "The single gateway between the data tier and the dashboard. Queries ScyllaDB for individual profiles, queries Pinot for analytics and aggregations, and streams live updates to all connected browsers via WebSocket. One Kafka consumer fans out profile changes and new events to every connected client in real time.",
-            Self::Dashboard => "The interface you're looking at. Shows live user profiles, event streams, and analytics charts \u{2014} all updating in real time via WebSocket without polling. Server-rendered HTML for instant first paint, then WASM hydrates for interactivity. Every page reflects pipeline state within milliseconds of Flink processing an event.",
+            Self::Producer => "Generates simulated clickstream traffic for multiple tenants: page views, clicks, signups, logins and feature usage. Behavioral personas create different session lengths and return patterns.",
+            Self::Redpanda => "The Kafka-compatible event bus carries raw events, resolved events, profile changes, session summaries and the internal messages connecting native pipelines.",
+            Self::Streamr => "Eleven native SQL pipelines resolve identities, maintain profiles and emit session summaries. Arcstream owns the schemas, identity policies and lifecycle functions; Streamr executes SQL, state lookups, timers and checkpoints.",
+            Self::LiveUpdates => "Committed Kafka event and profile topics feed the Query API. WebSocket subscriptions notify browsers when new data arrives, so live views can refresh without periodic polling.",
+            Self::FlareDB => "The analytics backend serves events, profiles and completed sessions. It consumes the native pipeline outputs and answers the SQL queries used by the dashboard's GraphQL API.",
+            Self::NativeState => "Native state tables retain tenant-scoped identity mappings, profiles and active sessions. RocksDB, the catalog, checkpoints and compiled application functions reside on persistent storage.",
+            Self::QueryApi => "The Rust GraphQL service reads FlareDB for profiles and analytics, consumes committed Kafka updates, and broadcasts live notifications to connected browsers.",
+            Self::Dashboard => "The interface you are viewing combines server-rendered HTML with Rust WASM hydration. Profiles, event streams and analytics use the same FlareDB backend and receive live update notifications.",
         }
     }
 
     fn points(&self) -> &'static [(&'static str, &'static str)] {
         match self {
             Self::Producer => &[
-                ("Behavioral Personas", "Power users, regulars, casuals, tourists \u{2014} each governs session length, page depth, conversion probability, and return rate"),
-                ("Multi-tenant Simulation", "Multiple game studios sharing one pipeline. Tenant ID as Kafka partition key for ordered per-tenant processing"),
-                ("Realistic Timing", "Normal distributions for think time and session gaps, diurnal traffic patterns, weekend effects"),
+                ("Behavioral Personas", "Different activity patterns drive session length, page depth and return frequency"),
+                ("Multiple Tenants", "Each event carries a tenant identifier through identity resolution and aggregation"),
+                ("Simulated Traffic", "The public demo uses generated data"),
             ],
             Self::Redpanda => &[
-                ("Five Topics", "raw-events, unified-events, profile-updates, session-events, identity-merges"),
-                ("7-day Retention", "Replay window for pipeline failures \u{2014} matches the timestamp clamping window for consistency"),
-                ("Seastar Framework", "Same async, shard-per-core C++ framework as ScyllaDB \u{2014} designed for predictable tail latencies"),
+                ("Committed Records", "Native application consumers read committed transactional output"),
+                ("Dedicated Topics", "The native demo uses its own input, output and recovery topics"),
+                ("Ordered Input", "The MVP pipelines run with one partition and parallelism one"),
             ],
-            Self::Flink => &[
-                ("Identity Resolution", "Maintains an identity graph in RocksDB. Maps anonymous IDs to canonical IDs. Detects and collapses identity merges"),
-                ("Profile Updater", "Rolling window counters (1d/7d/30d/90d), session state, device tracking. Writes directly to ScyllaDB"),
-                ("Sessionization", "Groups events into 30-minute timeout sessions. Emits summaries with duration, pages visited, and event breakdown"),
-                ("Exactly-once Delivery", "Kafka transactions + RocksDB checkpoints ensure no duplicates and no data loss across the entire pipeline"),
+            Self::Streamr => &[
+                ("Identity Resolution", "Arcstream policy connects anonymous and known identifiers within each tenant"),
+                ("Profile Lifecycle", "Maintains event counters, calendar windows, activity and timeout state"),
+                ("Session Summaries", "Emits a completed summary when input progress passes the inactivity deadline"),
+                ("Application-owned Functions", "Business rules remain in Arcstream rather than the engine"),
             ],
-            Self::ScyllaDB => &[
-                ("Partition Key Design", "(tenant_id, canonical_id) \u{2014} single-partition reads are O(1), regardless of total data size"),
-                ("Scales Beyond RAM", "Disk-backed with memory as cache. 200M profiles is trivial. No Redis-style RAM ceiling"),
-                ("Who Uses It", "Discord (trillions of messages), Starbucks, Samsung, Zillow, Comcast"),
+            Self::LiveUpdates => &[
+                ("Events", "Resolved events feed the live event view"),
+                ("Profiles", "Complete profile after-images feed the subscription adapter"),
+                ("Notifications", "One server-side consumer broadcasts updates to connected viewers"),
             ],
-            Self::Pinot => &[
-                ("Star-tree Index", "Pre-computes COUNT(*), DISTINCTCOUNTHLL, SUM across declared dimensions at ingestion \u{2014} queries are O(1) lookups"),
-                ("Two Tables", "Events (append-only, star-tree) for dashboard charts. Profiles (upsert, inverted indexes) for audience lists"),
-                ("HLL Sketches", "Approximate COUNT DISTINCT with ~1-2% error. Mergeable across segments, pre-computed in star-tree metrics"),
-                ("Who Uses It", "LinkedIn (billions of queries/day), Uber, Stripe, Walmart, Microsoft Teams, Slack"),
+            Self::FlareDB => &[
+                ("Three Tables", "Events, profiles and completed sessions support the demo's queries"),
+                ("Profile Upserts", "Profiles are keyed by tenant and canonical identity"),
+                ("SQL Analytics", "Aggregations and breakdowns are requested through the Query API"),
             ],
-            Self::Iceberg => &[
-                ("Parquet on MinIO", "Columnar storage with compression on S3-compatible object storage"),
-                ("90+ Day Archive", "Events that age out of Pinot's hot tier persist for historical analysis and compliance"),
-                ("Future Path", "Trino or Spark queries for ad-hoc analysis when real-time is not needed"),
+            Self::NativeState => &[
+                ("State Tables", "Native primary-key lookups read application state"),
+                ("RocksDB", "Disk-backed state uses explicit memory and row bounds"),
+                ("Persistent Checkpoints", "State and committed source positions support restart recovery"),
             ],
             Self::QueryApi => &[
-                ("Typed GraphQL", "async-graphql 7 with queries for tenants, user profiles, event history, and dashboard statistics"),
-                ("WebSocket Subscriptions", "Live profile updates and event streams via graphql-transport-ws protocol with automatic reconnection"),
-                ("Broadcast Channels", "tokio::broadcast fans out one Kafka consumer to all connected WebSocket clients \u{2014} O(1) per message, not O(clients)"),
+                ("Typed GraphQL", "Queries expose tenants, profiles, event histories and dashboard statistics"),
+                ("WebSocket Subscriptions", "Live event and profile notifications use graphql-transport-ws"),
+                ("Single Backend", "Every demo analytics request is served by FlareDB"),
             ],
             Self::Dashboard => &[
-                ("SSR + WASM", "Server renders full HTML (no loading spinners). WASM hydrates for interactivity. Progressive enhancement."),
-                ("Reactive Signals", "RwSignal for mutable state, Signal::derive for computed values \u{2014} surgical DOM updates, no virtual DOM diffing"),
-                ("Zero Polling", "All live data via WebSocket subscriptions. New users appear, counters update, events stream \u{2014} without a single setInterval"),
+                ("SSR + WASM", "Server-rendered pages hydrate for browser interactivity"),
+                ("Reactive Signals", "Rust signals update views as data arrives"),
+                ("Live or Paused", "Freeze profiles and events while inspecting them"),
             ],
         }
     }
@@ -94,47 +93,40 @@ impl ArchNode {
 
 const DECISIONS: &[(&str, &str, &str)] = &[
     (
-        "Pinot over ClickHouse",
-        "Sub-ms queries at 1000+ QPS vs ~50 QPS concurrent limit",
-        "ClickHouse optimizes for 'few big queries fast' \u{2014} each query gets a thread pool, parallel column scans, hash table aggregations. At ~50 concurrent queries, threads fight for CPU and IO. Pinot's star-tree index pre-computes aggregations at ingestion time. A query matching pre-computed dimensions is an index lookup \u{2014} near-zero CPU per query. 1000 concurrent dashboard queries at near-zero cost per query.",
+        "Native SQL with application-owned policy",
+        "Keep engine execution and CDP business rules separate",
+        "Streamr provides native SQL, state tables, configurable storage and checkpoint recovery. Arcstream supplies schemas, tenant identity rules, rolling counters and lifecycle functions.",
     ),
     (
-        "ScyllaDB over Redis",
-        "Sub-ms reads that scale beyond available RAM",
-        "Redis is purely in-memory. 200M profiles at ~1.5KB each means ~300GB RAM for a single dataset. ScyllaDB maintains sub-millisecond reads with disk-backed storage \u{2014} memory serves as cache, not the entire dataset. Same shard-per-core architecture as Redpanda means no lock contention at any scale.",
+        "FlareDB for demo analytics",
+        "One backend for profiles, events and session queries",
+        "The Query API reads the three FlareDB tables through SQL. The dashboard uses this same backend for every viewer, including browsers carrying older backend-selection cookies.",
     ),
     (
-        "Flink DataStream over SQL",
-        "Complex stateful logic that doesn't fit SQL's declarative model",
-        "Identity resolution requires maintaining an identity graph with merge detection, timer-based session management, and rolling window decay \u{2014} all keyed by tenant and user ID. Flink SQL can't express 'when two canonical IDs merge, collapse the graph and re-key all downstream state.' The Iceberg Writer uses Flink SQL because it's a straightforward stream-to-table copy.",
+        "Explicit clock policy",
+        "Event progress drives lifecycle timers",
+        "The live demo applies Arcstream's live timestamp policy. Replay uses a separately selected mode with historical source timestamps. Source progress advances inactivity and decay timers; elapsed wall time alone does not close an idle stream.",
     ),
     (
-        "Event-time over Processing-time",
-        "Correct results during replay, backfill, and catch-up scenarios",
-        "Processing-time timers produce catastrophically wrong results during replay. Replaying 90 days of events: a 30-minute session timeout never fires (events arrive faster than real time), so 200 sessions collapse into one continuous session. Event-time timers fire when the watermark advances, producing identical results whether processing live or replaying history.",
+        "Committed streaming output",
+        "Transactions and checkpoints support restart continuity",
+        "Each native Kafka sink commits its own output transaction and consumers read committed records. Checkpoints retain source positions and state. This does not create one transaction across all output topics or analytics storage.",
     ),
     (
-        "GraphQL Subscriptions over Polling",
-        "One Kafka consumer fans out to all connected clients",
-        "The Query API maintains tokio broadcast channels. A single Kafka consumer reads from profile-updates and unified-events topics, broadcasting to all WebSocket clients. No per-client polling, no N+1 queries, no stale data windows. Profile updates arrive within milliseconds of Flink processing them.",
-    ),
-    (
-        "PII Separation for GDPR",
-        "Personal data never touches the append-only analytics tier",
-        "Pinot's append-only events table cannot delete individual rows. Solution: PII (email, name, phone) lives exclusively in ScyllaDB. Pinot stores only canonical_id \u{2014} an opaque UUID. On erasure request, null PII columns in ScyllaDB. The Pinot data becomes pseudonymous with no re-identification path. GDPR recital 26 excludes data that cannot be attributed to a natural person.",
+        "GraphQL subscriptions",
+        "Stream notifications to connected browsers",
+        "The Query API broadcasts committed event and profile updates over WebSockets. Views can refresh as updates arrive, and viewers can pause the live tables while inspecting them.",
     ),
 ];
 
 const TECH_STACK: &[(&str, &str, &str)] = &[
-    ("Rust", "Event Producer, Query API, Dashboard", "Zero-cost abstractions, memory safety, async with tokio"),
-    ("Java", "Stream Processing", "Required by Flink DataStream API for stateful processing"),
-    ("Apache Flink", "Stateful Streaming", "Event-time semantics, RocksDB state, checkpoints to MinIO"),
-    ("Redpanda", "Event Bus", "Kafka-compatible, Seastar framework, single binary, no ZooKeeper"),
-    ("ScyllaDB", "Live Profiles", "Shard-per-core, sub-ms reads, CQL compatible, disk-backed"),
-    ("Apache Pinot", "OLAP Analytics", "Star-tree pre-aggregation, sub-ms at 10k QPS"),
-    ("Apache Iceberg", "Cold Storage", "Parquet on MinIO, 90+ day retention, partitioned by tenant"),
-    ("Leptos", "Frontend Framework", "Rust SSR + WASM hydration, reactive signals, zero JavaScript"),
-    ("GraphQL", "API Layer", "async-graphql with WebSocket subscriptions, broadcast channels"),
+    ("Rust", "Application Services", "Event producer, business functions, Query API and dashboard"),
+    ("Streamr", "Stateful Streaming", "Native SQL, state tables, event-time timers and checkpoints"),
+    ("Redpanda", "Event Bus", "Kafka-compatible input, output and transaction recovery topics"),
+    ("RocksDB", "Native State", "Disk-backed identity, profile and active-session state"),
+    ("FlareDB", "Analytics", "SQL over events, profiles and completed sessions"),
+    ("Leptos", "Frontend Framework", "Rust SSR, WASM hydration and reactive signals"),
+    ("GraphQL", "API Layer", "Typed queries and WebSocket subscriptions"),
 ];
 
 const P1: &str = "M140,155 L185,155";
@@ -309,9 +301,9 @@ pub fn AboutPage() -> impl IntoView {
                 <span class="about-badge">"Reference Architecture"</span>
                 <h2 class="about-title">"Real-time Customer Data Platform"</h2>
                 <p class="about-desc">
-                    "From raw clickstream events to live dashboards in milliseconds. "
+                    "From raw clickstream events to live profiles and dashboards. "
                     "Identity resolution, sessionization, and profile aggregation "
-                    "streaming through a pipeline built for scale."
+                    "powered by native Streamr SQL and FlareDB."
                 </p>
                 <p class="about-hint">"Click any component to explore"</p>
             </div>
@@ -358,39 +350,39 @@ pub fn AboutPage() -> impl IntoView {
                     </g>
 
                     <g class="arch-node"
-                       class:active=move || active.get() == Some(ArchNode::Flink)
-                       on:click=move |_| active.update(|a| *a = if *a == Some(ArchNode::Flink) { None } else { Some(ArchNode::Flink) })>
+                       class:active=move || active.get() == Some(ArchNode::Streamr)
+                       on:click=move |_| active.update(|a| *a = if *a == Some(ArchNode::Streamr) { None } else { Some(ArchNode::Streamr) })>
                         <rect x="350" y="75" width="145" height="160" rx="8" class="arch-rect" />
-                        <text x="422" y="98" class="arch-label">"Apache Flink"</text>
+                        <text x="422" y="98" class="arch-label">"Streamr"</text>
                         <line x1="368" y1="108" x2="477" y2="108" class="arch-divider" />
                         <text x="422" y="127" class="arch-job">"Identity Resolution"</text>
                         <text x="422" y="147" class="arch-job">"Profile Updater"</text>
                         <text x="422" y="167" class="arch-job">"Sessionization"</text>
-                        <text x="422" y="187" class="arch-job">"Iceberg Writer"</text>
+                        <text x="422" y="187" class="arch-job">"Lifecycle Timers"</text>
                     </g>
 
                     <g class="arch-node"
-                       class:active=move || active.get() == Some(ArchNode::ScyllaDB)
-                       on:click=move |_| active.update(|a| *a = if *a == Some(ArchNode::ScyllaDB) { None } else { Some(ArchNode::ScyllaDB) })>
+                       class:active=move || active.get() == Some(ArchNode::LiveUpdates)
+                       on:click=move |_| active.update(|a| *a = if *a == Some(ArchNode::LiveUpdates) { None } else { Some(ArchNode::LiveUpdates) })>
                         <rect x="550" y="47" width="130" height="50" rx="8" class="arch-rect" />
-                        <text x="615" y="69" class="arch-label">"ScyllaDB"</text>
-                        <text x="615" y="85" class="arch-sublabel">"Live profiles"</text>
+                        <text x="615" y="69" class="arch-label">"Live Updates"</text>
+                        <text x="615" y="85" class="arch-sublabel">"Committed Kafka"</text>
                     </g>
 
                     <g class="arch-node"
-                       class:active=move || active.get() == Some(ArchNode::Pinot)
-                       on:click=move |_| active.update(|a| *a = if *a == Some(ArchNode::Pinot) { None } else { Some(ArchNode::Pinot) })>
+                       class:active=move || active.get() == Some(ArchNode::FlareDB)
+                       on:click=move |_| active.update(|a| *a = if *a == Some(ArchNode::FlareDB) { None } else { Some(ArchNode::FlareDB) })>
                         <rect x="550" y="130" width="130" height="50" rx="8" class="arch-rect" />
-                        <text x="615" y="152" class="arch-label">"Apache Pinot"</text>
-                        <text x="615" y="168" class="arch-sublabel">"Star-tree OLAP"</text>
+                        <text x="615" y="152" class="arch-label">"FlareDB"</text>
+                        <text x="615" y="168" class="arch-sublabel">"SQL analytics"</text>
                     </g>
 
                     <g class="arch-node"
-                       class:active=move || active.get() == Some(ArchNode::Iceberg)
-                       on:click=move |_| active.update(|a| *a = if *a == Some(ArchNode::Iceberg) { None } else { Some(ArchNode::Iceberg) })>
+                       class:active=move || active.get() == Some(ArchNode::NativeState)
+                       on:click=move |_| active.update(|a| *a = if *a == Some(ArchNode::NativeState) { None } else { Some(ArchNode::NativeState) })>
                         <rect x="550" y="217" width="130" height="50" rx="8" class="arch-rect" />
-                        <text x="615" y="239" class="arch-label">"Apache Iceberg"</text>
-                        <text x="615" y="255" class="arch-sublabel">"Cold storage"</text>
+                        <text x="615" y="239" class="arch-label">"Native State"</text>
+                        <text x="615" y="255" class="arch-sublabel">"RocksDB + checkpoints"</text>
                     </g>
 
                     <g class="arch-node"
@@ -470,23 +462,23 @@ pub fn AboutPage() -> impl IntoView {
             </div>
 
             <div class="about-section">
-                <h2>"Data Guarantees"</h2>
+                <h2>"Processing Behavior"</h2>
                 <div class="guarantee-grid">
                     <div class="guarantee-card">
-                        <div class="guarantee-title">"Exactly-once Delivery"</div>
-                        <div class="guarantee-text">"Kafka transactions + Flink checkpoints ensure no duplicates and no data loss across the entire pipeline"</div>
+                        <div class="guarantee-title">"Committed Kafka Output"</div>
+                        <div class="guarantee-text">"Each native sink commits transactions; application consumers read committed records."</div>
                     </div>
                     <div class="guarantee-card">
-                        <div class="guarantee-title">"Event Deduplication"</div>
-                        <div class="guarantee-text">"RocksDB keyed state drops duplicate event IDs within a 10-minute window at the pipeline entry point"</div>
+                        <div class="guarantee-title">"Tenant-scoped Identity"</div>
+                        <div class="guarantee-text">"Native state tables retain identity mappings according to Arcstream tenant and identity policies."</div>
                     </div>
                     <div class="guarantee-card">
-                        <div class="guarantee-title">"Timestamp Clamping"</div>
-                        <div class="guarantee-text">"Client clocks clamped to \u{00b1}7 days of server time \u{2014} prevents watermark corruption from untrusted sources"</div>
+                        <div class="guarantee-title">"Explicit Event Clocks"</div>
+                        <div class="guarantee-text">"Arcstream applies its live profile timestamp policy; input progress drives lifecycle timers."</div>
                     </div>
                     <div class="guarantee-card">
                         <div class="guarantee-title">"Checkpoint Recovery"</div>
-                        <div class="guarantee-text">"RocksDB snapshots + Kafka offsets saved to MinIO every 60s. Pod restart resumes with at most 60s reprocessing"</div>
+                        <div class="guarantee-text">"Native state and source positions are checkpointed to persistent storage for restart recovery."</div>
                     </div>
                 </div>
             </div>
