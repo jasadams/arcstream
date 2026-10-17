@@ -75,6 +75,34 @@ class NativeManifestTests(unittest.TestCase):
             self.assertIn("arc-mvp-test-session-signals", sessions["query"])
             self.assertIn("session_progress", sessions["query"])
 
+    def test_every_native_sink_uses_lossless_lz4_and_preserves_recovery_settings(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            for mode in ["live", "replay"]:
+                for raw_topic in [None, "raw-events"]:
+                    directory = Path(temporary) / (mode + ("-external" if raw_topic else "-isolated"))
+                    manifest = prepare_mvp.prepare(directory, "broker:9092", "arc-mvp-compressed", mode, raw_topic)
+                    sinks = []
+                    for pipeline in manifest["pipelines"]:
+                        request = json.loads((directory / pipeline["request"]).read_text())
+                        for block in re.findall(r"CREATE TABLE .*? WITH\s*\((.*?)\);", request["query"], re.DOTALL):
+                            if re.search(r"'?type'?\s*=\s*'sink'", block):
+                                sinks.append(block)
+                                config = re.search(r"'?client_configs'?\s*=\s*'([^']+)'", block)
+                                self.assertIsNotNone(config)
+                                settings = dict(pair.split("=", 1) for pair in config[1].split(","))
+                                self.assertEqual(settings["compression.type"], "lz4")
+                                self.assertIn("'sink.commit_mode'", block)
+                                self.assertIn("'exactly_once'", block)
+                                self.assertIn("'sink.recovery_topic'", block)
+                                self.assertIn("'8388608'", block)
+                                if pipeline["name"] in {"identity", "unified", "merges"} and "transaction.timeout.ms" in block:
+                                    self.assertEqual(settings["transaction.timeout.ms"], "10000")
+                            else:
+                                self.assertNotIn("compression.type", block)
+                    self.assertEqual(len(sinks), 16)
+                    for name in ["identity", "unified", "merges"]:
+                        self.assertIn("transaction.timeout.ms=10000,compression.type=lz4", (directory / (name + ".sql")).read_text())
+
     def test_flaredb_storage_projection_preserves_application_stream_and_full_schema(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary) / "candidate"

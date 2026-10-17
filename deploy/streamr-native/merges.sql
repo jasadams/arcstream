@@ -26,7 +26,7 @@ CREATE TABLE identity_merges (
   'sink.commit_mode' = 'exactly_once',
   'sink.recovery_topic' = 'arc-native-merges-commits',
   'sink.recovery_max_bytes' = '8388608',
-  client_configs = 'transaction.timeout.ms=10000'
+  client_configs = 'transaction.timeout.ms=10000,compression.type=lz4'
 );
 
 INSERT INTO identity_merges

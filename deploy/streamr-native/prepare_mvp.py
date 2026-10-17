@@ -35,7 +35,7 @@ def connector(broker, topic, name, sink=False, raw=False, recovery_topic=None):
     }
     if sink:
         options.update({"sink.commit_mode": "exactly_once", "sink.recovery_topic": recovery_topic or topic + "-commits",
-                        "sink.recovery_max_bytes": "8388608"})
+                        "sink.recovery_max_bytes": "8388608", "client_configs": "compression.type=lz4"})
     else:
         options.update({"source.offset": "earliest", "source.group_id": name,
                         "source.read_mode": "read_committed"})
