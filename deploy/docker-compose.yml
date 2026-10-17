@@ -119,7 +119,7 @@ services:
   # ── Layer 2: FlareDB OLAP database ────────────────────────────────
 
   flaredb:
-    image: ghcr.io/jasadams/arcstream/flaredb:1.0.49
+    image: ghcr.io/jasadams/flaredb:arcstream-2026-10-17-95b58cb@sha256:3c8ea585571f4e12f24761356febc071ee018600bc0a58a1848c44312f913a91
     command: >
       --data-dir /data
       --http 0.0.0.0:8099
@@ -135,7 +135,19 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8099/query/sql -X POST -H 'Content-Type: application/json' -d '{\"sql\":\"SELECT 1\"}' || exit 1"]
+      disable: true
+
+  # The pinned FlareDB runtime is scratch; readiness tools live separately.
+  flaredb-health:
+    image: curlimages/curl:8.16.0@sha256:463eaf6072688fe96ac64fa623fe73e1dbe25d8ad6c34404a669ad3ce1f104b6
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["while :; do sleep 3600; done"]
+    depends_on:
+      flaredb:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "4", "http://flaredb:8099/query/sql", "--request", "POST", "--header", "Content-Type: application/json", "--data", "{\"sql\":\"SELECT 1\"}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -162,7 +174,7 @@ services:
       KAFKA_BROKERS: redpanda:9092
       ENABLE_PLAYGROUND: "true"
     depends_on:
-      flaredb:
+      flaredb-health:
         condition: service_healthy
       redpanda:
         condition: service_healthy

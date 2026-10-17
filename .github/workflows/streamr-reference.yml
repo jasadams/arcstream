@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'deploy/streamr-native/**'
+      - 'deploy/docker-compose.yml'
       - 'test/streamr-reference/**'
       - 'query-api/**'
       - 'dashboard/**'
@@ -38,6 +39,10 @@ jobs:
         run: python3 -m unittest discover -s test/streamr-reference/session-mvp -p 'test_*.py' -v
       - name: Check full graph supervisor arguments
         run: python3 test/streamr-reference/native_mvp_kafka.py --help
+      - name: Check pinned FlareDB smoke arguments
+        run: python3 test/streamr-reference/flaredb_image_smoke.py --help
+      - name: Validate scratch-aware service readiness configuration
+        run: docker compose -f deploy/docker-compose.yml config --quiet
 
   query-api:
     name: Query API consumer checks
