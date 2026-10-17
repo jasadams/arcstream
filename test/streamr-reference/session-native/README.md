@@ -12,7 +12,7 @@ ancient records is intentionally removed under the user's explicit instruction.
 | late-first-arrival | Thirty-second-late activity is dropped |
 | reopened-late | Reopened session excludes activity twenty minutes behind current progress |
 | tenant-reopen | Four explicit summaries, tenant isolation, reopening, null-session exclusion and ancient-event rejection |
-| five-second-cutoff | Accept 5,000ms disorder, drop 5,002ms disorder; preserve arrival metadata among accepted rows |
+| five-second-cutoff | Accept 5,000ms disorder, drop 5,001ms disorder; preserve arrival metadata among accepted rows |
 | chronological-recovery | Three independently specified summaries; first committed before worker loss, two fresh afterward |
 
 The tenant-reopen product oracle explicitly expects four summaries. Historical

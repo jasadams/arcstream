@@ -28,7 +28,7 @@ this source removal.
 
 `deploy/streamr-native/identity.sql`, `unified.sql` and `merges.sql` retain native
 identity state-table logic. Their sources now cast the application event_time
-and declare an explicit five-second disorder watermark (5,001 ms boundary),
+and declare an explicit five-second disorder watermark,
 instead of suppressing admission or using an implicit wall-clock source floor.
 Their changed Kafka event-time behavior requires application validation before
 cutover. Existing sink exactly-once configuration and identity policies remain.

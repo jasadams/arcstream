@@ -1,4 +1,4 @@
-CREATE TABLE events(tenant_id TEXT,canonical_id TEXT,session_id TEXT,event_ts TIMESTAMP NOT NULL,total_events BIGINT,last_page TEXT,WATERMARK FOR event_ts AS event_ts - INTERVAL '5001 milliseconds') WITH(connector='single_file',path='{{INPUT}}',format='json',type='source',wait_for_control='true');
+CREATE TABLE events(tenant_id TEXT,canonical_id TEXT,session_id TEXT,event_ts TIMESTAMP NOT NULL,total_events BIGINT,last_page TEXT,WATERMARK FOR event_ts AS event_ts - INTERVAL '5 seconds') WITH(connector='single_file',path='{{INPUT}}',format='json',type='source',wait_for_control='true');
 CREATE STATE TABLE emitted(tenant_id TEXT,canonical_id TEXT,total_events BIGINT,last_page TEXT,PRIMARY KEY(tenant_id,canonical_id)) PARTITION BY tenant_id;
 CREATE VIEW snapshots AS SELECT tenant_id,canonical_id,total_events,last_page FROM events WHERE session_id IS NOT NULL AND session_id <> '';
 CREATE VIEW applied AS MERGE INTO emitted AS target USING snapshots AS source

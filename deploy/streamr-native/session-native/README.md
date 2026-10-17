@@ -4,7 +4,7 @@ This query uses native SESSION and SQL aggregates. It registers no UDF and has
 no timer-seed sink, feedback controls, synthetic dispatch timestamps or transport
 cursor. The source event timestamp drives session closure with a 30-minute gap.
 The product allows five seconds of disorder: its watermark is event time minus
-5,001 milliseconds. Older events are dropped; they do not reopen closed sessions
+exactly five seconds. Older events are dropped; they do not reopen closed sessions
 or mutate an unrelated newly opened session. No legacy maximum-zero timestamp
 initialization is reproduced.
 

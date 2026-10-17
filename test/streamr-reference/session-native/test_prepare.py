@@ -32,7 +32,7 @@ class SessionNativeFixtures(unittest.TestCase):
         data = fixture('five-second-cutoff')
         first, inside, outside, last, progress = data['inputs']
         self.assertEqual(first['event_ms']-inside['event_ms'], 5000)
-        self.assertEqual(first['event_ms']-outside['event_ms'], 5002)
+        self.assertEqual(first['event_ms']-outside['event_ms'], 5001)
         expected = data['expected'][0]
         self.assertEqual(expected['event_count'],3)
         self.assertEqual(expected['pages'], ['/first','/inside'])

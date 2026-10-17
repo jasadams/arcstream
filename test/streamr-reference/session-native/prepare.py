@@ -62,7 +62,7 @@ DESCRIPTIONS = {
     'late-first-arrival': 'Thirty-second-late activity is dropped by the five-second product watermark.',
     'reopened-late': 'After closure and reopening at 00:40, twenty-minute-late a5 is dropped.',
     'tenant-reopen': 'Four native summaries, tenant isolation, reopening, null session exclusion and rejection of ancient activity.',
-    'five-second-cutoff': 'Accept five-second-disordered activity, reject activity 5002 milliseconds behind source progress.',
+    'five-second-cutoff': 'Accept five-second-disordered activity, reject activity 5001 milliseconds behind source progress.',
     'chronological-recovery': 'Three sequential sessions with distinct identities and source-progress closures; fault after first committed summary while later summaries remain.',
 }
 
@@ -101,7 +101,7 @@ def fixture(case):
     elif case == 'five-second-cutoff':
         first = dict(by_id['a1'], event_id='cutoff-first', event_time='2020-02-01 00:00:10.000')
         inside = dict(by_id['a2'], event_id='cutoff-inside', event_time='2020-02-01 00:00:05.000', event_type='click', page_url='/inside')
-        outside = dict(by_id['a2'], event_id='cutoff-outside', event_time='2020-02-01 00:00:04.998', page_url='/outside', browser='Rejected')
+        outside = dict(by_id['a2'], event_id='cutoff-outside', event_time='2020-02-01 00:00:04.999', page_url='/outside', browser='Rejected')
         last = dict(by_id['a3'], event_id='cutoff-last', event_time='2020-02-01 00:00:12.000')
         signals = [first, inside, outside, last, progress('close', '2020-02-01 00:40:00.000')]
         expected = [dict(data['expected'][0], start_time='2020-02-01 00:00:10.000', end_time='2020-02-01 00:00:12.000', duration_sec=2, event_count=3, pages=['/first','/inside'], event_types={'page_view':1,'click':1,'custom_event':1}, browser='Chrome')]
@@ -133,7 +133,7 @@ def prepare(directory, case):
         (directory / name).write_text(''.join(json.dumps(row, sort_keys=True) + '\n' for row in rows))
     manifest = dict(case=case, description=data['description'], input_rows=len(data['inputs']),
                     expected_rows=len(data['expected']), progress_contract='Ordinary empty-session events advance raw source event time; no special clock protocol.',
-                    source_watermark='Product contract: event_ts minus 5001 milliseconds; older events are dropped.',
+                    source_watermark='Product contract: event_ts minus 5 seconds; older events are dropped.',
                     output_order='No cross-key ordering contract. Compare complete records with multiplicity; preserve physical committed bytes for recovery.',
                     status='prepared only; expected is application oracle, not a claimed native result',
                     source_sha256={str(Path(__file__)): hashlib.sha256(Path(__file__).read_bytes()).hexdigest()},

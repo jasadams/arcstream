@@ -1,4 +1,4 @@
-CREATE TABLE events(tenant_id TEXT,canonical_id TEXT,session_id TEXT,event_ts TIMESTAMP NOT NULL,total_events BIGINT,last_page TEXT,WATERMARK FOR event_ts AS event_ts - INTERVAL '5001 milliseconds') WITH(connector='single_file',path='{{INPUT}}',format='json',type='source',wait_for_control='true');
+CREATE TABLE events(tenant_id TEXT,canonical_id TEXT,session_id TEXT,event_ts TIMESTAMP NOT NULL,total_events BIGINT,last_page TEXT,WATERMARK FOR event_ts AS event_ts - INTERVAL '5 seconds') WITH(connector='single_file',path='{{INPUT}}',format='json',type='source',wait_for_control='true');
 CREATE VIEW closed AS SELECT tenant_id,canonical_id,session_id,SESSION(INTERVAL '30 minutes') AS window,COUNT(*) AS event_count FROM events WHERE session_id IS NOT NULL AND session_id <> '' GROUP BY tenant_id,canonical_id,session_id,window;
 CREATE STATE TABLE cursor(tenant_id TEXT,canonical_id TEXT,session_id TEXT,current_session_active BOOLEAN,PRIMARY KEY(tenant_id,canonical_id)) PARTITION BY tenant_id;
 CREATE VIEW reset AS MERGE INTO cursor AS target USING closed AS source
