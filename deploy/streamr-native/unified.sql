@@ -30,7 +30,7 @@ CREATE TABLE unified_events (
   'sink.commit_mode' = 'exactly_once',
   'sink.recovery_topic' = 'arc-native-unified-commits',
   'sink.recovery_max_bytes' = '8388608',
-  client_configs = 'transaction.timeout.ms=10000'
+  client_configs = 'transaction.timeout.ms=10000,compression.type=lz4'
 );
 
 INSERT INTO unified_events
