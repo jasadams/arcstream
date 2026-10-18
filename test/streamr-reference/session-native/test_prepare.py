@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from prepare import DESCRIPTIONS, fixture, product_oracle, prepare
+from prepare import DESCRIPTIONS, fixture, product_oracle, prepare, milliseconds
 
 
 class SessionNativeFixtures(unittest.TestCase):
@@ -14,7 +14,7 @@ class SessionNativeFixtures(unittest.TestCase):
         self.assertEqual(data['inputs'][2]['session_id'], '')
         self.assertTrue(all(row['session_id']=='' for row in data['inputs'][3:7]))
         self.assertTrue(all(row['event_count']==2 and row['duration_sec']==120 for row in data['expected']))
-        self.assertLess(data['inputs'][2]['event_ms'], data['inputs'][7]['event_ms'])
+        self.assertLess(data['inputs'][2]['event_time'], data['inputs'][7]['event_time'])
 
     def test_native_product_oracle_rejects_late_events(self):
         data = fixture('tenant-reopen')
@@ -27,26 +27,47 @@ class SessionNativeFixtures(unittest.TestCase):
         self.assertEqual(reopened['pages'], ['/new'])
         self.assertEqual(reopened['start_time'], '2020-02-01 00:40:00.000')
         self.assertEqual(data['expected'], product_oracle()['expected'])
+        self.assertIsNone(next(row for row in data['inputs'] if row['event_id']=='empty')['session_id'])
 
-    def test_five_second_cutoff_preserves_accepted_arrival_semantics(self):
+    def test_five_second_cutoff_uses_earliest_accepted_event(self):
         data = fixture('five-second-cutoff')
         first, inside, outside, last, progress = data['inputs']
-        self.assertEqual(first['event_ms']-inside['event_ms'], 5000)
-        self.assertEqual(first['event_ms']-outside['event_ms'], 5001)
+        self.assertEqual(milliseconds(first['event_time'])-milliseconds(inside['event_time']), 5000)
+        self.assertEqual(milliseconds(first['event_time'])-milliseconds(outside['event_time']), 5001)
         expected = data['expected'][0]
         self.assertEqual(expected['event_count'],3)
         self.assertEqual(expected['pages'], ['/first','/inside'])
-        self.assertEqual(expected['browser'],'Chrome')
-        self.assertEqual(expected['canonical_id'],'first-a')
-        self.assertEqual(expected['start_time'],first['event_ts'])
-        self.assertEqual(expected['end_time'],last['event_ts'])
+        self.assertEqual(expected['browser'],'Firefox')
+        self.assertEqual(expected['canonical_id'],'later-a')
+        self.assertEqual(expected['start_time'],inside['event_time'])
+        self.assertEqual(expected['end_time'],last['event_time'])
+
+    def test_event_time_ordering_differs_from_arrival_order(self):
+        data = fixture('event-time-ordering')
+        expected = data['expected'][0]
+        self.assertEqual(expected['canonical_id'], 'earliest')
+        self.assertEqual(expected['start_time'], data['inputs'][1]['event_time'])
+        self.assertEqual(expected['end_time'], data['inputs'][2]['event_time'])
+        self.assertEqual(expected['duration_sec'], 4)
+        self.assertEqual((expected['device_type'],expected['browser'],expected['country']), ('tablet','Latest','GB'))
+        self.assertNotEqual(expected['device_type'],data['inputs'][3]['device_type'])
+        self.assertEqual(expected['event_count'],4)
+
+    def test_equal_event_time_ties_keep_first_and_last_write(self):
+        data = fixture('equal-time-ties')
+        self.assertEqual(data['inputs'][0]['event_time'],data['inputs'][1]['event_time'])
+        self.assertEqual(data['expected'][0]['canonical_id'],data['inputs'][0]['canonical_id'])
+        self.assertEqual(data['expected'][0]['browser'],data['inputs'][1]['browser'])
 
     def test_all_cases_have_real_progress_and_complete_twelve_fields(self):
         for name in DESCRIPTIONS:
             data = fixture(name)
             self.assertEqual(data['inputs'][-1]['session_id'],'')
-            self.assertEqual([row['arrival_seq'] for row in data['inputs']],list(range(len(data['inputs']))))
+            self.assertTrue(all('event_time' in row for row in data['inputs']))
             for row in data['inputs']:
+                self.assertNotIn('event_ts',row)
+                self.assertNotIn('event_ms',row)
+                self.assertNotIn('arrival_seq',row)
                 self.assertNotIn('clock_ts',row)
                 self.assertNotIn('is_clock',row)
                 self.assertNotIn('kind',row)

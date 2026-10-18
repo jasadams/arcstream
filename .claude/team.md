@@ -12,12 +12,14 @@
 
 ## Release
 
-- **Pipelines:** Publish Docker Images; arcstream-cloud Deploy native demo
+- **Pipelines:** Publish Docker Images (application artifacts).
 - **Production URL:** https://cdp.alytic.com.au
-- Version tags publish the dashboard, query-api and event-producer images.
-  The explicit native demo workflow in `jasadams/arcstream-cloud` coordinates
-  the engine, schemas, consumers and producer; publication does not automatically
-  roll app images ahead of the engine. Its manual inputs pin the source and images.
+- Version tags publish dashboard, query-api and event-producer images.
+- The custom native demo rollout workflow was retired under ARC-18. There is
+  currently no complete native profile/session deployment graph. Do not reuse
+  historical rollout instructions or treat image publication as cutover.
+- Production cutover requires validated native application results and explicit
+  authorization. See `docs/arc-18-native-status.md`.
 
 ## Worktree
 

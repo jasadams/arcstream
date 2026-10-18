@@ -8,7 +8,7 @@ CREATE TABLE identity_capture (
   element_id TEXT, feature_name TEXT, device_type TEXT, browser TEXT,
   os TEXT, country TEXT, properties TEXT, merge_old TEXT, user_binding TEXT,
   event_ts TIMESTAMP GENERATED ALWAYS AS (CAST(event_time AS TIMESTAMP)) STORED,
-  WATERMARK FOR event_ts AS event_ts - INTERVAL '5 seconds'
+  WATERMARK FOR event_ts AS CAST(event_time AS TIMESTAMP) - INTERVAL '5 seconds'
 ) WITH (
   connector = 'kafka', bootstrap_servers = 'broker:9092',
   topic = 'arc-native-identity-capture', format = 'json', type = 'source',

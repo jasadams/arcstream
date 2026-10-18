@@ -48,6 +48,32 @@ calendar logic must not substitute wall clock or delayed watermark time.
 
 ## Outstanding integration and product work
 
+Preparation against STR-29, STR-60, STR-64 and STR-146 is now available through
+`deploy/streamr-native/prepare.py`. It renders native SQL and zero-UDF public
+API requests only; it does not submit or deploy. The graph includes the native
+identity paths, full 12-field completed-session summaries, a 20-field partial
+profile component and separate completed-session count/average metrics. Partial
+profile output is confined to diagnostic topics, never the 33-field consumer.
+
+SESSION fixtures now use actual payload event_time and require implicit
+event-time FIRST/LAST, including admitted out-of-order events and full ties.
+They no longer supply arrival_seq or typed timestamps fabricated by the fixture.
+Profile fixtures explicitly distinguish raw event date from delayed watermark
+and maximum observed time, include ranking changes, late rejection, tenant
+isolation and quiet-key calendar zero. Prepared expectations are not runtime
+passes. Remaining 13 profile fields are listed in profile-native/fields.json;
+their session lifecycle/publication semantics are unfinished application work,
+not proof of new engine deficiencies or permission to fabricate values.
+
+Current preparation evidence is under
+`/home/jason/qa-evidence/arc18-native-integration-contracts-20261018/`.
+Public API planner checks on qualified main14353046 accepted the corrected
+identity/unified/merges queries. The exact partial profile query was rejected
+with `native MERGE source must be an append event stream, not a changelog`,
+the expected pending STR-64 route. No engine changes or application runtime
+success are claimed. Dependency completion must be followed by actual composed
+Kafka/RocksDB correctness, state lookup and committed-output recovery evidence.
+
 - Compose the full profile schema and lifecycle using native SQL; no fabricated
   fields, serialized state-machine substitute or custom deadline dispatcher.
 - Validate native session output with the application consumers and real Kafka
