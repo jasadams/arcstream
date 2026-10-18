@@ -48,6 +48,23 @@ calendar logic must not substitute wall clock or delayed watermark time.
 
 ## Outstanding integration and product work
 
+The candidate `deploy/streamr-native/profile-native/closed-session-metrics.sql`
+composes native SESSION with lifetime COUNT/SUM and updating CDC. It contributes
+only completed-session count and average seconds. Independent 13-event fixtures
+cover session reuse, tenant isolation, fractional-second arithmetic, five-second
+late rejection and a two-day inactivity interval. Fixture preparation and runner
+unit tests do not establish application runtime correctness.
+
+Current investigation evidence is under
+`/home/jason/qa-evidence/arc18-native-profile-20261018/`. The native composition
+planned successfully before adding the existing `SET updating_ttl = NULL`
+setting. The current Kafka/RocksDB checkpoint/SIGKILL experiment remains pending:
+the shared queue disk guard rejected launch while another build held its lock.
+No Kafka application result or recovery success is claimed for this component.
+The same planner investigation corrected watermark expressions in the three
+identity queries to cast the physical payload field directly; those queries
+still require revalidation.
+
 - Compose the full profile schema and lifecycle using native SQL; no fabricated
   fields, serialized state-machine substitute or custom deadline dispatcher.
 - Validate native session output with the application consumers and real Kafka

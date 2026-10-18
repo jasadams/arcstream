@@ -32,10 +32,73 @@ def records_equal(actual, expected, unordered=False):
     return sorted(actual) == sorted(expected) if unordered else actual == expected
 
 
-def request(port, path, payload=None, timeout=600):
+def strict_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError('duplicate JSON key: ' + key)
+        result[key] = value
+    return result
+
+
+def decode_kafka_offset(h, key, value):
+    def signed(data):
+        raw, size = h.bincode_uint(data)
+        return (raw >> 1) ^ -(raw & 1), size
+    partition, key_size = signed(key)
+    stored_partition, start = signed(value)
+    offset, end = signed(value[start:])
+    if partition != 0 or stored_partition != partition or key_size != len(key) or start + end != len(value) or offset < 0:
+        raise ValueError('expected one complete partition-zero Kafka next-offset record')
+    return offset
+
+
+def check_cdc(data, expected, keys):
+    """Check every complete image/chain, with exact expected multiplicity."""
+    previous, images, traces = {}, [], {}
+    for line in data.splitlines():
+        row = json.loads(line, object_pairs_hook=strict_object)
+        if set(row) != {'before', 'after', 'op'} or not isinstance(row['after'], dict):
+            raise ValueError('expected complete create/update CDC envelope, no deletes')
+        after, before = row['after'], row['before']
+        key = tuple(json.dumps(after[field], sort_keys=True) for field in keys)
+        wanted_before = previous.get(key)
+        if not records_equal([before], [wanted_before]) or row['op'] != ('c' if wanted_before is None else 'u'):
+            raise ValueError('CDC before/after chain differs')
+        previous[key] = after
+        images.append(after)
+        traces.setdefault(key, []).append(after)
+    # Intermediate inconsistent images are never discarded, even when a later
+    # image happens to match. Sorting only removes cross-key ordering claims.
+    if not records_equal(images, expected, unordered=True):
+        raise ValueError('complete CDC image multiplicity differs')
+    wanted_final = {}
+    wanted_traces = {}
+    for row in expected:
+        key = tuple(json.dumps(row[field], sort_keys=True) for field in keys)
+        wanted_final[key] = row
+        wanted_traces.setdefault(key, []).append(row)
+    if any(not records_equal(traces.get(key, []), rows) for key, rows in wanted_traces.items()):
+        raise ValueError('per-key CDC postimage sequence differs')
+    if not records_equal(list(previous.values()), list(wanted_final.values()), unordered=True):
+        raise ValueError('CDC final values differ')
+    return images
+
+
+def validate_stages(stages, input_count, fault_prefix):
+    prefixes = [stage['input_lines'] for stage in stages]
+    if not prefixes or prefixes[0] != fault_prefix or prefixes[-1] != input_count or any(
+            type(value) is not int or value <= 0 for value in prefixes) or any(
+            left >= right for left, right in zip(prefixes, prefixes[1:])):
+        raise ValueError('stages must increase from fault prefix through complete input')
+    if not all(isinstance(stage.get('value'), dict) for stage in stages):
+        raise ValueError('every stage requires an explicit complete metric value')
+
+
+def request(port, path, payload=None, timeout=600, method=None):
     data = None if payload is None else json.dumps(payload).encode()
     req = urllib.request.Request(f'http://127.0.0.1:{port}/api/v1/{path}', data=data,
-                                 headers={'Content-Type': 'application/json'})
+                                 headers={'Content-Type': 'application/json'}, method=method)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as response:
             return json.load(response)
@@ -43,14 +106,14 @@ def request(port, path, payload=None, timeout=600):
         raise RuntimeError(f'API {path}: HTTP {error.code}: {error.read().decode()}') from error
 
 
-def checkpoint(h, case, owner, epoch):
+def checkpoint(h, case, owner, epoch, kafka=False):
     """Verify actual source/sink offsets and referenced typed artifacts."""
     import pyarrow.parquet as parquet
     base = case/'checkpoints'/owner['job']/'checkpoints'/f'checkpoint-{epoch:07}'
     cp = h.wire((base/'metadata').read_bytes())
     h.require(h.one(cp, 1) == owner['job'].encode() and h.one(cp, 2) == epoch,
               'checkpoint identity mismatch')
-    globals_, artifacts, typed, windows = {}, [], [], []
+    globals_, artifacts, typed, windows, offsets = {}, [], [], [], []
     for name in cp.get(6, []):
         # Object-store checkpoint paths encode reserved operator-name characters
         # (for example SESSION's `SessionWindow<1800s>`).
@@ -73,10 +136,13 @@ def checkpoint(h, case, owner, epoch):
                     artifacts.append(relative); files.append(relative)
                 entry = {'operator': name.decode(), 'namespace': table.decode(), 'files': files}
                 (windows if kind == 3 else typed).append(entry)
-            elif kind == 1 and table == b'f':
+            elif kind == 1 and table in (b'f', b'k'):
                 for relative in payload.get(1, []):
                     path = case/'checkpoints'/relative.decode(); artifacts.append(relative.decode())
                     for row in parquet.read_table(path, columns=['key', 'value']).to_pylist():
+                        if table == b'k':
+                            offsets.append(decode_kafka_offset(h, row['key'], row['value']))
+                            continue
                         size, start = h.bincode_uint(row['key'])
                         key = row['key'][start:].decode()
                         h.require(size == len(row['key'])-start, 'global key mismatch')
@@ -85,6 +151,9 @@ def checkpoint(h, case, owner, epoch):
                         h.require(key not in globals_, 'duplicate source/sink key')
                         globals_[key] = value
     source, offset = globals_.get(str(case/'input.jsonl')), globals_.get(str(case/'output.jsonl'))
+    if kafka:
+        h.require(len(offsets) <= 1, 'expected exactly one Kafka source partition owner')
+        source = offsets[0] if offsets else 0
     h.require(source is not None and offset is not None, 'source/sink checkpoint missing')
     data = (case/'output.jsonl').read_bytes()[:offset]
     h.require(len(data) == offset and (not data or data.endswith(b'\n')), 'incomplete committed output')
@@ -118,15 +187,36 @@ def main():
     p.add_argument('--compile-only', action='store_true')
     p.add_argument('--unordered-output', action='store_true',
                    help='compare complete-record multiplicity when cross-key order is unspecified')
+    p.add_argument('--kafka-rpk', type=Path)
+    p.add_argument('--kafka-broker')
+    p.add_argument('--kafka-topic')
+    p.add_argument('--expected-prefixes', type=Path,
+                   help='JSON stages: input_lines and complete expected CDC postimage value')
+    p.add_argument('--cdc-keys', nargs='+', help='key fields of complete expected CDC images')
     a = p.parse_args()
+    kafka = a.kafka_rpk is not None
+    kafka_options = [a.kafka_rpk, a.kafka_broker, a.kafka_topic, a.expected_prefixes, a.cdc_keys]
+    if any(kafka_options) and not all(kafka_options):
+        p.error('Kafka fixture mode requires rpk, broker, topic, prefixes and CDC keys')
+    stages = json.loads(a.expected_prefixes.read_text()) if kafka else []
     spec = importlib.util.spec_from_file_location('streamr_recovery', a.engine_helper)
     h = importlib.util.module_from_spec(spec); spec.loader.exec_module(h)
     case = a.case.resolve(); case.mkdir(parents=True, exist_ok=False)
     shutil.copy2(Path(__file__),case/'supervisor.py')
     shutil.copy2(a.input, case/'input.jsonl'); shutil.copy2(a.expected, case/'expected.jsonl')
+    input_lines = (case/'input.jsonl').read_text().splitlines()
+    if kafka:
+        h.require(not a.compile_only, 'Kafka fixture mode requires actual staged execution')
+        validate_stages(stages, len(input_lines), a.fault_prefix)
+        shutil.copy2(a.expected_prefixes, case/'expected-prefixes.json')
+        expected_images = [json.loads(line, object_pairs_hook=strict_object) for line in (case/'expected.jsonl').read_text().splitlines()]
+        h.require(records_equal([stage['value'] for stage in stages], expected_images), 'stage oracle differs from expected images')
     if not a.compile_only:
         h.require(0<a.fault_prefix<len((case/'input.jsonl').read_bytes().splitlines()),'fault prefix must leave a nonempty source suffix')
     query = a.query.read_text().replace('{{INPUT}}', str(case/'input.jsonl')).replace('{{OUTPUT}}', str(case/'output.jsonl'))
+    if kafka:
+        for name, value in [('BROKER', a.kafka_broker), ('INPUT_TOPIC', a.kafka_topic), ('GROUP_ID', case.name)]:
+            query = query.replace('{{' + name + '}}', value.replace("'", "''"))
     (case/'query.sql').write_text(query)
     config = json.loads(a.config_template.read_text())
     config['checkpoint-url'] = str(case/'checkpoints')
@@ -165,6 +255,21 @@ def main():
               'prepared_files':{str(case/name):digest(case/name) for name in ['config.yaml','query.sql','input.jsonl','expected.jsonl','supervisor.py']},
               'binary_sha256':digest(a.binary),
               'files':{str(path):digest(path) for path in [a.query,a.input,a.expected,a.engine_helper,Path(__file__)]}}
+    if kafka:
+        result.update(kafka_topic=a.kafka_topic, cdc_keys=a.cdc_keys,
+                      stages_sha256=digest(a.expected_prefixes), kafka_commands=[])
+    stage_index, produced, stop_requested = 0, 0, False
+    def produce_stage():
+        nonlocal produced
+        end = stages[stage_index]['input_lines']
+        argv = [str(a.kafka_rpk), 'topic', 'produce', a.kafka_topic, '-X', 'brokers=' + a.kafka_broker]
+        output = subprocess.run(argv, input=''.join(line+'\n' for line in input_lines[produced:end]),
+                                text=True, capture_output=True, timeout=30)
+        result['kafka_commands'].append(dict(command=argv, exit=output.returncode, stdout=output.stdout, stderr=output.stderr,
+                                             first_input_line=produced+1, last_input_line=end))
+        h.write(case/'kafka-commands.json', result['kafka_commands'])
+        h.require(output.returncode == 0, 'Kafka fixture production failed: ' + output.stderr)
+        produced = end
     timeline, owned, prefix, fault, replacement, pipeline = [], {}, None, None, None, None
     started = time.monotonic(); h.enable_subreaper()
     clean = {k:v for k,v in os.environ.items() if not k.startswith(('STREAMR_TEST_','STREAMR_CAPTURE_','ARROYO__'))}
@@ -197,15 +302,23 @@ def main():
                 h.require(job['state']!='Failed','pipeline failed')
                 h.require(fault is not None or job['state']!='Finished','job finished before planned fault')
                 h.require(fault is not None or job['state']!='Recovering','unexpected recovery before planned fault; inspect runtime error')
+                if kafka and not produced and job['state']=='Running':
+                    produce_stage()
                 if not fault and job['state']=='Running' and len(workers)==1:
                     cps=request(a.port,f"pipelines/{pipeline['id']}/jobs/{job['id']}/checkpoints",timeout=10)['data']
                     completed=sorted((x for x in cps if x['finish_time'] is not None),key=lambda x:x['epoch'],reverse=True)
                     if completed:
-                        selected,data=checkpoint(h,case,workers[0],completed[0]['epoch'])
+                        selected,data=checkpoint(h,case,workers[0],completed[0]['epoch'],kafka=kafka)
                         h.require(len(selected['typed_owners'])==a.typed_owners,'typed owner inventory mismatch')
                         h.require(len(selected['window_owners'])==a.window_owners,'window owner inventory mismatch')
                         h.require(selected['source_lines']<=a.fault_prefix,'missed fault source prefix')
                         if selected['source_lines']==a.fault_prefix:
+                            if kafka:
+                                count = len(data.splitlines())
+                                check_cdc(data, [stage['value'] for stage in stages[:min(count,1)]], a.cdc_keys)
+                                if count < 1:
+                                    time.sleep(.15)
+                                    continue
                             checkpoint_dir=case/'checkpoints'/workers[0]['job']/'checkpoints'/f"checkpoint-{selected['epoch']:07}"
                             shutil.copytree(checkpoint_dir,case/'selected-checkpoint-metadata')
                             prefix=data; (case/'committed-prefix.jsonl').write_bytes(data)
@@ -235,14 +348,47 @@ def main():
                 if fault:
                     fresh=[w for w in workers if h.identity(w)!=h.identity(fault['worker']) and w['job']==fault['worker']['job'] and w['pipeline']==fault['worker']['pipeline'] and w['generation']>fault['worker']['generation']]
                     if fresh: replacement=fresh[0]
-                    if job['state']=='Finished':
+                    if kafka and replacement and job['state']=='Running' and not stop_requested:
+                        runtime=re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]','',(case/'runtime.log').read_text(errors='replace'))
+                        restored=any('restoring checkpoint' in line.lower() and fault['worker']['job'] in line
+                                     and re.search(r'epoch=' + str(fault['checkpoint']['epoch']) + r'(?:\D|$)',line)
+                                     for line in runtime.splitlines())
+                        if restored:
+                            cps=request(a.port,f"pipelines/{pipeline['id']}/jobs/{job['id']}/checkpoints",timeout=10)['data']
+                            completed=sorted((x for x in cps if x['finish_time'] is not None),key=lambda x:x['epoch'],reverse=True)
+                            if completed:
+                                selected, committed=checkpoint(h,case,replacement,completed[0]['epoch'],kafka=True)
+                                h.require(len(selected['typed_owners'])==a.typed_owners and len(selected['window_owners'])==a.window_owners,
+                                          'recovered owner inventory differs')
+                                h.require(selected['source_lines']<=produced, 'Kafka source passed produced fixture input')
+                                h.require(committed.startswith(prefix), 'committed output bytes changed during Kafka stage')
+                                if selected['source_lines']==produced:
+                                    count = len(committed.splitlines())
+                                    wanted = [stage['value'] for stage in stages[:stage_index+1]]
+                                    check_cdc(committed, wanted[:count], a.cdc_keys)
+                                    if count < len(wanted):
+                                        time.sleep(.15)
+                                        continue
+                                    h.write(case/f'stage-{stage_index}-checkpoint.json', selected)
+                                    (case/f'stage-{stage_index}-committed.jsonl').write_bytes(committed)
+                                    if stage_index+1<len(stages):
+                                        stage_index += 1
+                                        produce_stage()
+                                    else:
+                                        request(a.port,f"pipelines/{pipeline['id']}",{'stop':'checkpoint'},timeout=10,method='PATCH')
+                                        stop_requested = True
+                    if job['state']==('Stopped' if kafka else 'Finished'):
+                        h.require(not kafka or stop_requested, 'Kafka job stopped before explicit final checkpoint stop')
                         h.require(replacement is not None,'fresh worker generation absent')
                         data=(case/'output.jsonl').read_bytes()
                         h.require(data.startswith(prefix),'committed output bytes changed')
                         raw=[json.loads(x) for x in data.splitlines()]
                         actual=raw
                         expected=[json.loads(x) for x in (case/'expected.jsonl').read_text().splitlines()]
-                        h.require(records_equal(actual,expected,a.unordered_output),'exact application output differs')
+                        if kafka:
+                            actual=check_cdc(data,expected,a.cdc_keys)
+                        else:
+                            h.require(records_equal(actual,expected,a.unordered_output),'exact application output differs')
                         h.require(len(raw)>fault['physical_record_slots'],'no physically fresh recovered raw records')
                         h.require(len(actual)>fault['physical_result_slots'],'no physically fresh recovered application records')
                         runtime=re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]','',(case/'runtime.log').read_text(errors='replace'))

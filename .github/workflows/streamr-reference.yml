@@ -33,6 +33,10 @@ jobs:
         run: python3 deploy/streamr-native/fixture-run.py --help
       - name: Check native SESSION product fixtures
         run: python3 -m unittest discover -s test/streamr-reference/session-native -p 'test_*.py' -v
+      - name: Check native profile metric fixtures
+        run: python3 -m unittest discover -s test/streamr-reference/profile-native -p 'test_*.py' -v
+      - name: Check isolated native Kafka fixture arguments
+        run: python3 test/streamr-reference/native_kafka_fixture.py --help
       - name: Check native SQL recovery runner arguments
         run: python3 test/streamr-reference/native_sql_runtime.py --help
       - name: Check pinned FlareDB smoke arguments
