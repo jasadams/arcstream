@@ -1,3 +1,6 @@
+> Current-source follow-up: [23 October readiness ledger](arc-18-readiness-20261023.md).
+> Historical results below remain bound to their recorded engine revisions.
+
 # Native SQL integration status
 
 Current merged-source findings (22 October):

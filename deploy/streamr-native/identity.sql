@@ -28,8 +28,7 @@ CREATE TABLE identity_capture (
   topic = 'arc-native-identity-capture', format = 'json', type = 'sink',
   'sink.commit_mode' = 'exactly_once',
   'sink.recovery_topic' = 'arc-native-identity-commits',
-  'sink.recovery_max_bytes' = '8388608',
-  client_configs = 'transaction.timeout.ms=10000,compression.type=lz4'
+  client_configs = 'transaction.timeout.ms=60000,compression.type=lz4'
 );
 
 CREATE STATE TABLE anonymous_bindings (

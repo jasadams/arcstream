@@ -1,0 +1,55 @@
+[
+  {
+    "input_lines": 1,
+    "values": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person-a",
+        "total_events": 1,
+        "last_seen": 1580551200000,
+        "action": "create",
+        "changed_fields": [
+          "tenant_id",
+          "canonical_id",
+          "total_events",
+          "last_seen"
+        ],
+        "candidate_event_updated_at": 1580551200000,
+        "candidate_event_timestamp": "2020-02-01T10:00:00"
+      }
+    ]
+  },
+  {
+    "input_lines": 2,
+    "values": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person-a",
+        "total_events": 1,
+        "last_seen": 1580551200000,
+        "action": "create",
+        "changed_fields": [
+          "tenant_id",
+          "canonical_id",
+          "total_events",
+          "last_seen"
+        ],
+        "candidate_event_updated_at": 1580551200000,
+        "candidate_event_timestamp": "2020-02-01T10:00:00"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person-a",
+        "total_events": 2,
+        "last_seen": 1580551202000,
+        "action": "update",
+        "changed_fields": [
+          "total_events",
+          "last_seen"
+        ],
+        "candidate_event_updated_at": 1580551202000,
+        "candidate_event_timestamp": "2020-02-01T10:00:02"
+      }
+    ]
+  }
+]

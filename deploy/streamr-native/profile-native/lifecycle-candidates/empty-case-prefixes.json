@@ -1,0 +1,14 @@
+[
+  {
+    "input_lines": 1,
+    "values": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person-a",
+        "changed_fields": [
+          "created"
+        ]
+      }
+    ]
+  }
+]

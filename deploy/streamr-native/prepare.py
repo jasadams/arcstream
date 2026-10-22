@@ -29,8 +29,8 @@ def sink_options(broker, topic, journal, format_):
             + ",topic=" + literal(topic) + ",format=" + literal(format_)
             + ",type='sink','sink.commit_mode'='exactly_once',"
             "'sink.recovery_topic'=" + literal(journal)
-            + ",'sink.recovery_max_bytes'='8388608',"
-            "client_configs='transaction.timeout.ms=10000,compression.type=lz4'")
+            + ","
+            "client_configs='transaction.timeout.ms=60000,compression.type=lz4'")
 
 
 def replace_once(query, old, new):
