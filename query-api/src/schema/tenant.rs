@@ -23,11 +23,6 @@ pub struct Tenant {
     pub unique_users: u64,
 }
 
-#[derive(Deserialize)]
-struct ActiveSessionsRow {
-    active_sessions: u64,
-}
-
 #[Object]
 impl Tenant {
     async fn id(&self) -> &str {
@@ -40,28 +35,6 @@ impl Tenant {
 
     async fn unique_users(&self) -> u64 {
         self.unique_users
-    }
-
-    async fn active_sessions(&self, ctx: &Context<'_>) -> async_graphql::Result<u64> {
-        let pinot = ctx.data::<Arc<dyn PinotQuerier>>()?;
-        let safe_tenant = sanitize_input(&self.id).map_err(async_graphql::Error::new)?;
-
-        let thirty_min_ago = (chrono::Utc::now() - chrono::Duration::seconds(1800))
-            .format("%Y-%m-%dT%H:%M:%SZ")
-            .to_string();
-        let sql = format!(
-            "SELECT DISTINCTCOUNTHLL(session_id) AS active_sessions \
-             FROM events \
-             WHERE tenant_id = '{safe_tenant}' \
-             AND event_time > '{thirty_min_ago}'"
-        );
-
-        let result = pinot.query_with_stats(&sql).await.map_err(async_graphql::Error::new)?;
-        if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
-            collector.push(&result);
-        }
-        let rows: Vec<ActiveSessionsRow> = parse_jsonl(&result.body);
-        Ok(rows.first().map(|r| r.active_sessions).unwrap_or(0))
     }
 
     async fn users(
@@ -83,11 +56,10 @@ impl Tenant {
             "SELECT \
                 tenant_id, canonical_id, \
                 first_seen, last_seen, \
-                total_events, total_sessions, \
+                total_events, \
                 page_views, clicks, logins, feature_uses, \
                 last_country, last_device, last_browser, \
                 events_1d, events_7d, events_30d, events_90d, \
-                sessions_1d, sessions_7d, sessions_30d, sessions_90d, \
                 avg_session_duration_sec \
              FROM profiles \
              WHERE tenant_id = '{safe_tenant}' AND first_seen IS NOT NULL \

@@ -35,10 +35,10 @@ impl ArchNode {
         match self {
             Self::Producer => "Generates simulated clickstream traffic for multiple tenants: page views, clicks, signups, logins and feature usage. Behavioral personas create different session lengths and return patterns.",
             Self::Redpanda => "The Kafka-compatible event bus carries raw events, resolved events, profile changes, session summaries and the internal messages connecting native pipelines.",
-            Self::Streamr => "Eleven native SQL pipelines resolve identities, maintain profiles and emit session summaries. Arcstream owns the schemas, identity policies and lifecycle functions; Streamr executes SQL, state lookups, timers and checkpoints.",
+            Self::Streamr => "Native SQL pipelines resolve identities, maintain core profile metrics and emit completed session summaries. Arcstream owns schemas and business policies; Streamr executes SQL, state tables, event-time windows and checkpoints.",
             Self::LiveUpdates => "Committed Kafka event and profile topics feed the Query API. WebSocket subscriptions notify browsers when new data arrives, so live views can refresh without periodic polling.",
             Self::FlareDB => "The analytics backend serves events, profiles and completed sessions. It consumes the native pipeline outputs and answers the SQL queries used by the dashboard's GraphQL API.",
-            Self::NativeState => "Native state tables retain tenant-scoped identity mappings, profiles and active sessions. RocksDB, the catalog, checkpoints and compiled application functions reside on persistent storage.",
+            Self::NativeState => "Native operators retain tenant-scoped identity mappings, core profiles and session state in RocksDB. Persistent checkpoints retain state and source positions for recovery.",
             Self::QueryApi => "The Rust GraphQL service reads FlareDB for profiles and analytics, consumes committed Kafka updates, and broadcasts live notifications to connected browsers.",
             Self::Dashboard => "The interface you are viewing combines server-rendered HTML with Rust WASM hydration. Profiles, event streams and analytics use the same FlareDB backend and receive live update notifications.",
         }
@@ -104,8 +104,8 @@ const DECISIONS: &[(&str, &str, &str)] = &[
     ),
     (
         "Explicit clock policy",
-        "Event progress drives lifecycle timers",
-        "The live demo applies Arcstream's live timestamp policy. Replay uses a separately selected mode with historical source timestamps. Source progress advances inactivity and decay timers; elapsed wall time alone does not close an idle stream.",
+        "Source event time governs replay and live processing",
+        "Both replay and live processing use original source event time with a five-second disorder watermark. Native calendar aggregates update retained metrics as source time progresses; SESSION publishes completed windows. Elapsed wall time alone does not close an idle stream.",
     ),
     (
         "Committed streaming output",
@@ -123,7 +123,7 @@ const TECH_STACK: &[(&str, &str, &str)] = &[
     ("Rust", "Application Services", "Event producer, business functions, Query API and dashboard"),
     ("Streamr", "Stateful Streaming", "Native SQL, state tables, event-time timers and checkpoints"),
     ("Redpanda", "Event Bus", "Kafka-compatible input, output and transaction recovery topics"),
-    ("RocksDB", "Native State", "Disk-backed identity, profile and active-session state"),
+    ("RocksDB", "Native State", "Disk-backed identity, profile and native session state"),
     ("FlareDB", "Analytics", "SQL over events, profiles and completed sessions"),
     ("Leptos", "Frontend Framework", "Rust SSR, WASM hydration and reactive signals"),
     ("GraphQL", "API Layer", "Typed queries and WebSocket subscriptions"),
@@ -195,7 +195,6 @@ pub fn AboutPage() -> impl IntoView {
 
     let total_users = RwSignal::new(0u64);
     let total_events = RwSignal::new(0u64);
-    let active_sessions = RwSignal::new(0u64);
     let events_per_sec = RwSignal::new(0u64);
     let prev_snapshot = RwSignal::new(None::<(u64, f64)>);
     let rate_samples = StoredValue::new(std::collections::VecDeque::<f64>::with_capacity(10));
@@ -205,7 +204,6 @@ pub fn AboutPage() -> impl IntoView {
         if let Some(Ok(result)) = stats.get() {
             let s = &result.data;
             total_users.set(s.total_users);
-            active_sessions.set(s.active_sessions);
 
             #[cfg(feature = "hydrate")]
             {
@@ -283,17 +281,6 @@ pub fn AboutPage() -> impl IntoView {
                         }}
                     </span>
                     <span class="pulse-label">"Total Events"</span>
-                </div>
-                <div class="pulse-metric">
-                    <span class="pulse-dot"></span>
-                    <span class="pulse-value">
-                        {move || if pulse_loaded.get() {
-                            view! { <RollingCounter value=Signal::from(active_sessions) /> }.into_any()
-                        } else {
-                            view! { <span>"\u{2014}"</span> }.into_any()
-                        }}
-                    </span>
-                    <span class="pulse-label">"Active Sessions"</span>
                 </div>
             </div>
 
@@ -474,7 +461,7 @@ pub fn AboutPage() -> impl IntoView {
                     </div>
                     <div class="guarantee-card">
                         <div class="guarantee-title">"Explicit Event Clocks"</div>
-                        <div class="guarantee-text">"Arcstream applies its live profile timestamp policy; input progress drives lifecycle timers."</div>
+                        <div class="guarantee-text">"Replay and live processing preserve source event timestamps and the configured five-second watermark; native windows close when event time advances."</div>
                     </div>
                     <div class="guarantee-card">
                         <div class="guarantee-title">"Checkpoint Recovery"</div>

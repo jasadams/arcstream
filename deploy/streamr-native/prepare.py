@@ -39,7 +39,7 @@ def replace_once(query, old, new):
     return query.replace(old, new)
 
 
-def render(broker, namespace):
+def render(broker, namespace, profile_release=False):
     if not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,62}', namespace):
         raise ValueError('namespace must be 1..63 lowercase letters, numbers or hyphens')
     names = ['raw-events', 'identity-capture', 'unified-events', 'identity-merges',
@@ -73,6 +73,15 @@ def render(broker, namespace):
         broker, namespace + '-closed-session-metrics-diagnostic',
         namespace + '-closed-metrics-commits', 'debezium_json'))
     queries['closed-metrics'] = closed
+    if profile_release:
+        release = (HERE / 'profile-native/release.sql').read_text()
+        release = replace_once(release, '{{SOURCE_OPTIONS}}', source_options(
+            broker, namespace + '-unified-events', namespace + '-profiles'))
+        release = replace_once(release, '{{SINK_OPTIONS}}', sink_options(
+            broker, namespace + '-profiles', namespace + '-profiles-commits', 'debezium_json'))
+        del queries['profile-core']
+        del queries['closed-metrics']
+        queries['profiles'] = release
     for name, query in queries.items():
         if re.search(r'\{\{[^}]+\}\}', query):
             raise ValueError('unresolved placeholder in ' + name)
@@ -84,28 +93,28 @@ def render_fixture(component, input_path, output_path):
         query = (HERE / 'session-native/query.sql').read_text()
         query = replace_once(query, "'{{INPUT}}'", literal(input_path))
         return replace_once(query, "'{{OUTPUT}}'", literal(output_path))
-    template = {'profile-core': 'core.sql', 'closed-metrics': 'closed-metrics.sql'}[component]
+    template = {'profile-core': 'core.sql', 'closed-metrics': 'closed-metrics.sql', 'profiles': 'release.sql'}[component]
     query = (HERE / 'profile-native' / template).read_text()
     query = replace_once(query, '{{SOURCE_OPTIONS}}',
                          "connector='single_file',path=" + literal(input_path)
                          + ",format='json',type='source',wait_for_control='true'")
-    format_ = 'json' if component == 'profile-core' else 'debezium_json'
+    format_ = 'debezium_json' if component in ('closed-metrics', 'profiles') else 'json'
     return replace_once(query, '{{SINK_OPTIONS}}',
                         "connector='single_file',path=" + literal(output_path)
                         + ",format=" + literal(format_) + ",type='sink'")
 
 
-def prepare(directory, broker, namespace, fixture=None):
-    queries = ({fixture[0]: render_fixture(*fixture)} if fixture else render(broker, namespace))
+def prepare(directory, broker, namespace, fixture=None, profile_release=False):
+    queries = ({fixture[0]: render_fixture(*fixture)} if fixture else render(broker, namespace, profile_release))
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=False)
     sources = [HERE / (name + '.sql') for name in ['identity', 'unified', 'merges']]
     sources += [HERE / 'session-native/query.sql', HERE / 'profile-native/core.sql',
-                HERE / 'profile-native/closed-metrics.sql', Path(__file__)]
+                HERE / 'profile-native/closed-metrics.sql', HERE / 'profile-native/release.sql', Path(__file__)]
     manifest = dict(status='prepared; engine-dependent validation not run',
                     complete_mvp=False, production_ready=False, broker=broker, namespace=namespace,
                     required_backend='rocksdb', required_engine_contracts=['STR-29', 'STR-60', 'STR-64', 'STR-146'],
-                    profile_output='partial 20-field diagnostic, never the 33-field profiles topic',
+                    profile_output=('22-field first-release profiles; seven live/start fields and four unused publication metadata fields explicitly deferred' if profile_release or fixture and fixture[0] == 'profiles' else 'partial 20-field diagnostic, never the profiles topic'),
                     mode='fixture' if fixture else 'kafka',
                     source_commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
                     templates_sha256={str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources},
@@ -125,7 +134,9 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--brokers', required=True)
     parser.add_argument('--namespace', required=True)
-    parser.add_argument('--fixture-component', choices=['sessions', 'profile-core', 'closed-metrics'])
+    parser.add_argument('--fixture-component', choices=['sessions', 'profile-core', 'closed-metrics', 'profiles'])
+    parser.add_argument('--profile-release', action='store_true',
+                        help='render the explicitly scoped 22-field profiles graph; does not deploy')
     parser.add_argument('--fixture-input', type=Path)
     parser.add_argument('--fixture-output', type=Path)
     args = parser.parse_args()
@@ -134,7 +145,7 @@ def main():
         parser.error('fixture mode requires component, input and output together')
     fixture = ((args.fixture_component, args.fixture_input, args.fixture_output)
                if args.fixture_component else None)
-    print(json.dumps(prepare(args.output, args.brokers, args.namespace, fixture)))
+    print(json.dumps(prepare(args.output, args.brokers, args.namespace, fixture, args.profile_release)))
 
 
 if __name__ == '__main__':

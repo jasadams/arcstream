@@ -54,7 +54,43 @@ class PrepareTests(unittest.TestCase):
         self.assertFalse(actual & pending)
         consumer = (ROOT/'query-api/src/streaming/profile_decode.rs').read_text().split('];', 1)[0]
         import re
-        self.assertEqual(actual | pending, set(re.findall(r'^    "([a-z_0-9]+)",$', consumer, re.M)))
+        release = json.loads((ROOT/'deploy/streamr-native/profile-native/release-fields.json').read_text())
+        released = {row['name'] for row in release['output_fields']}
+        deferred = set(release['deferred_session_fields'] + release['omitted_publication_fields'])
+        self.assertEqual(released - {'action'}, set(re.findall(r'^    "([a-z_0-9]+)",$', consumer, re.M)))
+        self.assertEqual(actual | pending, released | deferred)
+        self.assertFalse(released & deferred)
+
+    def test_scoped_release_emits_complete_profiles_without_diagnostic_producers(self):
+        queries = prepare.render('owned-broker:9092', 'arc-test', profile_release=True)
+        self.assertEqual(set(queries), {'identity', 'unified', 'merges', 'sessions', 'profiles'})
+        self.assertIn("topic='arc-test-profiles'", queries['profiles'])
+        self.assertNotIn('diagnostic', queries['profiles'])
+        self.assertIn("SESSION(INTERVAL '30 minutes')", queries['profiles'])
+        self.assertNotIn('EVENT_TIMESTAMP()', queries['profiles'])
+        self.assertNotIn('changed_fields', queries['profiles'])
+        self.assertNotIn('sink.recovery_max_bytes', queries['profiles'])
+        self.assertIn("format='debezium_json'", queries['profiles'])
+        self.assertIn('LEFT JOIN profile_closed_average', queries['profiles'])
+
+    def test_release_oracle_preserves_absence_fractional_average_and_quiet_expiry(self):
+        directory = ROOT/'test/streamr-reference/profile-native/release'
+        stages = json.loads((directory/'expected-prefixes.json').read_text())
+        fields = json.loads((ROOT/'deploy/streamr-native/profile-native/release-fields.json').read_text())
+        keys = {row['name'] for row in fields['output_fields']}
+        for stage in stages:
+            for row in stage['values']:
+                self.assertEqual(set(row), keys)
+        self.assertIsNone(stages[0]['values'][0]['avg_session_duration_sec'])
+        self.assertEqual(stages[5]['values'], stages[4]['values'])
+        person_a = lambda stage: [r for r in stage['values'] if r['tenant_id'] == 'tenant-a'][-1]
+        self.assertEqual(person_a(stages[6])['avg_session_duration_sec'], 5.0)
+        self.assertEqual(person_a(stages[8])['avg_session_duration_sec'], 5.0)
+        self.assertEqual(person_a(stages[9])['avg_session_duration_sec'], 3.75)
+        self.assertEqual(person_a(stages[10])['avg_session_duration_sec'], 3.75)
+        self.assertEqual(person_a(stages[10])['events_1d'], 0)
+        self.assertEqual(person_a(stages[10])['total_events'], 7)
+
 
 
 if __name__ == '__main__':

@@ -56,7 +56,6 @@ pub enum UserSort {
     FirstSeen,
     LastSeen,
     TotalEvents,
-    TotalSessions,
 }
 
 impl UserSort {
@@ -65,7 +64,6 @@ impl UserSort {
             UserSort::FirstSeen => "first_seen",
             UserSort::LastSeen => "last_seen",
             UserSort::TotalEvents => "total_events",
-            UserSort::TotalSessions => "total_sessions",
         }
     }
 }

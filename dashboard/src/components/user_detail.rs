@@ -12,6 +12,16 @@ use crate::util::*;
 
 type TimelineEntry = (String, RwSignal<EventRow>, RwSignal<bool>);
 
+fn same_profile(tenant: &str, canonical: &str, incoming_tenant: &str, incoming_canonical: &str) -> bool {
+    tenant == incoming_tenant && canonical == incoming_canonical
+}
+
+fn format_completed_duration(value: Option<f64>) -> String {
+    value
+        .map(|seconds| format!("{seconds}s"))
+        .unwrap_or_else(|| "—".into())
+}
+
 #[component]
 pub fn UserDetailPage() -> impl IntoView {
     let params = use_params_map();
@@ -69,7 +79,7 @@ pub fn UserDetailPage() -> impl IntoView {
         Effect::new(move || {
             let Some(update) = profile_signal.get() else { return };
             let cid = canonical_id();
-            if update.canonical_id == cid {
+            if same_profile(&tenant_id(), &cid, &update.tenant_id, &update.canonical_id) {
                 set_live_profile.set(Some(update.profile));
             }
         });
@@ -77,7 +87,7 @@ pub fn UserDetailPage() -> impl IntoView {
         Effect::new(move || {
             let Some(event) = event_signal.get() else { return };
             let cid = canonical_id();
-            if event.canonical_id == cid {
+            if same_profile(&tenant_id(), &cid, &event.tenant_id, &event.canonical_id) {
                 let eid = event.event_id.clone();
                 let row = EventRow {
                     event_id: event.event_id,
@@ -133,10 +143,8 @@ pub fn UserDetailPage() -> impl IntoView {
     };
 
     let total_events = RwSignal::new(0u64);
-    let total_sessions = RwSignal::new(0u64);
     let events_7d = RwSignal::new(0u64);
-    let sessions_7d = RwSignal::new(0u64);
-    let avg_session = RwSignal::new(0u64);
+    let avg_session = RwSignal::new(None::<f64>);
     let page_views = RwSignal::new(0u64);
     let clicks = RwSignal::new(0u64);
     let logins = RwSignal::new(0u64);
@@ -150,9 +158,7 @@ pub fn UserDetailPage() -> impl IntoView {
     Effect::new(move || {
         if let Some(p) = profile_data.get() {
             total_events.set(p.total_events);
-            total_sessions.set(p.total_sessions);
             events_7d.set(p.events_7d);
-            sessions_7d.set(p.sessions_7d);
             avg_session.set(p.avg_session_duration_sec);
             page_views.set(p.page_views);
             clicks.set(p.clicks);
@@ -226,13 +232,11 @@ pub fn UserDetailPage() -> impl IntoView {
                             <h2>{display_name}</h2>
                             <div class="subtitle">
                                 {move || profile_data.get().map(|p| {
-                                    let active = p.current_session_active;
                                     let user_label = if !p.user_id.is_empty() {
                                         format!("User: {}", p.user_id)
                                     } else {
                                         "Anonymous".to_string()
                                     };
-                                    let active_text = if active { " \u{00b7} Active now" } else { "" };
                                     let first_seen_ts = p.first_seen.clone();
                                     let last_seen_ts = p.last_seen.clone();
                                     let device_browser = if !p.last_device.is_empty() || !p.last_browser.is_empty() {
@@ -242,14 +246,9 @@ pub fn UserDetailPage() -> impl IntoView {
                                     };
                                     let last_page = p.last_page.clone();
                                     view! {
-                                        {if active {
-                                            view! { <span class="active-dot"></span> }.into_any()
-                                        } else {
-                                            view! { <span></span> }.into_any()
-                                        }}
                                         <span class="mono">{p.canonical_id.clone()}</span>
                                         " \u{00b7} "
-                                        {user_label} " \u{00b7} " {p.tenant_id.clone()} {active_text}
+                                        {user_label} " \u{00b7} " {p.tenant_id.clone()}
                                         <div class="subtitle-meta">
                                             "First seen " <RelativeTime timestamp=first_seen_ts />
                                             " \u{00b7} Last seen "
@@ -278,20 +277,12 @@ pub fn UserDetailPage() -> impl IntoView {
                     <div class="value"><RollingCounter value=Signal::from(total_events) /></div>
                 </div>
                 <div class="stat-card">
-                    <div class="label">"Sessions"</div>
-                    <div class="value"><RollingCounter value=Signal::from(total_sessions) /></div>
-                </div>
-                <div class="stat-card">
                     <div class="label">"Events (7d)"</div>
                     <div class="value"><RollingCounter value=Signal::from(events_7d) /></div>
                 </div>
                 <div class="stat-card">
-                    <div class="label">"Sessions (7d)"</div>
-                    <div class="value"><RollingCounter value=Signal::from(sessions_7d) /></div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">"Avg Session"</div>
-                    <div class="value"><RollingCounter value=Signal::from(avg_session) />"s"</div>
+                    <div class="label">"Avg completed session"</div>
+                    <div class="value">{move || format_completed_duration(avg_session.get())}</div>
                 </div>
                 <div class="stat-card">
                     <div class="label">"Country"</div>
@@ -412,5 +403,24 @@ fn TimelineItemView(
                 </div>
             </A>
         </div>
+    }
+}
+
+#[cfg(test)]
+mod completed_duration_tests {
+    use super::{format_completed_duration, same_profile};
+
+    #[test]
+    fn shared_profile_and_event_streams_require_tenant_and_person_match() {
+        assert!(same_profile("tenant-a", "person", "tenant-a", "person"));
+        assert!(!same_profile("tenant-a", "person", "tenant-b", "person"));
+        assert!(!same_profile("tenant-a", "person", "tenant-a", "other-person"));
+    }
+
+    #[test]
+    fn incomplete_and_zero_length_completed_sessions_are_distinct() {
+        assert_eq!(format_completed_duration(None), "—");
+        assert_eq!(format_completed_duration(Some(0.0)), "0s");
+        assert_eq!(format_completed_duration(Some(2.125)), "2.125s");
     }
 }

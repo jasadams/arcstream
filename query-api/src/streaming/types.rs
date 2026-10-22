@@ -8,9 +8,6 @@ pub struct ProfileUpdateMessage {
     pub canonical_id: String,
     pub tenant_id: String,
     pub profile: LiveProfile,
-    pub changed_fields: Vec<String>,
-    pub timestamp: String,
-    pub trigger: String,
     pub action: String,
 }
 
@@ -25,11 +22,7 @@ pub struct FlatProfileUpdate {
     #[serde(default)]
     pub last_seen: i64,
     #[serde(default)]
-    pub updated_at: i64,
-    #[serde(default)]
     pub total_events: u64,
-    #[serde(default)]
-    pub total_sessions: u64,
     #[serde(default)]
     pub events_1d: u64,
     #[serde(default)]
@@ -39,19 +32,7 @@ pub struct FlatProfileUpdate {
     #[serde(default)]
     pub events_90d: u64,
     #[serde(default)]
-    pub sessions_1d: u64,
-    #[serde(default)]
-    pub sessions_7d: u64,
-    #[serde(default)]
-    pub sessions_30d: u64,
-    #[serde(default)]
-    pub sessions_90d: u64,
-    #[serde(default)]
-    pub avg_session_duration_sec: u64,
-    #[serde(default)]
-    pub current_session_active: bool,
-    #[serde(default)]
-    pub current_session_duration_sec: i64,
+    pub avg_session_duration_sec: Option<f64>,
     #[serde(default)]
     pub page_views: u64,
     #[serde(default)]
@@ -74,12 +55,6 @@ pub struct FlatProfileUpdate {
     pub top_features: Vec<String>,
     #[serde(default)]
     pub action: String,
-    #[serde(default)]
-    pub changed_fields: Vec<String>,
-    #[serde(default)]
-    pub timestamp: String,
-    #[serde(default)]
-    pub trigger: String,
 }
 
 fn format_epoch_millis(ms: i64) -> String {
@@ -100,18 +75,11 @@ impl FlatProfileUpdate {
                 first_seen: format_epoch_millis(self.first_seen),
                 last_seen: format_epoch_millis(self.last_seen),
                 total_events: self.total_events,
-                total_sessions: self.total_sessions,
                 events_1d: self.events_1d,
                 events_7d: self.events_7d,
                 events_30d: self.events_30d,
                 events_90d: self.events_90d,
-                sessions_1d: self.sessions_1d,
-                sessions_7d: self.sessions_7d,
-                sessions_30d: self.sessions_30d,
-                sessions_90d: self.sessions_90d,
                 avg_session_duration_sec: self.avg_session_duration_sec,
-                current_session_active: self.current_session_active,
-                current_session_duration_sec: self.current_session_duration_sec,
                 page_views: self.page_views,
                 clicks: self.clicks,
                 logins: self.logins,
@@ -123,9 +91,6 @@ impl FlatProfileUpdate {
                 top_pages: self.top_pages,
                 top_features: self.top_features,
             },
-            changed_fields: self.changed_fields,
-            timestamp: self.timestamp,
-            trigger: self.trigger,
             action: self.action,
         }
     }

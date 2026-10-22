@@ -122,7 +122,6 @@ pub struct BreakdownRow {
 pub struct DashboardStats {
     pub total_users: u64,
     pub total_events: u64,
-    pub active_sessions: u64,
 }
 
 #[derive(SimpleObject)]
@@ -144,24 +143,15 @@ impl StatsQuery {
 
         let users_sql = "SELECT COUNT(*) AS total_users FROM profiles";
         let events_sql = "SELECT COUNT(*) AS total_events FROM events";
-        let thirty_min_ago = (Utc::now() - chrono::Duration::seconds(1800))
-            .format("%Y-%m-%d %H:%M:%S%.3f")
-            .to_string();
-        let sessions_sql = format!(
-            "SELECT DISTINCTCOUNTHLL(session_id) AS active_sessions FROM events WHERE event_time > '{thirty_min_ago}'"
-        );
-
-        let (users_result, events_result, sessions_result) = tokio::try_join!(
+        let (users_result, events_result) = tokio::try_join!(
             pinot.query_with_stats(users_sql),
             pinot.query_with_stats(events_sql),
-            pinot.query_with_stats(&sessions_sql),
         )
         .map_err(async_graphql::Error::new)?;
 
         if let Ok(collector) = ctx.data::<Arc<QueryStatsCollector>>() {
             collector.push(&users_result);
             collector.push(&events_result);
-            collector.push(&sessions_result);
         }
 
         #[derive(Deserialize)]
@@ -172,19 +162,13 @@ impl StatsQuery {
         struct EventsRow {
             total_events: u64,
         }
-        #[derive(Deserialize)]
-        struct SessionsRow {
-            active_sessions: u64,
-        }
 
         let users: Vec<UsersRow> = parse_jsonl(&users_result.body);
         let events: Vec<EventsRow> = parse_jsonl(&events_result.body);
-        let sessions: Vec<SessionsRow> = parse_jsonl(&sessions_result.body);
 
         Ok(DashboardStats {
             total_users: users.first().map(|r| r.total_users).unwrap_or(0),
             total_events: events.first().map(|r| r.total_events).unwrap_or(0),
-            active_sessions: sessions.first().map(|r| r.active_sessions).unwrap_or(0),
         })
     }
 

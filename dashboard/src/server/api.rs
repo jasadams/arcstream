@@ -16,14 +16,10 @@ pub struct UserProfile {
     pub last_seen: String,
     #[serde(alias = "totalEvents")]
     pub total_events: u64,
-    #[serde(alias = "totalSessions")]
-    pub total_sessions: u64,
     #[serde(default, alias = "pageViews")]
     pub page_views: u64,
     #[serde(default)]
     pub clicks: u64,
-    #[serde(default)]
-    pub signups: u64,
     #[serde(default)]
     pub logins: u64,
     #[serde(default, alias = "featureUses")]
@@ -42,18 +38,23 @@ pub struct UserProfile {
     pub events_30d: u64,
     #[serde(default, alias = "events90D")]
     pub events_90d: u64,
-    #[serde(default, alias = "sessions1D")]
-    pub sessions_1d: u64,
-    #[serde(default, alias = "sessions7D")]
-    pub sessions_7d: u64,
-    #[serde(default, alias = "sessions30D")]
-    pub sessions_30d: u64,
-    #[serde(default, alias = "sessions90D")]
-    pub sessions_90d: u64,
-    #[serde(default, alias = "totalClosedSessions")]
-    pub total_closed_sessions: u64,
     #[serde(default, alias = "avgSessionDurationSec")]
-    pub avg_session_duration_sec: u64,
+    pub avg_session_duration_sec: Option<f64>,
+}
+
+impl From<&LiveProfile> for UserProfile {
+    fn from(profile: &LiveProfile) -> Self {
+        Self {
+            tenant_id: profile.tenant_id.clone(), canonical_id: profile.canonical_id.clone(),
+            first_seen: profile.first_seen.clone(), last_seen: profile.last_seen.clone(),
+            total_events: profile.total_events, page_views: profile.page_views,
+            clicks: profile.clicks, logins: profile.logins, feature_uses: profile.feature_uses,
+            last_country: profile.last_country.clone(), last_device: profile.last_device.clone(),
+            last_browser: profile.last_browser.clone(), events_1d: profile.events_1d,
+            events_7d: profile.events_7d, events_30d: profile.events_30d,
+            events_90d: profile.events_90d, avg_session_duration_sec: profile.avg_session_duration_sec,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -94,16 +95,6 @@ pub struct LiveProfile {
     pub last_seen: String,
     #[serde(default, alias = "totalEvents")]
     pub total_events: u64,
-    #[serde(default, alias = "totalSessions")]
-    pub total_sessions: u64,
-    #[serde(default, alias = "sessions1D", alias = "sessions1d")]
-    pub sessions_1d: u64,
-    #[serde(default, alias = "sessions7D", alias = "sessions7d")]
-    pub sessions_7d: u64,
-    #[serde(default, alias = "sessions30D", alias = "sessions30d")]
-    pub sessions_30d: u64,
-    #[serde(default, alias = "sessions90D", alias = "sessions90d")]
-    pub sessions_90d: u64,
     #[serde(default, alias = "events1D", alias = "events1d")]
     pub events_1d: u64,
     #[serde(default, alias = "events7D", alias = "events7d")]
@@ -113,11 +104,7 @@ pub struct LiveProfile {
     #[serde(default, alias = "events90D", alias = "events90d")]
     pub events_90d: u64,
     #[serde(default, alias = "avgSessionDurationSec")]
-    pub avg_session_duration_sec: u64,
-    #[serde(default, alias = "currentSessionActive")]
-    pub current_session_active: bool,
-    #[serde(default, alias = "currentSessionDurationSec")]
-    pub current_session_duration_sec: i64,
+    pub avg_session_duration_sec: Option<f64>,
     #[serde(default, alias = "pageViews")]
     pub page_views: u64,
     #[serde(default)]
@@ -151,8 +138,6 @@ pub struct DashboardStats {
     pub total_users: u64,
     #[serde(alias = "totalEvents")]
     pub total_events: u64,
-    #[serde(alias = "activeSessions")]
-    pub active_sessions: u64,
 }
 
 #[server(GetUsers)]
@@ -179,11 +164,11 @@ pub async fn get_users(page: u32) -> Result<WithStats<Vec<UserProfile>>, ServerF
         &state,
         "query($limit: Int!, $offset: Int!) { users(limit: $limit, offset: $offset) { nodes { \
             tenantId canonicalId firstSeen lastSeen \
-            totalEvents totalSessions pageViews clicks signups logins featureUses \
+            totalEvents pageViews clicks logins featureUses \
             lastCountry lastDevice lastBrowser \
             events1D events7D events30D events90D \
-            sessions1D sessions7D sessions30D sessions90D \
-            totalClosedSessions avgSessionDurationSec \
+            \
+            avgSessionDurationSec \
         } } }",
         vars,
     )
@@ -237,7 +222,7 @@ pub async fn get_dashboard_stats() -> Result<WithStats<DashboardStats>, ServerFn
 
     let (data, stats): (Response, Vec<crate::server::QueryStatEntry>) = graphql_query_with_stats(
         &state,
-        "{ dashboardStats { totalUsers totalEvents activeSessions } }",
+        "{ dashboardStats { totalUsers totalEvents } }",
         serde_json::json!({}),
     )
     .await
@@ -268,10 +253,10 @@ pub async fn get_live_profile(tenant_id: String, canonical_id: String) -> Result
         "query($tenantId: String!, $canonicalId: String!) { \
             liveProfile(tenantId: $tenantId, canonicalId: $canonicalId) { \
                 canonicalId userId tenantId firstSeen lastSeen \
-                totalEvents totalSessions \
+                totalEvents \
                 events1D events7D events30D events90D \
-                sessions1D sessions7D \
-                avgSessionDurationSec currentSessionActive currentSessionDurationSec \
+                \
+                avgSessionDurationSec \
                 pageViews clicks logins featureUses \
                 lastPage lastCountry lastDevice lastBrowser \
                 topPages topFeatures \
@@ -389,4 +374,25 @@ pub async fn get_event(tenant_id: String, event_id: String, event_date_hint: Str
     .map_err(ServerFnError::new)?;
 
     data.event.ok_or_else(|| ServerFnError::new("Event not found"))
+}
+
+#[cfg(test)]
+mod release_profile_tests {
+    use super::LiveProfile;
+
+    #[test]
+    fn profile_retains_nullable_fractional_completed_average_without_deferred_fields() {
+        for (value, expected) in [(serde_json::Value::Null, None), (serde_json::json!(2.125), Some(2.125))] {
+            let row = serde_json::json!({
+                "canonicalId":"person", "avgSessionDurationSec":value,
+                "topPages":["/home"], "topFeatures":[]
+            });
+            let profile: LiveProfile = serde_json::from_value(row).unwrap();
+            assert_eq!(profile.avg_session_duration_sec, expected);
+            let serialized = serde_json::to_value(profile).unwrap();
+            for field in ["total_sessions", "sessions_1d", "sessions_7d", "sessions_30d", "sessions_90d", "current_session_active", "current_session_duration_sec"] {
+                assert!(serialized.get(field).is_none(), "deferred field: {field}");
+            }
+        }
+    }
 }

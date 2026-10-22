@@ -50,9 +50,15 @@ impl TenantQuery {
         }
 
         #[derive(Deserialize)]
-        struct EventsRow { tenant_id: String, total_events: u64 }
+        struct EventsRow {
+            tenant_id: String,
+            total_events: u64,
+        }
         #[derive(Deserialize)]
-        struct UsersRow { tenant_id: String, unique_users: u64 }
+        struct UsersRow {
+            tenant_id: String,
+            unique_users: u64,
+        }
 
         let events: Vec<EventsRow> = parse_jsonl(&events_result.body);
         let users: Vec<UsersRow> = parse_jsonl(&users_result.body);
@@ -68,11 +74,7 @@ impl TenantQuery {
             .collect())
     }
 
-    async fn tenant(
-        &self,
-        ctx: &Context<'_>,
-        id: String,
-    ) -> async_graphql::Result<Option<Tenant>> {
+    async fn tenant(&self, ctx: &Context<'_>, id: String) -> async_graphql::Result<Option<Tenant>> {
         let pinot = ctx.data::<Arc<dyn PinotQuerier>>()?;
         let safe_id = sanitize_input(&id).map_err(async_graphql::Error::new)?;
 
@@ -96,9 +98,14 @@ impl TenantQuery {
         }
 
         #[derive(Deserialize)]
-        struct EventsRow { tenant_id: String, total_events: u64 }
+        struct EventsRow {
+            tenant_id: String,
+            total_events: u64,
+        }
         #[derive(Deserialize)]
-        struct UsersRow { unique_users: u64 }
+        struct UsersRow {
+            unique_users: u64,
+        }
 
         let events: Vec<EventsRow> = parse_jsonl(&events_result.body);
         let users: Vec<UsersRow> = parse_jsonl(&users_result.body);
@@ -133,11 +140,10 @@ impl GlobalQuery {
             "SELECT \
                 tenant_id, canonical_id, \
                 first_seen, last_seen, \
-                total_events, total_sessions, \
+                total_events, \
                 page_views, clicks, logins, feature_uses, \
                 last_country, last_device, last_browser, \
                 events_1d, events_7d, events_30d, events_90d, \
-                sessions_1d, sessions_7d, sessions_30d, sessions_90d, \
                 avg_session_duration_sec \
              FROM profiles \
              WHERE first_seen IS NOT NULL \

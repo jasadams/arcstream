@@ -1,0 +1,1991 @@
+[
+  {
+    "input_lines": 1,
+    "name": "nonzero-feature-first",
+    "values": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551204000,
+        "last_seen": 1580551204000,
+        "total_events": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 1,
+        "events_7d": 1,
+        "events_30d": 1,
+        "events_90d": 1,
+        "top_pages": [],
+        "top_features": [
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "create"
+      }
+    ]
+  },
+  {
+    "input_lines": 2,
+    "name": "earlier-event-and-feature-tie",
+    "values": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551204000,
+        "last_seen": 1580551204000,
+        "total_events": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 1,
+        "events_7d": 1,
+        "events_30d": 1,
+        "events_90d": 1,
+        "top_pages": [],
+        "top_features": [
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "create"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551204000,
+        "total_events": 2,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "earlier-user",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 2,
+        "events_7d": 2,
+        "events_30d": 2,
+        "events_90d": 2,
+        "top_pages": [],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      }
+    ]
+  },
+  {
+    "input_lines": 3,
+    "name": "page-and-feature-ranking-reversal",
+    "values": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551204000,
+        "last_seen": 1580551204000,
+        "total_events": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 1,
+        "events_7d": 1,
+        "events_30d": 1,
+        "events_90d": 1,
+        "top_pages": [],
+        "top_features": [
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "create"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551204000,
+        "total_events": 2,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "earlier-user",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 2,
+        "events_7d": 2,
+        "events_30d": 2,
+        "events_90d": 2,
+        "top_pages": [],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551205000,
+        "total_events": 3,
+        "page_views": 1,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "page-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 3,
+        "events_7d": 3,
+        "events_30d": 3,
+        "events_90d": 3,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      }
+    ]
+  },
+  {
+    "input_lines": 4,
+    "name": "nonzero-click-feature-tie",
+    "values": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551204000,
+        "last_seen": 1580551204000,
+        "total_events": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 1,
+        "events_7d": 1,
+        "events_30d": 1,
+        "events_90d": 1,
+        "top_pages": [],
+        "top_features": [
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "create"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551204000,
+        "total_events": 2,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "earlier-user",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 2,
+        "events_7d": 2,
+        "events_30d": 2,
+        "events_90d": 2,
+        "top_pages": [],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551205000,
+        "total_events": 3,
+        "page_views": 1,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "page-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 3,
+        "events_7d": 3,
+        "events_30d": 3,
+        "events_90d": 3,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551206000,
+        "total_events": 4,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "page-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 4,
+        "events_7d": 4,
+        "events_30d": 4,
+        "events_90d": 4,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      }
+    ]
+  },
+  {
+    "input_lines": 5,
+    "name": "nonzero-login-feature-reversal",
+    "values": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551204000,
+        "last_seen": 1580551204000,
+        "total_events": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 1,
+        "events_7d": 1,
+        "events_30d": 1,
+        "events_90d": 1,
+        "top_pages": [],
+        "top_features": [
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "create"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551204000,
+        "total_events": 2,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "earlier-user",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 2,
+        "events_7d": 2,
+        "events_30d": 2,
+        "events_90d": 2,
+        "top_pages": [],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551205000,
+        "total_events": 3,
+        "page_views": 1,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "page-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 3,
+        "events_7d": 3,
+        "events_30d": 3,
+        "events_90d": 3,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551206000,
+        "total_events": 4,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "page-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 4,
+        "events_7d": 4,
+        "events_30d": 4,
+        "events_90d": 4,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551207000,
+        "total_events": 5,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/login",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 5,
+        "events_7d": 5,
+        "events_30d": 5,
+        "events_90d": 5,
+        "top_pages": [
+          "/home",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      }
+    ]
+  },
+  {
+    "input_lines": 6,
+    "name": "late-rejected-no-publication",
+    "values": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551204000,
+        "last_seen": 1580551204000,
+        "total_events": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 1,
+        "events_7d": 1,
+        "events_30d": 1,
+        "events_90d": 1,
+        "top_pages": [],
+        "top_features": [
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "create"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551204000,
+        "total_events": 2,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "earlier-user",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 2,
+        "events_7d": 2,
+        "events_30d": 2,
+        "events_90d": 2,
+        "top_pages": [],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551205000,
+        "total_events": 3,
+        "page_views": 1,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "page-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 3,
+        "events_7d": 3,
+        "events_30d": 3,
+        "events_90d": 3,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551206000,
+        "total_events": 4,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "page-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 4,
+        "events_7d": 4,
+        "events_30d": 4,
+        "events_90d": 4,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551207000,
+        "total_events": 5,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/login",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 5,
+        "events_7d": 5,
+        "events_30d": 5,
+        "events_90d": 5,
+        "top_pages": [
+          "/home",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      }
+    ]
+  },
+  {
+    "input_lines": 7,
+    "name": "first-session-closes-on-other-tenant-event",
+    "values": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551204000,
+        "last_seen": 1580551204000,
+        "total_events": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 1,
+        "events_7d": 1,
+        "events_30d": 1,
+        "events_90d": 1,
+        "top_pages": [],
+        "top_features": [
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "create"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551204000,
+        "total_events": 2,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "earlier-user",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 2,
+        "events_7d": 2,
+        "events_30d": 2,
+        "events_90d": 2,
+        "top_pages": [],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551205000,
+        "total_events": 3,
+        "page_views": 1,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "page-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 3,
+        "events_7d": 3,
+        "events_30d": 3,
+        "events_90d": 3,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551206000,
+        "total_events": 4,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "page-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 4,
+        "events_7d": 4,
+        "events_30d": 4,
+        "events_90d": 4,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551207000,
+        "total_events": 5,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/login",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 5,
+        "events_7d": 5,
+        "events_30d": 5,
+        "events_90d": 5,
+        "top_pages": [
+          "/home",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551207000,
+        "total_events": 5,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/login",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 5,
+        "events_7d": 5,
+        "events_30d": 5,
+        "events_90d": 5,
+        "top_pages": [
+          "/home",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": 5.0,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-b",
+        "canonical_id": "person",
+        "first_seen": 1580553013000,
+        "last_seen": 1580553013000,
+        "total_events": 1,
+        "page_views": 1,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 0,
+        "user_id": "",
+        "last_page": "/other",
+        "last_country": "",
+        "last_device": "phone",
+        "last_browser": "",
+        "events_1d": 1,
+        "events_7d": 1,
+        "events_30d": 1,
+        "events_90d": 1,
+        "top_pages": [
+          "/other"
+        ],
+        "top_features": [],
+        "avg_session_duration_sec": null,
+        "action": "create"
+      }
+    ]
+  },
+  {
+    "input_lines": 8,
+    "name": "second-session-start-does-not-reset-closed-average",
+    "values": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551204000,
+        "last_seen": 1580551204000,
+        "total_events": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 1,
+        "events_7d": 1,
+        "events_30d": 1,
+        "events_90d": 1,
+        "top_pages": [],
+        "top_features": [
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "create"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551204000,
+        "total_events": 2,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "earlier-user",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 2,
+        "events_7d": 2,
+        "events_30d": 2,
+        "events_90d": 2,
+        "top_pages": [],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551205000,
+        "total_events": 3,
+        "page_views": 1,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "page-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 3,
+        "events_7d": 3,
+        "events_30d": 3,
+        "events_90d": 3,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551206000,
+        "total_events": 4,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "page-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 4,
+        "events_7d": 4,
+        "events_30d": 4,
+        "events_90d": 4,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551207000,
+        "total_events": 5,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/login",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 5,
+        "events_7d": 5,
+        "events_30d": 5,
+        "events_90d": 5,
+        "top_pages": [
+          "/home",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551207000,
+        "total_events": 5,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/login",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 5,
+        "events_7d": 5,
+        "events_30d": 5,
+        "events_90d": 5,
+        "top_pages": [
+          "/home",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": 5.0,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-b",
+        "canonical_id": "person",
+        "first_seen": 1580553013000,
+        "last_seen": 1580553013000,
+        "total_events": 1,
+        "page_views": 1,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 0,
+        "user_id": "",
+        "last_page": "/other",
+        "last_country": "",
+        "last_device": "phone",
+        "last_browser": "",
+        "events_1d": 1,
+        "events_7d": 1,
+        "events_30d": 1,
+        "events_90d": 1,
+        "top_pages": [
+          "/other"
+        ],
+        "top_features": [],
+        "avg_session_duration_sec": null,
+        "action": "create"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580553014500,
+        "total_events": 6,
+        "page_views": 2,
+        "clicks": 1,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 6,
+        "events_7d": 6,
+        "events_30d": 6,
+        "events_90d": 6,
+        "top_pages": [
+          "/home",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": 5.0,
+        "action": "update"
+      }
+    ]
+  },
+  {
+    "input_lines": 9,
+    "name": "fractional-second-session-span",
+    "values": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551204000,
+        "last_seen": 1580551204000,
+        "total_events": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 1,
+        "events_7d": 1,
+        "events_30d": 1,
+        "events_90d": 1,
+        "top_pages": [],
+        "top_features": [
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "create"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551204000,
+        "total_events": 2,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "earlier-user",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 2,
+        "events_7d": 2,
+        "events_30d": 2,
+        "events_90d": 2,
+        "top_pages": [],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551205000,
+        "total_events": 3,
+        "page_views": 1,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "page-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 3,
+        "events_7d": 3,
+        "events_30d": 3,
+        "events_90d": 3,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551206000,
+        "total_events": 4,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "page-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 4,
+        "events_7d": 4,
+        "events_30d": 4,
+        "events_90d": 4,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551207000,
+        "total_events": 5,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/login",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 5,
+        "events_7d": 5,
+        "events_30d": 5,
+        "events_90d": 5,
+        "top_pages": [
+          "/home",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551207000,
+        "total_events": 5,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/login",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 5,
+        "events_7d": 5,
+        "events_30d": 5,
+        "events_90d": 5,
+        "top_pages": [
+          "/home",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": 5.0,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-b",
+        "canonical_id": "person",
+        "first_seen": 1580553013000,
+        "last_seen": 1580553013000,
+        "total_events": 1,
+        "page_views": 1,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 0,
+        "user_id": "",
+        "last_page": "/other",
+        "last_country": "",
+        "last_device": "phone",
+        "last_browser": "",
+        "events_1d": 1,
+        "events_7d": 1,
+        "events_30d": 1,
+        "events_90d": 1,
+        "top_pages": [
+          "/other"
+        ],
+        "top_features": [],
+        "avg_session_duration_sec": null,
+        "action": "create"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580553014500,
+        "total_events": 6,
+        "page_views": 2,
+        "clicks": 1,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 6,
+        "events_7d": 6,
+        "events_30d": 6,
+        "events_90d": 6,
+        "top_pages": [
+          "/home",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": 5.0,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580553017000,
+        "total_events": 7,
+        "page_views": 2,
+        "clicks": 2,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/checkout",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 7,
+        "events_7d": 7,
+        "events_30d": 7,
+        "events_90d": 7,
+        "top_pages": [
+          "/home",
+          "/checkout",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": 5.0,
+        "action": "update"
+      }
+    ]
+  },
+  {
+    "input_lines": 10,
+    "name": "second-close-exact-fractional-average",
+    "values": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551204000,
+        "last_seen": 1580551204000,
+        "total_events": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 1,
+        "events_7d": 1,
+        "events_30d": 1,
+        "events_90d": 1,
+        "top_pages": [],
+        "top_features": [
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "create"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551204000,
+        "total_events": 2,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "earlier-user",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 2,
+        "events_7d": 2,
+        "events_30d": 2,
+        "events_90d": 2,
+        "top_pages": [],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551205000,
+        "total_events": 3,
+        "page_views": 1,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "page-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 3,
+        "events_7d": 3,
+        "events_30d": 3,
+        "events_90d": 3,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551206000,
+        "total_events": 4,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "page-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 4,
+        "events_7d": 4,
+        "events_30d": 4,
+        "events_90d": 4,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551207000,
+        "total_events": 5,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/login",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 5,
+        "events_7d": 5,
+        "events_30d": 5,
+        "events_90d": 5,
+        "top_pages": [
+          "/home",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551207000,
+        "total_events": 5,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/login",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 5,
+        "events_7d": 5,
+        "events_30d": 5,
+        "events_90d": 5,
+        "top_pages": [
+          "/home",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": 5.0,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-b",
+        "canonical_id": "person",
+        "first_seen": 1580553013000,
+        "last_seen": 1580553013000,
+        "total_events": 1,
+        "page_views": 1,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 0,
+        "user_id": "",
+        "last_page": "/other",
+        "last_country": "",
+        "last_device": "phone",
+        "last_browser": "",
+        "events_1d": 1,
+        "events_7d": 1,
+        "events_30d": 1,
+        "events_90d": 1,
+        "top_pages": [
+          "/other"
+        ],
+        "top_features": [],
+        "avg_session_duration_sec": null,
+        "action": "create"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580553014500,
+        "total_events": 6,
+        "page_views": 2,
+        "clicks": 1,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 6,
+        "events_7d": 6,
+        "events_30d": 6,
+        "events_90d": 6,
+        "top_pages": [
+          "/home",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": 5.0,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580553017000,
+        "total_events": 7,
+        "page_views": 2,
+        "clicks": 2,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/checkout",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 7,
+        "events_7d": 7,
+        "events_30d": 7,
+        "events_90d": 7,
+        "top_pages": [
+          "/home",
+          "/checkout",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": 5.0,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580553017000,
+        "total_events": 7,
+        "page_views": 2,
+        "clicks": 2,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/checkout",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 7,
+        "events_7d": 7,
+        "events_30d": 7,
+        "events_90d": 7,
+        "top_pages": [
+          "/home",
+          "/checkout",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": 3.75,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-b",
+        "canonical_id": "person",
+        "first_seen": 1580553013000,
+        "last_seen": 1580554823000,
+        "total_events": 2,
+        "page_views": 2,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 0,
+        "user_id": "",
+        "last_page": "/other",
+        "last_country": "",
+        "last_device": "phone",
+        "last_browser": "",
+        "events_1d": 2,
+        "events_7d": 2,
+        "events_30d": 2,
+        "events_90d": 2,
+        "top_pages": [
+          "/other"
+        ],
+        "top_features": [],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      }
+    ]
+  },
+  {
+    "input_lines": 11,
+    "name": "quiet-calendar-expiry-retains-lifetime-and-average",
+    "values": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551204000,
+        "last_seen": 1580551204000,
+        "total_events": 1,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 1,
+        "user_id": "",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 1,
+        "events_7d": 1,
+        "events_30d": 1,
+        "events_90d": 1,
+        "top_pages": [],
+        "top_features": [
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "create"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551204000,
+        "total_events": 2,
+        "page_views": 0,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "earlier-user",
+        "last_page": "",
+        "last_country": "",
+        "last_device": "desktop",
+        "last_browser": "",
+        "events_1d": 2,
+        "events_7d": 2,
+        "events_30d": 2,
+        "events_90d": 2,
+        "top_pages": [],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551205000,
+        "total_events": 3,
+        "page_views": 1,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "page-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 3,
+        "events_7d": 3,
+        "events_30d": 3,
+        "events_90d": 3,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551206000,
+        "total_events": 4,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 0,
+        "feature_uses": 2,
+        "user_id": "page-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "desktop",
+        "last_browser": "Firefox",
+        "events_1d": 4,
+        "events_7d": 4,
+        "events_30d": 4,
+        "events_90d": 4,
+        "top_pages": [
+          "/home"
+        ],
+        "top_features": [
+          "export",
+          "search"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551207000,
+        "total_events": 5,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/login",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 5,
+        "events_7d": 5,
+        "events_30d": 5,
+        "events_90d": 5,
+        "top_pages": [
+          "/home",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580551207000,
+        "total_events": 5,
+        "page_views": 1,
+        "clicks": 1,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/login",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 5,
+        "events_7d": 5,
+        "events_30d": 5,
+        "events_90d": 5,
+        "top_pages": [
+          "/home",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": 5.0,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-b",
+        "canonical_id": "person",
+        "first_seen": 1580553013000,
+        "last_seen": 1580553013000,
+        "total_events": 1,
+        "page_views": 1,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 0,
+        "user_id": "",
+        "last_page": "/other",
+        "last_country": "",
+        "last_device": "phone",
+        "last_browser": "",
+        "events_1d": 1,
+        "events_7d": 1,
+        "events_30d": 1,
+        "events_90d": 1,
+        "top_pages": [
+          "/other"
+        ],
+        "top_features": [],
+        "avg_session_duration_sec": null,
+        "action": "create"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580553014500,
+        "total_events": 6,
+        "page_views": 2,
+        "clicks": 1,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/home",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 6,
+        "events_7d": 6,
+        "events_30d": 6,
+        "events_90d": 6,
+        "top_pages": [
+          "/home",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": 5.0,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580553017000,
+        "total_events": 7,
+        "page_views": 2,
+        "clicks": 2,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/checkout",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 7,
+        "events_7d": 7,
+        "events_30d": 7,
+        "events_90d": 7,
+        "top_pages": [
+          "/home",
+          "/checkout",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": 5.0,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580553017000,
+        "total_events": 7,
+        "page_views": 2,
+        "clicks": 2,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/checkout",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 7,
+        "events_7d": 7,
+        "events_30d": 7,
+        "events_90d": 7,
+        "top_pages": [
+          "/home",
+          "/checkout",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": 3.75,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-b",
+        "canonical_id": "person",
+        "first_seen": 1580553013000,
+        "last_seen": 1580554823000,
+        "total_events": 2,
+        "page_views": 2,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 0,
+        "user_id": "",
+        "last_page": "/other",
+        "last_country": "",
+        "last_device": "phone",
+        "last_browser": "",
+        "events_1d": 2,
+        "events_7d": 2,
+        "events_30d": 2,
+        "events_90d": 2,
+        "top_pages": [
+          "/other"
+        ],
+        "top_features": [],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person",
+        "first_seen": 1580551202000,
+        "last_seen": 1580553017000,
+        "total_events": 7,
+        "page_views": 2,
+        "clicks": 2,
+        "logins": 1,
+        "feature_uses": 2,
+        "user_id": "logged-user",
+        "last_page": "/checkout",
+        "last_country": "AU",
+        "last_device": "tablet",
+        "last_browser": "Firefox",
+        "events_1d": 0,
+        "events_7d": 7,
+        "events_30d": 7,
+        "events_90d": 7,
+        "top_pages": [
+          "/home",
+          "/checkout",
+          "/login"
+        ],
+        "top_features": [
+          "search",
+          "export"
+        ],
+        "avg_session_duration_sec": 3.75,
+        "action": "update"
+      },
+      {
+        "tenant_id": "tenant-b",
+        "canonical_id": "person",
+        "first_seen": 1580553013000,
+        "last_seen": 1580601606000,
+        "total_events": 3,
+        "page_views": 3,
+        "clicks": 0,
+        "logins": 0,
+        "feature_uses": 0,
+        "user_id": "",
+        "last_page": "/other",
+        "last_country": "",
+        "last_device": "phone",
+        "last_browser": "",
+        "events_1d": 1,
+        "events_7d": 3,
+        "events_30d": 3,
+        "events_90d": 3,
+        "top_pages": [
+          "/other"
+        ],
+        "top_features": [],
+        "avg_session_duration_sec": null,
+        "action": "update"
+      }
+    ]
+  }
+]

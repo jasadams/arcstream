@@ -16,10 +16,6 @@ pub struct ProfileUpdateMessage {
     #[serde(alias = "tenantId")]
     pub tenant_id: String,
     pub profile: LiveProfile,
-    #[serde(alias = "changedFields")]
-    pub changed_fields: Vec<String>,
-    pub timestamp: String,
-    pub trigger: String,
     #[serde(default)]
     pub action: String,
 }
@@ -79,7 +75,7 @@ pub fn provide_stream_contexts() {
     provide_context(EventStream(event_signal));
 }
 
-const PROFILE_FIELDS: &str = "canonicalId tenantId profile { canonicalId userId tenantId firstSeen lastSeen totalEvents totalSessions events1D events7D events30D events90D sessions1D sessions7D sessions30D sessions90D avgSessionDurationSec currentSessionActive currentSessionDurationSec pageViews clicks logins featureUses lastPage lastCountry lastDevice lastBrowser topPages topFeatures } changedFields timestamp trigger action";
+const PROFILE_FIELDS: &str = "canonicalId tenantId profile { canonicalId userId tenantId firstSeen lastSeen totalEvents events1D events7D events30D events90D avgSessionDurationSec pageViews clicks logins featureUses lastPage lastCountry lastDevice lastBrowser topPages topFeatures } action";
 
 const EVENT_FIELDS: &str = "eventId eventType tenantId eventTime canonicalId anonymousId userId pageUrl deviceType browser country";
 

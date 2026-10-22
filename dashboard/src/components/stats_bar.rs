@@ -14,14 +14,12 @@ pub fn StatsBar() -> impl IntoView {
 
     let total_users = RwSignal::new(0u64);
     let total_events = RwSignal::new(0u64);
-    let active_sessions = RwSignal::new(0u64);
     let loaded = RwSignal::new(false);
 
     Effect::new(move || {
         if let Some(Ok(result)) = stats.get() {
             total_users.set(result.data.total_users);
             total_events.set(result.data.total_events);
-            active_sessions.set(result.data.active_sessions);
             if !loaded.get_untracked() {
                 loaded.set(true);
             }
@@ -50,16 +48,7 @@ pub fn StatsBar() -> impl IntoView {
                     }}
                 </div>
             </div>
-            <div class="stat-card">
-                <div class="label">"Active Sessions"</div>
-                <div class="value">
-                    {move || if loaded.get() {
-                        view! { <RollingCounter value=Signal::from(active_sessions) /> }.into_any()
-                    } else {
-                        view! { <span>"\u{2014}"</span> }.into_any()
-                    }}
-                </div>
-            </div>
+
         </div>
     }
 }

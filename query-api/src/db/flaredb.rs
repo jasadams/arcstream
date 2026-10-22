@@ -37,6 +37,7 @@ struct FlareDBStats {
     rows_scanned: usize,
 }
 
+// Historical FlareDB receipts may still contain changed_fields; preserve their typed-array decoding.
 const PROFILE_ARRAY_COLUMNS: [&str; 3] = ["top_pages", "top_features", "changed_fields"];
 
 fn decode_profile_value(
@@ -149,10 +150,9 @@ impl LiveProfileProvider for FlareDBClient {
     ) -> Result<Option<String>, String> {
         let sql = format!(
             "SELECT canonical_id, user_id, tenant_id, first_seen, last_seen, \
-             total_events, total_sessions, \
+             total_events, \
              events_1d, events_7d, events_30d, events_90d, \
-             sessions_1d, sessions_7d, sessions_30d, sessions_90d, \
-             avg_session_duration_sec, current_session_active, current_session_duration_sec, \
+             avg_session_duration_sec, \
              page_views, clicks, logins, feature_uses, \
              last_page, last_country, last_device, last_browser, top_pages, top_features \
              FROM profiles \
@@ -193,14 +193,12 @@ mod tests {
                 column_names: vec![
                     "top_pages".into(),
                     "top_features".into(),
-                    "changed_fields".into(),
                     "last_page".into(),
                 ],
             },
             rows: vec![vec![
                 json!(values.to_string()),
                 json!("[]"),
-                serde_json::Value::Null,
                 json!("[ordinary page]"),
             ]],
         };
@@ -208,7 +206,7 @@ mod tests {
             serde_json::from_str(&table_to_jsonl(&table).unwrap()).unwrap();
         assert_eq!(
             decoded,
-            json!({"top_pages": values, "top_features": [], "changed_fields": null, "last_page": "[ordinary page]"})
+            json!({"top_pages": values, "top_features": [], "last_page": "[ordinary page]"})
         );
         assert_eq!(
             decode_profile_value("top_pages", &json!("null")).unwrap(),
