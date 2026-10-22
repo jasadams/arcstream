@@ -1,5 +1,14 @@
 # Native SQL integration status
 
+Current merged-source findings (22 October):
+[validation results](arc-18-merged-validation.md). Streamr c5e06665 contains all
+four dependency deliveries. COUNT-to-state-table recovery, full native SESSION
+summaries and Kafka-input completed-session metrics pass their scoped fixtures.
+The prepared full profile composition remains rejected: calendar, array/ranking
+and finalized-window MERGE boundaries exceed the delivered route. No workaround
+was added. Older pending-dependency statements below describe preparation history;
+the linked report supplies current exact SQL, errors, results and limits.
+
 Arcstream validates Streamr as a product. Native SQL, configured event-time
 watermarks, state-table semantics and RocksDB recovery govern execution.
 Legacy Flink output equivalence does not override those contracts.

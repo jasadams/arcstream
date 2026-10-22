@@ -1,6 +1,6 @@
 {
   "component": "profile-core",
-  "status": "prepared-not-qualified",
+  "status": "blocked-on-demonstrated-native-composition-limits",
   "output_fields": [
     {
       "name": "tenant_id",

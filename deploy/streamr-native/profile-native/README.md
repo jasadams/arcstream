@@ -1,8 +1,11 @@
 # Native profile core candidate
 
-`core.sql` prepares a 20-field component against the approved STR-29, STR-60
-and STR-64 contracts. It has not been compiled or executed on an engine with
-those deliveries. It is not the complete 33-field application publication and
+`core.sql` prepares a 20-field component. Its planning attempt on merged Streamr
+c5e06665 rejects the array/ranking aggregate-to-MERGE route; the prepared
+composition assumed broader support than STR-64 delivered. See
+[current validation](../../../docs/arc-18-merged-validation.md) for the exact
+query errors and successful narrower application slices.
+It is not the complete 33-field application publication and
 must not feed the existing profile consumer, which requires all 33 fields.
 `fields.json` records the exact partial output and remaining fields.
 

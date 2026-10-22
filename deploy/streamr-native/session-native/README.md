@@ -45,3 +45,13 @@ ordering is not claimed to work on the older qualified binary. The out-of-order
 and equal-time fixtures must pass through the actual engine and Kafka/RocksDB
 recovery after STR-60 merges. The file source is for finite fixtures; the maintained
 integration renderer selects Kafka source options without rewriting the SQL body.
+
+# Current merged-source validation
+
+On Streamr c5e06665, the actual 12-field event-time-ordering fixture and the
+three-session chronological recovery fixture pass. Both use production CLI
+workers, configured RocksDB, the public pipeline API and actual worker SIGKILL.
+The separate chronological case preserves a nonempty 318-byte committed prefix
+and produces two fresh summaries after restore. These are file source/sink
+captures, not a complete Kafka session deployment. See
+[exact results and limits](../../../docs/arc-18-merged-validation.md).

@@ -1,5 +1,12 @@
 # Native application integration preparation
 
+Merged-source validation is recorded in
+[the current report](../../docs/arc-18-merged-validation.md). All four engine
+deliveries are merged, but the prepared profile-to-MERGE composition exceeds
+their implemented boundary and is rejected. Narrow COUNT/state lookup and
+SESSION recovery pass; Kafka-input closed metrics pass. The component table
+below records the original preparation gates; it does not supersede that report.
+
 Prepare against STR-29 (quiet calendar zero), STR-60 (event-time selectors),
 STR-64 (maintained results into state tables) and STR-146 (Kafka checkpoint
 journal flow control). This prepares Arcstream SQL against their agreed
