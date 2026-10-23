@@ -41,12 +41,36 @@ class FoundationTests(unittest.TestCase):
                 if path.endswith('validate_query'):
                     return {'errors': []}
                 if path.startswith('pipelines?'):
-                    return {'data': payloads, 'has_more': False}
+                    return {'data': payloads, 'hasMore': False}
                 raise AssertionError('must not create existing or conflicting graph')
             self.assertEqual(bootstrap.bootstrap(directory, request), payloads)
             payloads[-1]['query'] = 'conflict'
             with self.assertRaises(ValueError):
                 bootstrap.bootstrap(directory, request)
+
+    def test_current_wire_pagination_keeps_snake_case_cursor_and_payloads(self):
+        bootstrap = load('bootstrap')
+        calls = []
+        with tempfile.TemporaryDirectory() as directory:
+            payloads = [dict(id='p'+str(i), name=stage, query=stage, udfs=[],
+                             checkpoint_interval_micros=2)
+                        for i, stage in enumerate(bootstrap.STAGES)]
+            for stage, payload in zip(bootstrap.STAGES, payloads):
+                Path(directory, stage+'-request.json').write_text(json.dumps(payload))
+            def request(path, payload=None):
+                calls.append(path)
+                if path.endswith('validate_query'):
+                    return {'errors': []}
+                if path == 'pipelines?limit=100':
+                    page = json.loads((HERE/'fixtures/streamr-empty-pipelines.json').read_text())
+                    page.update(data=payloads[:2], hasMore=True)
+                    return page
+                if path == 'pipelines?limit=100&starting_after=p1':
+                    return {'data': payloads[2:], 'hasMore': False}
+                raise AssertionError('unexpected API request: '+path)
+            self.assertEqual(bootstrap.bootstrap(directory, request), payloads)
+        self.assertEqual(calls[-2:], ['pipelines?limit=100',
+                                     'pipelines?limit=100&starting_after=p1'])
 
     def test_rendered_streamr_ports_override_the_native_image_default(self):
         render = load('render')
