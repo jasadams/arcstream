@@ -15,6 +15,7 @@ ancient records is intentionally removed under the user's explicit instruction.
 | five-second-cutoff | Accept 5,000ms disorder, drop 5,001ms disorder; choose identity/start and metadata by event time among admitted rows |
 | event-time-ordering | Four admitted events arrive out of timestamp order; earlier arrival must not choose first identity/start or final metadata |
 | equal-time-ties | FIRST keeps the first equal-time arrival; LAST uses the later write |
+| large-pages |10 admitted mixed-type events; long repeated pages exceed512 bytes before encoding, preserving the complete summary in native aggregate values |
 | chronological-recovery | Three independently specified summaries; first committed before worker loss, two fresh afterward |
 
 The tenant-reopen product oracle explicitly expects four summaries. Historical
@@ -50,3 +51,41 @@ The cutoff fixture's accepted second-5 event changes the first identity/start;
 the second-4.999 event is dropped. Equal-event-time expectations follow STR-60's
 first-arrival FIRST and later-write LAST rule. These are independent expectations,
 not observed engine results. Runtime qualification remains pending STR-60.
+
+
+The `large-pages` regression contains10 ordinary ordered activity records over
+9seconds and one ordinary closing progress record. Repeated page strings alone
+occupy1100 UTF8 bytes before encoding: the previous grouping of the full raw
+pages array could not fit a512-byte key. The expected12 fields are independent
+literals: first identity `long-first`, count10, duration9, three110-byte literal URLs rooted at
+`/catalog/product`, `/checkout`, `/home`, event counts4page_view/3click/
+3feature_used, final metadata tablet/Safari/NZ. Pages are normalized to the same final sorted set before downstream grouping;
+metadata and normalized pages remain grouping fields. No event is removed and
+no result is inferred from an engine run. Existing fixture expectations remain
+unchanged. The finite resource configuration is sized separately below.
+
+For bounded runtime qualification, run all nine cases on RocksDB with the
+maintained16KiB window-key/32KiB partial/8MiB scan-pool envelope from
+`deploy/streamr-native/runtime-resources.json` and its accompanying resource
+documentation. The baseline512-byte configuration remains failure evidence.
+Use `native_sql_runtime.py`, `--typed-owners 0`,
+`--window-owners 3`, `--unordered-output` and the existing normal resource
+configuration. Use `--fault-prefix 2` for ordinary cases, `--fault-prefix 10`
+for `large-pages` (all10 open-session rows checkpointed before closure), and
+`--fault-prefix 3 --require-committed-output` for `chronological-recovery`.
+The latter must retain the first committed summary across actual SIGKILL and
+produce both fresh later summaries. These are commands to execute, not passes.
+Coordinate one shared run-queue reservation with the deployment owner; do not
+start a second overlapping campaign.
+
+Published Streamr image `ghcr.io/jasadams/streamr@sha256:c341eca8e6f88bd4f7d97bde7462e337faf5cfd604db50c7cb1840ff264e5a20`
+is source `ac15b4e9dec7bfa5a8ea080a712c71897c520ca5`. The already qualified
+`1314e702a955ad3f19c390b3f10c9d3ee1958d40` executable is an alternate runtime:
+these sources have no diff in `crates/`, `Cargo.toml` or `Cargo.lock`. Its binary
+SHA256 is `3e2594d62f6103501a84d17ff133032866d1929a0e84c42949ad3d7976b9d255`.
+Record this source equivalence and actual executable/config/query/fixture hashes
+when using that alternate; do not describe it as executing the published image.
+
+The ten-row case avoids the single-file harness's checkpoint-per-input overhead;
+each of its three explicit page URLs is110 UTF8 bytes. This remains a regression
+for full-array grouping, without a larger event campaign.

@@ -7,6 +7,25 @@ from prepare import DESCRIPTIONS, fixture, product_oracle, prepare, milliseconds
 
 
 class SessionNativeFixtures(unittest.TestCase):
+    def test_large_pages_exceed_key_budget_with_literal_full_summary(self):
+        data = fixture('large-pages')
+        events = data['inputs'][:-1]
+        self.assertEqual(len(events),10)
+        self.assertEqual(sum(len(row['page_url'].encode('utf-8')) for row in events),1100)
+        self.assertGreater(sum(len(row['page_url'].encode('utf-8')) for row in events),512)
+        self.assertEqual(len({row['page_url'] for row in events}),3)
+        self.assertEqual(data['inputs'][-1]['session_id'],'')
+        self.assertEqual(events[0]['event_time'],'2020-02-01 00:00:00.000')
+        self.assertEqual(events[-1]['event_time'],'2020-02-01 00:00:09.000')
+        self.assertNotEqual(events[-1]['canonical_id'],events[0]['canonical_id'])
+        self.assertEqual(data['expected'], [{
+            'tenant_id':'tenant-long','session_id':'long-session','canonical_id':'long-first',
+            'start_time':'2020-02-01 00:00:00.000','end_time':'2020-02-01 00:00:09.000',
+            'duration_sec':9,'event_count':10,'pages':['/catalog/product/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '/checkout/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', '/home/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'],
+            'event_types':{'page_view':4,'click':3,'feature_used':3},
+            'device_type':'tablet','browser':'Safari','country':'NZ',
+        }])
+
     def test_recovery_has_committed_prefix_and_future_sessions(self):
         data = fixture('chronological-recovery')
         self.assertEqual(len(data['inputs']), 17)
