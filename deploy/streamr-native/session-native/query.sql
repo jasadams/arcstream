@@ -4,7 +4,7 @@
 -- substitute Kafka offsets or fabricated arrival sequence fields.
 CREATE TABLE events(event_id TEXT NOT NULL,session_id TEXT,tenant_id TEXT NOT NULL,canonical_id TEXT NOT NULL,event_type TEXT NOT NULL,page_url TEXT,device_type TEXT,browser TEXT,country TEXT,event_time TEXT NOT NULL,event_ts TIMESTAMP GENERATED ALWAYS AS (CAST(event_time AS TIMESTAMP)) STORED,event_ms BIGINT GENERATED ALWAYS AS (CAST(CAST(event_time AS TIMESTAMP(3)) AS BIGINT)) STORED,WATERMARK FOR event_ts AS CAST(event_time AS TIMESTAMP) - INTERVAL '5 seconds') WITH(connector='single_file',path='{{INPUT}}',format='json',type='source',wait_for_control='true');
 CREATE VIEW selected AS SELECT *,page_url IS NOT NULL AND page_url <> '' AS page_selected,device_type IS NOT NULL AND device_type <> '' AS device_selected,browser IS NOT NULL AND browser <> '' AS browser_selected,country IS NOT NULL AND country <> '' AS country_selected FROM events WHERE session_id IS NOT NULL AND session_id <> '';
-CREATE VIEW closed_sessions AS SELECT session_id,canonical_id,tenant_id,start_time,end_time,CAST((end_ms-start_ms)/1000 AS BIGINT) AS duration_sec,event_count,pages,event_types,device_type,browser,country,window,window.start AS window_start,window.end AS window_end FROM (
+CREATE VIEW closed_sessions AS SELECT session_id,canonical_id,tenant_id,start_time,end_time,CAST((end_ms-start_ms)/1000 AS BIGINT) AS duration_sec,event_count,array_sort(array_distinct(pages)) AS pages,event_types,device_type,browser,country,window,window.start AS window_start,window.end AS window_end FROM (
 SELECT tenant_id,session_id,SESSION(INTERVAL '30 minutes') AS window,
 FIRST_VALUE(canonical_id) AS canonical_id,
 FIRST_VALUE(event_ts) AS start_time,MAX(event_ts) AS end_time,
