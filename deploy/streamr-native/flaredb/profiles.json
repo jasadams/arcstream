@@ -93,12 +93,12 @@
     },
     {
       "name": "top_pages",
-      "type": "Utf8",
+      "type": "List(item:Utf8:true)",
       "nullable": false
     },
     {
       "name": "top_features",
-      "type": "Utf8",
+      "type": "List(item:Utf8:true)",
       "nullable": false
     },
     {

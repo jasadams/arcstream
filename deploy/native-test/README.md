@@ -31,8 +31,13 @@ The bundle uses the current reviewed native flat22 profiles schema rendered by
 Kafka topics/brokers change: `<namespace>-unified-events` and
 `<namespace>-sessions`. Their timestamp/int fields match the native SQL projections;
 SESSION pages/event_types are extra output fields outside these analytics schemas.
-Actual FlareDB ingestion must still verify its handling of those extra fields and
-native SESSION string timestamps. No invented schema endpoint or CDC adapter is
+Source inspection of published FlareDB95b58cb found that JSON arrays are rejected
+by Utf8 fields, so the profile schema correctly declares native List(Utf8).
+That source also rejects List in mutable ingestion and falls back to display text
+for HTTP list results. Both generic gaps require runnable reproduction and repair
+before this schema can ingest and serve complete profiles; schema rendering is
+not a pass. Extra SESSION fields and string timestamps also remain in the runtime
+check. No invented schema endpoint or CDC adapter is
 involved. Initialization uses the existing published
 `--load-tables /config --brokers ...` CLI on the dedicated database volume.
 

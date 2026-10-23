@@ -115,12 +115,17 @@ class PrepareTests(unittest.TestCase):
         for field in fields['output_fields']:
             name = field['name']
             expected_type = ('Timestamp(Millisecond, None)' if name in {'first_seen', 'last_seen'}
-                             else {'TEXT': 'Utf8', 'TEXT[]': 'Utf8', 'BIGINT': 'Int64', 'DOUBLE': 'Float64'}[field['sql_type']])
+                             else {'TEXT': 'Utf8', 'TEXT[]': 'List(item:Utf8:true)', 'BIGINT': 'Int64', 'DOUBLE': 'Float64'}[field['sql_type']])
             self.assertEqual(schema[name]['type'], expected_type, name)
             self.assertEqual(schema[name]['nullable'], field.get('nullable', False), name)
         self.assertEqual(schema['avg_session_duration_sec'],
                          {'name': 'avg_session_duration_sec', 'type': 'Float64', 'nullable': True})
         self.assertEqual(config['upsertConfig'], {'mode': 'FULL', 'primary_key_columns': ['tenant_id', 'canonical_id']})
+        # FlareDB catalog::data_type_from_string parses List(name:type:nullable);
+        # ingestion::deserialize accepts JSON arrays only for native List fields.
+        # Utf8 would reject each complete native profile row containing ranks.
+        for name in ('top_pages', 'top_features'):
+            self.assertEqual(schema[name]['type'], 'List(item:Utf8:true)')
         self.assertEqual(config['tableName'], 'profiles')
         self.assertEqual(config['ingestionConfig'], {'topic': 'arc-test-profiles', 'brokers': 'owned-broker:9092'})
         stages = json.loads((ROOT/'test/streamr-reference/profile-native/release/expected-prefixes.json').read_text())
