@@ -5,7 +5,6 @@ import json
 import os
 from pathlib import Path
 import re
-import shutil
 import subprocess
 
 HERE = Path(__file__).resolve().parent
@@ -28,15 +27,14 @@ def validate_environment(env):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--flaredb-config', type=Path, required=True,
-                        help='reviewed native profiles/events/sessions load-tables directory')
+    parser.add_argument('--source-root', type=Path, default=HERE.parents[1],
+                        help='checkout containing the maintained native SQL/schema renderer')
+    parser.add_argument('--output', type=Path, default=HERE / 'bundle')
     args = parser.parse_args()
     validate_environment(os.environ)
-    if {p.stem for p in args.flaredb_config.glob('*.json')} != {'profiles', 'events', 'sessions'}:
-        raise ValueError('provide exactly the three dedicated native table definitions')
-    bundle = HERE / 'bundle'
+    bundle = args.output
     bundle.mkdir(exist_ok=False)
-    resources = json.loads((HERE.parent / 'streamr-native/runtime-resources.json').read_text())
+    resources = json.loads((args.source_root / 'deploy/streamr-native/runtime-resources.json').read_text())
     config = {
         'api': {'bind-address': '0.0.0.0', 'http-port': 8000, 'run-http-port': 8000},
         'controller': {'bind-address': '127.0.0.1', 'scheduler': 'process'},
@@ -50,11 +48,20 @@ def main():
     config['worker']['bind-address'] = '127.0.0.1'
     config['worker']['disk-sql-state']['directory'] = '/state/rocksdb'
     (bundle / 'streamr.json').write_text(json.dumps(config, indent=2) + '\n')
-    shutil.copytree(args.flaredb_config, bundle / 'flaredb')
-    subprocess.run(['python3', str(HERE.parent / 'streamr-native/prepare.py'),
+    subprocess.run(['python3', str(args.source_root / 'deploy/streamr-native/prepare.py'),
                     '--output', str(bundle / 'queries'), '--brokers', os.environ['KAFKA_BROKERS'],
                     '--namespace', os.environ['NATIVE_NAMESPACE'], '--profile-release',
                     '--raw-events-topic', os.environ['RAW_EVENTS_TOPIC']], check=True)
+    tables = bundle / 'flaredb'
+    tables.mkdir()
+    # Current maintained prepare.py owns the reviewed flat22 profile schema.
+    profile = json.loads((bundle / 'queries/flaredb/profiles.json').read_text())
+    (tables / 'profiles.json').write_text(json.dumps(profile, indent=2) + '\n')
+    for table, suffix in [('events', 'unified-events'), ('sessions', 'sessions')]:
+        definition = json.loads((args.source_root / 'deploy/config/flaredb-tables' / (table + '.json')).read_text())
+        definition['ingestionConfig'] = {'topic': os.environ['NATIVE_NAMESPACE'] + '-' + suffix,
+                                         'brokers': os.environ['KAFKA_BROKERS']}
+        (tables / (table + '.json')).write_text(json.dumps(definition, indent=2) + '\n')
     (bundle / 'images.json').write_text(json.dumps({k: os.environ[k] for k in IMAGES}, indent=2) + '\n')
 
 

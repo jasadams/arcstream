@@ -27,20 +27,22 @@ profile contract. The renderer reuses the maintained `prepare.py --profile-relea
 and requires its explicit `--raw-events-topic` interface (being integrated by the
 coordinating agent); it does not rewrite rendered SQL.
 
-Supply exactly profiles.json, events.json and sessions.json in a reviewed native
-FlareDB load-tables directory. The legacy flat profiles config is **not compatible**
-with native Debezium output and must not be copied as a substitute. Exact current
-FlareDB ingestion/schema compatibility remains an integration input, not a guessed
-new HTTP endpoint. FlareDB initialization uses the existing published
-`--load-tables /config --brokers ...` CLI used in the repository's maintained
-compose. It only initializes this project's dedicated database volume.
+The bundle uses the current reviewed native flat22 profiles schema rendered by
+`prepare.py`, plus the maintained events/sessions load-tables schemas. Only their
+Kafka topics/brokers change: `<namespace>-unified-events` and
+`<namespace>-sessions`. Their timestamp/int fields match the native SQL projections;
+SESSION pages/event_types are extra output fields outside these analytics schemas.
+Actual FlareDB ingestion must still verify its handling of those extra fields and
+native SESSION string timestamps. No invented schema endpoint or CDC adapter is
+involved. Initialization uses the existing published
+`--load-tables /config --brokers ...` CLI on the dedicated database volume.
 
 ## Render, inspect, then run when authorized
 
 From this checkout:
 
 ```sh
-python3 deploy/native-test/render.py --flaredb-config /absolute/reviewed/native-tables
+python3 deploy/native-test/render.py
 python3 -m unittest discover -s deploy/native-test -p test_foundation.py -v
 docker compose -f deploy/native-test/compose.yaml config
 # After source qualification and production-host test authorization:
@@ -65,10 +67,20 @@ stopped. Streamr APIs are internal to the Compose network; the only host binding
 the gateway on loopback by default, with GraphQL/WebSocket and dashboard sharing
 one origin. Use a separately authorized test-host ingress to access it remotely.
 
-`runtime-resources.json` is copied without relaxing RocksDB or state limits. Its
-100-row JOIN cap comes from the small integration fixture and is **not** a proved
-90-day replay allocation. The production-host test needs an explicitly reviewed
-bounded allocation for its real cardinality; no memory-only fallback is provided.
+`runtime-resources.json` is copied without relaxing RocksDB or state limits. The
+current native profile route uses state-table MERGE rather than an ordinary JOIN;
+the legacy configured JOIN cap100 is therefore not its retained profile limit.
+The remaining allocation question is the actual source-qualified graph's disk-owner
+count, typed owner footprint and combined queued-write reservation against the
+shared 8-database/96MiB-write pool, across all process workers. Source-only rendering
+cannot establish those runtime totals or a 90-day replay allocation. No memory-only
+fallback or data-size claim is provided.
+
+Source-only full-bundle rendering against the coordinating publication-repair
+checkout passed: five query requests, all three schema topics correctly namespaced,
+existing raw topic retained, no services or containers started. The immutable
+placeholder image references used for that rendering test are never runnable
+release image pins.
 
 Qualification still required: actual all-five-job run, FlareDB stored rows and
 browser results, native profile publication behavior, worker restart with committed
