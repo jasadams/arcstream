@@ -4,6 +4,9 @@ services:
   streamr:
     image: ${STREAMR_IMAGE:?set an immutable image digest}
     command: ["--config", "/bundle/streamr.json", "cluster"]
+    environment:
+      ARROYO__API__HTTP_PORT: "8000"
+      ARROYO__API__RUN_HTTP_PORT: "8000"
     volumes:
       - ./bundle:/bundle:ro
       - streamr-state:/state
