@@ -1,3 +1,9 @@
+> Historical Compose foundation notes. The approved graph now has scoped runtime
+> and cluster-launch evidence; use the [current delivery snapshot](../../docs/arc-18-native-delivery-20261023.md)
+> and its private maintained CI launch/update/routing links for operations.
+> Commands and pending-engine statements below describe the original foundation,
+> not a current manual production rollout or unresolved native List capability.
+
 # Native production-host test deployment foundation
 
 This separate Compose project attaches to existing Kafka. It creates no broker,

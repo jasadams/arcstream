@@ -1,3 +1,7 @@
+> Historical source-bound report. Preserve the results below for their recorded
+> versions; use the [23 October delivery snapshot](arc-18-native-delivery-20261023.md)
+> for current integration and deployment status.
+
 # ARC-18 current native readiness, 23 October 2026
 
 The native core20 passes real Kafka/RocksDB worker-loss recovery. Full33

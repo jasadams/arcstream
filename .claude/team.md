@@ -15,11 +15,15 @@
 - **Pipelines:** Publish Docker Images (application artifacts).
 - **Production URL:** https://cdp.alytic.com.au
 - Version tags publish dashboard, query-api and event-producer images.
-- The custom native demo rollout workflow was retired under ARC-18. There is
-  currently no complete native profile/session deployment graph. Do not reuse
-  historical rollout instructions or treat image publication as cutover.
-- Production cutover requires validated native application results and explicit
-  authorization. See `docs/arc-18-native-status.md`.
+- The approved zero-UDF native profile/session graph has scoped Kafka/RocksDB
+  correctness and recovery evidence. Native deployment is maintained in private
+  `arcstream-cloud`: launch, qualified FlareDB-only update, then separate routing.
+- Read `docs/arc-18-native-delivery-20261023.md` and the current ARC-17/18 ledger
+  before acting. FLA-183 query availability currently blocks cutover; pending
+  candidates and historical failed reports are not readiness evidence.
+- Image publication, integration readiness, replay completion and production
+  cutover are distinct. Cutover requires actual application evidence and explicit
+  user authorization; do not re-request authorization already given in-session.
 
 ## Worktree
 
