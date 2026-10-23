@@ -1,0 +1,112 @@
+{
+  "result_table": {
+    "data_schema": {
+      "column_names": [
+        "tenant_id",
+        "canonical_id",
+        "first_seen",
+        "last_seen",
+        "total_events",
+        "page_views",
+        "clicks",
+        "logins",
+        "feature_uses",
+        "user_id",
+        "last_page",
+        "last_country",
+        "last_device",
+        "last_browser",
+        "events_1d",
+        "events_7d",
+        "events_30d",
+        "events_90d",
+        "top_pages",
+        "top_features",
+        "avg_session_duration_sec",
+        "action"
+      ],
+      "column_data_types": [
+        "Utf8",
+        "Utf8",
+        "Timestamp(ms)",
+        "Timestamp(ms)",
+        "Int64",
+        "Int64",
+        "Int64",
+        "Int64",
+        "Int64",
+        "Utf8",
+        "Utf8",
+        "Utf8",
+        "Utf8",
+        "Utf8",
+        "Int64",
+        "Int64",
+        "Int64",
+        "Int64",
+        "List(Utf8)",
+        "List(Utf8)",
+        "Float64",
+        "Utf8"
+      ]
+    },
+    "rows": [
+      [
+        "tenant-a",
+        "cf3ebbc9-d5ce-40cc-888c-262e0d437eea",
+        "2020-02-01 10:00:02.000",
+        "2020-02-01 10:00:07.000",
+        5,
+        1,
+        1,
+        1,
+        2,
+        "logged-user",
+        "/login",
+        "AU",
+        "tablet",
+        "Firefox",
+        5,
+        5,
+        5,
+        5,
+        [
+          "/home",
+          "/login"
+        ],
+        [
+          "search",
+          "export"
+        ],
+        5.0,
+        "update"
+      ],
+      [
+        "tenant-b",
+        "f575e62e-2658-4ffc-9c0b-0ccc30237a53",
+        "2020-02-01 10:30:13.000",
+        "2020-02-01 10:30:13.000",
+        1,
+        1,
+        0,
+        0,
+        0,
+        "",
+        "/other",
+        "",
+        "phone",
+        "",
+        1,
+        1,
+        1,
+        1,
+        [
+          "/other"
+        ],
+        [],
+        null,
+        "create"
+      ]
+    ]
+  }
+}
