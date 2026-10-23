@@ -25,7 +25,7 @@ def bootstrap(directory, request):
             if pipeline['name'] in existing:
                 raise ValueError('duplicate pipeline name: ' + pipeline['name'])
             existing[pipeline['name']] = pipeline
-        if not page['has_more']:
+        if not page['hasMore']:
             break
         if not page['data']:
             raise ValueError('invalid empty paginated pipeline response')
