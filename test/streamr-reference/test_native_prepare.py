@@ -127,7 +127,8 @@ class PrepareTests(unittest.TestCase):
         for name in ('top_pages', 'top_features'):
             self.assertEqual(schema[name]['type'], 'List(item:Utf8:true)')
         self.assertEqual(config['tableName'], 'profiles')
-        self.assertEqual(config['ingestionConfig'], {'topic': 'arc-test-profiles', 'brokers': 'owned-broker:9092'})
+        self.assertEqual(config['ingestionConfig'], {'topic': 'arc-test-profiles', 'brokers': 'owned-broker:9092',
+                                                    'groupId': 'arc-test-flaredb-profiles'})
         stages = json.loads((ROOT/'test/streamr-reference/profile-native/release/expected-prefixes.json').read_text())
         values = [row['avg_session_duration_sec'] for stage in stages for row in stage['values']]
         self.assertIn(None, values)
@@ -141,7 +142,9 @@ class PrepareTests(unittest.TestCase):
             manifest = prepare.prepare(directory, broker, 'arc-test', profile_release=True)
             path = directory/'flaredb/profiles.json'
             config = json.loads(path.read_text())
-            self.assertEqual(config['ingestionConfig'], {'topic': 'arc-test-profiles', 'brokers': broker})
+            self.assertEqual(config['ingestionConfig'], {'topic': 'arc-test-profiles', 'brokers': broker,
+                                                        'groupId': 'arc-test-flaredb-profiles'})
+            self.assertEqual(manifest['required_flaredb_contracts'], ['FLA-177', 'FLA-178', 'FLA-179'])
             self.assertEqual(manifest['analytics_configs']['flaredb/profiles.json'], hashlib.sha256(path.read_bytes()).hexdigest())
             self.assertIn('deploy/streamr-native/flaredb/profiles.json', manifest['templates_sha256'])
             self.assertIn('actual FlareDB ingestion not validated', manifest['analytics_validation'])
