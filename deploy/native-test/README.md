@@ -100,3 +100,9 @@ browser results, native profile publication behavior, worker restart with commit
 output continuity, image entrypoint and container volume permissions. This source
 foundation does not itself prove deployment readiness or authorize production
 traffic cutover. Do not use `down --volumes` against retained test evidence.
+
+The Streamr service explicitly sets `ARROYO__API__HTTP_PORT=8000` and
+`ARROYO__API__RUN_HTTP_PORT=8000` to agree with the rendered API configuration and
+bootstrap address. Native images declare HTTP port 5115 in their environment,
+which the config loader applies after file configuration. Other image settings,
+including the compiler environment, remain inherited.

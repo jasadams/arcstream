@@ -1,5 +1,8 @@
 import importlib.util
 import json
+import os
+import re
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -44,6 +47,20 @@ class FoundationTests(unittest.TestCase):
             payloads[-1]['query'] = 'conflict'
             with self.assertRaises(ValueError):
                 bootstrap.bootstrap(directory, request)
+
+    def test_rendered_streamr_ports_override_the_native_image_default(self):
+        render = load('render')
+        env = {**os.environ, **{key: 'registry/image@sha256:' + 'a'*64 for key in render.IMAGES},
+               'NATIVE_NAMESPACE': 'native-test-ports', 'KAFKA_BROKERS': 'broker:9092',
+               'RAW_EVENTS_TOPIC': 'raw-events', 'NATIVE_TEST_PORT': '18080'}
+        rendered = subprocess.check_output(
+            ['docker', 'compose', '-f', str(HERE/'compose.yaml'), 'config'], env=env, text=True)
+        # Inspect the actual provider's normalized service; both Docker Compose
+        # and the maintained Podman provider render YAML on this interface.
+        section = re.search(r'(?ms)^  streamr:\n(.*?)(?=^  [a-zA-Z_-]+:|^volumes:|\Z)', rendered).group(1)
+        self.assertRegex(section, r'''(?m)^\s+ARROYO__API__HTTP_PORT: ['"]?8000['"]?$''')
+        self.assertRegex(section, r'''(?m)^\s+ARROYO__API__RUN_HTTP_PORT: ['"]?8000['"]?$''')
+        self.assertNotIn('ARROYO__COMPILER__', section)
 
     def test_only_digest_pins_accepted(self):
         render = load('render')
