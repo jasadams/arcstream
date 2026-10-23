@@ -19,13 +19,17 @@ an open session as a completed zero-duration sample.
 `profile-native/release.sql` retains the existing core's native lifetime,
 calendar, page-count and feature-count relations. A native SESSION branch
 computes completed duration, then native COUNT/SUM computes the current average.
-The core current relation LEFT JOINs the completed average using native updating
-JOIN semantics. The native sink publishes `debezium_json` with 21 business
-fields; its standard CDC operation supplies the 22nd application field, action,
-in the transport adapter. A CDC create maps to `create`, update to `update`, and
-delete is unsupported and raises an explicit application-contract error. No business metric is
-computed by that adapter. Arrays remain native aggregate/join values; no
-serialized arrays, scalar rank-slot state or application UDF is introduced.
+The active query composes four native branches through the existing accepted
+MERGE result boundary: core, page counts, feature counts and closed-session
+average. The finalized branch acknowledges raw events without emitting a
+session; actual native watermark closures independently update its average.
+`MERGE RETURNING source` supplies all 21 business fields, including native
+array values, and the SQL projection maps native insert/update action to
+create/update. The Kafka sink uses plain JSON with exactly 22 fields. The
+transport adapter validates that snapshot without computing business values or
+inferring an action. There is no CDC fallback or suppression of delete records.
+The earlier JOIN/CDC query is retained as `lifecycle-candidates/join-cdc-release.sql`.
+The new engine composition and this application query require runtime qualification.
 A closure must publish the entire profile including the new average without
 waiting for another event belonging to that person.
 
@@ -250,11 +254,10 @@ whole-event coherence across independently maintained branches.
 `lifecycle-candidates/join-merge-release.sql` is the explicit native keyed-MERGE
 materialization attempt. It preserves the JOIN and applies the existing primitive
 snapshot schema, passing arrays through `RETURNING source`; it does not store
-serialized arrays or discard retractions. The current accepted-JOIN MERGE route
+serialized arrays or discard retractions. The baseline accepted-JOIN MERGE route
 is narrow: two simple COUNT/MAX branches sharing one original admitted source;
-its planner also rejects calendars and unsupported nested lineage. The exact
-probe must be executed before claiming whether that existing route can cover
-this application. Neither this preparation nor an eventual planner-only pass
+its planner also rejects calendars and unsupported nested lineage. That baseline probe failed as recorded below; it is superseded by the native
+four-branch materialization repair. Neither this preparation nor an eventual planner-only pass
 would establish successful runtime publication.
 
 ## Keyed materialization attempt
@@ -273,3 +276,19 @@ STR-150 records this composed-result publication gap and proposed native
 materialization contract. No engine extension, record filtering or consumer
 semantic workaround has been implemented. Application integration and recovery
 remain unqualified for this release query.
+
+## Publication repair candidate
+
+The current release query is the four-branch native materialization candidate,
+not the failing ordinary JOIN query. The first 22-field literal fixture and
+complete-prefix assertions are unchanged. The graph oracle validates every
+native create/update snapshot and compares all resulting images, without
+filtering duplicates or intermediate rows. Profiles now owns five native
+aggregate backends, one native SESSION backend and one typed state-table owner;
+the existing eight database slots still cover this seven-owner graph.
+
+Repair worktree: Streamr `str-150-composed-publication-20261023`, fetched base
+a5d28ad8. Application repair worktree starts from fetched cbcb901b with existing
+reviewed PR head 6a13f63 incorporated by fast-forward. Runtime results and exact
+new source pin will be recorded after execution; neither compilation nor source
+review alone establishes successful application/recovery behavior.

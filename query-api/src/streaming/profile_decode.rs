@@ -1,5 +1,5 @@
-//! Adapt the native SQL changelog to the application's profile subscription.
-//! A retraction is the before-image of one update, not a separate zero profile.
+//! Validate native MERGE RETURNING profile snapshots for application subscriptions.
+//! Business values and create/update action are supplied by the native SQL producer.
 use serde_json::Value;
 
 use super::types::{FlatProfileUpdate, ProfileUpdateMessage};
@@ -26,25 +26,24 @@ const PROFILE_FIELDS: &[&str] = &[
     "last_browser",
     "top_pages",
     "top_features",
+    "action",
 ];
 
-fn full_profile(mut value: Value, action: &str) -> Result<FlatProfileUpdate, String> {
+fn full_profile(value: Value) -> Result<FlatProfileUpdate, String> {
     let fields = value
         .as_object()
         .ok_or("native profile image must be an object")?;
     if fields.len() != PROFILE_FIELDS.len()
         || PROFILE_FIELDS.iter().any(|key| !fields.contains_key(*key))
     {
-        return Err("native profile must contain all 21 release business fields".into());
+        return Err("native profile must contain all 22 release fields".into());
     }
-    // Action is transport metadata derived from the native CDC operation.
-    value
-        .as_object_mut()
-        .unwrap()
-        .insert("action".into(), Value::String(action.into()));
     let profile: FlatProfileUpdate = serde_json::from_value(value).map_err(|e| e.to_string())?;
     if profile.tenant_id.is_empty() || profile.canonical_id.is_empty() {
         return Err("native profile requires nonempty tenant and canonical identity".into());
+    }
+    if !matches!(profile.action.as_str(), "create" | "update") {
+        return Err("native profile action must be create or update".into());
     }
     for timestamp in [profile.first_seen, profile.last_seen] {
         if chrono::DateTime::from_timestamp_millis(timestamp).is_none() {
@@ -66,29 +65,5 @@ pub fn decode(payload: &[u8]) -> Result<Option<ProfileUpdateMessage>, String> {
     if value.is_null() {
         return Ok(None);
     }
-    let op = value
-        .get("op")
-        .and_then(Value::as_str)
-        .ok_or("native CDC op must be text")?;
-    let before = value.get("before").ok_or("native CDC requires before")?;
-    let after = value.get("after").ok_or("native CDC requires after")?;
-    match op {
-        "c" | "r" if before.is_null() && !after.is_null() => {
-            Ok(Some(full_profile(after.clone(), "create")?.into_message()))
-        }
-        "u" if !before.is_null() && !after.is_null() => {
-            let previous = full_profile(before.clone(), "update")?;
-            let current = full_profile(after.clone(), "update")?;
-            if previous.tenant_id != current.tenant_id
-                || previous.canonical_id != current.canonical_id
-            {
-                return Err("native CDC update cannot change the profile identity".into());
-            }
-            Ok(Some(current.into_message()))
-        }
-        // Profile lifecycle closes/decays by updating its durable row. A physical
-        // deletion requires an explicit application deletion contract.
-        "d" => Err("native profile deletion is not an application lifecycle update".into()),
-        _ => Err("invalid native profile CDC operation or image combination".into()),
-    }
+    full_profile(value).map(|profile| Some(profile.into_message()))
 }

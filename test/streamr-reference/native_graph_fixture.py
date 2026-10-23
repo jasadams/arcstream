@@ -46,6 +46,7 @@ def main():
     p.add_argument('--broker-image', required=True)
     p.add_argument('--fixtures', type=Path, default=Path(__file__).resolve().parent/'graph-release-fixtures')
     p.add_argument('--timeout', type=int, default=720)
+    p.add_argument('--scan-diagnostics', action='store_true', help='Enable native opt-in scan counters; no performance qualification')
     a = p.parse_args()
     for selected in (a.runtime_image, a.broker_image):
         if not re.fullmatch(r'(?:sha256:)?[a-f0-9]{64}', selected):
@@ -134,6 +135,8 @@ def main():
                   (a.python_runtime.resolve(),a.python_runtime.resolve(),'ro')}
         for source,target,mode in sorted(mounts, key=lambda item: str(item[1])):
             argv += ['-v',str(source)+':'+str(target)+':'+mode]
+        if a.scan_diagnostics:
+            argv += ['-e','STREAMR_LIVE_SCAN_DIAGNOSTICS=1']
         argv += ['-e','LD_LIBRARY_PATH='+str(pin/'package/lib'),
                  '-e','PYTHONPATH='+str(a.python_runtime.resolve()),'-e','PYTHONDONTWRITEBYTECODE=1',
                  runtime_image,'python3',str(repo/'test/streamr-reference/native_graph_runtime.py'),

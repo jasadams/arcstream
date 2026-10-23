@@ -46,20 +46,17 @@ def identity_oracle(raw, accepted, unified):
 
 
 def decode_profiles(rows):
-    """Validate every native CDC transition; only map its public c/u action."""
-    current={};decoded=[]
-    for envelope in rows:
-        if not isinstance(envelope,dict) or not {'before','after','op'} <= set(envelope):
-            raise ValueError('profile requires native CDC envelope')
-        before,after,op=(envelope[k] for k in ('before','after','op'))
-        if op not in ('c','u') or not isinstance(after,dict) or len(after)!=21 or 'action' in after:
-            raise ValueError('unexpected profile CDC operation/schema')
-        key=(after['tenant_id'],after['canonical_id'])
-        if op=='c':
-            if before is not None or key in current:raise ValueError('duplicate or invalid create')
-        elif before!=current.get(key) or key not in current:
-            raise ValueError('CDC before image does not equal preceding complete image')
-        current[key]=dict(after);decoded.append(dict(after,action={'c':'create','u':'update'}[op]))
+    """Validate every coherent native MERGE snapshot, preserving native action."""
+    current={}; decoded=[]
+    for row in rows:
+        if not isinstance(row,dict) or len(row)!=22 or row.get('action') not in ('create','update'):
+            raise ValueError('profile requires complete native MERGE snapshot')
+        key=(row['tenant_id'],row['canonical_id'])
+        if row['action']=='create' and key in current:
+            raise ValueError('duplicate native profile create')
+        if row['action']=='update' and key not in current:
+            raise ValueError('native profile update without preceding create')
+        current[key]=dict(row); decoded.append(dict(row))
     return decoded
 
 
@@ -125,7 +122,9 @@ def main():
             if not done:return None,None
             owner=matches[0];cp=p.checkpoint(h,case,owner,max(x['epoch'] for x in done))
             if name=='identity':h.require(sum(x['kind']==4 for x in cp['owners'])==2,'identity must checkpoint both native typed tables')
-            if name=='profiles':h.require(any(x['kind']==3 for x in cp['owners']),'profiles disk-backed aggregate inventory absent')
+            if name=='profiles':
+                h.require(sum(x['kind']==3 for x in cp['owners'])==6,'profiles must checkpoint five aggregates and one native SESSION')
+                h.require(sum(x['kind']==4 for x in cp['owners'])==1,'profiles must checkpoint its native typed materialization')
             return owner,cp
         wait_ready()
         for index,stage in enumerate(stages):

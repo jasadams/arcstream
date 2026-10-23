@@ -25,6 +25,21 @@ class PrepareTests(unittest.TestCase):
         self.assertNotIn("topic='arc-test-profiles'", queries['profile-core'])
         self.assertIn('FIRST_VALUE(canonical_id)', queries['sessions'])
 
+    def test_existing_raw_topic_preserves_isolated_groups_and_outputs(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp)/'bundle'
+            manifest = prepare.prepare(path, 'broker:9092', 'arc-test',
+                                       profile_release=True, raw_events_topic='existing.events')
+            self.assertEqual(manifest['raw_events_topic'], 'existing.events')
+            identity = (path/'identity.sql').read_text()
+            self.assertIn("topic = 'existing.events'", identity)
+            self.assertIn("'arc-test-identity-owner'", identity)
+            self.assertIn("'arc-test-identity-capture'", identity)
+            self.assertIn("topic='arc-test-profiles'", (path/'profiles.sql').read_text())
+            with self.assertRaises(ValueError):
+                prepare.prepare(Path(temp)/'invalid', 'broker:9092', 'arc-test',
+                                fixture=('sessions', '/in', '/out'), raw_events_topic='existing.events')
+
     def test_sql_literal_quote_cannot_inject_connector_options(self):
         query = prepare.render_fixture('profile-core', "/tmp/input'file", '/tmp/output')
         self.assertIn("path='/tmp/input''file'", query)
@@ -57,7 +72,7 @@ class PrepareTests(unittest.TestCase):
         release = json.loads((ROOT/'deploy/streamr-native/profile-native/release-fields.json').read_text())
         released = {row['name'] for row in release['output_fields']}
         deferred = set(release['deferred_session_fields'] + release['omitted_publication_fields'])
-        self.assertEqual(released - {'action'}, set(re.findall(r'^    "([a-z_0-9]+)",$', consumer, re.M)))
+        self.assertEqual(released, set(re.findall(r'^    "([a-z_0-9]+)",$', consumer, re.M)))
         self.assertEqual(actual | pending, released | deferred)
         self.assertFalse(released & deferred)
 
@@ -70,8 +85,8 @@ class PrepareTests(unittest.TestCase):
         self.assertNotIn('EVENT_TIMESTAMP()', queries['profiles'])
         self.assertNotIn('changed_fields', queries['profiles'])
         self.assertNotIn('sink.recovery_max_bytes', queries['profiles'])
-        self.assertIn("format='debezium_json'", queries['profiles'])
-        self.assertIn('LEFT JOIN profile_closed_average', queries['profiles'])
+        self.assertIn("format='json'", queries['profiles'])
+        self.assertIn('MERGE INTO profile_scalar_snapshot', queries['profiles'])
 
     def test_release_oracle_preserves_absence_fractional_average_and_quiet_expiry(self):
         directory = ROOT/'test/streamr-reference/profile-native/release'
@@ -90,6 +105,47 @@ class PrepareTests(unittest.TestCase):
         self.assertEqual(person_a(stages[10])['avg_session_duration_sec'], 3.75)
         self.assertEqual(person_a(stages[10])['events_1d'], 0)
         self.assertEqual(person_a(stages[10])['total_events'], 7)
+
+    def test_native_flaredb_schema_matches_complete_wire_and_fractional_average(self):
+        fields = json.loads((ROOT/'deploy/streamr-native/profile-native/release-fields.json').read_text())
+        config = prepare.render_flaredb_profiles('owned-broker:9092', 'arc-test')
+        schema = {field['name']: field for field in config['schema']}
+        self.assertEqual(set(schema), {field['name'] for field in fields['output_fields']})
+        self.assertEqual(len(schema), 22)
+        for field in fields['output_fields']:
+            name = field['name']
+            expected_type = ('Timestamp(Millisecond, None)' if name in {'first_seen', 'last_seen'}
+                             else {'TEXT': 'Utf8', 'TEXT[]': 'Utf8', 'BIGINT': 'Int64', 'DOUBLE': 'Float64'}[field['sql_type']])
+            self.assertEqual(schema[name]['type'], expected_type, name)
+            self.assertEqual(schema[name]['nullable'], field.get('nullable', False), name)
+        self.assertEqual(schema['avg_session_duration_sec'],
+                         {'name': 'avg_session_duration_sec', 'type': 'Float64', 'nullable': True})
+        self.assertEqual(config['upsertConfig'], {'mode': 'FULL', 'primary_key_columns': ['tenant_id', 'canonical_id']})
+        self.assertEqual(config['tableName'], 'profiles')
+        self.assertEqual(config['ingestionConfig'], {'topic': 'arc-test-profiles', 'brokers': 'owned-broker:9092'})
+        stages = json.loads((ROOT/'test/streamr-reference/profile-native/release/expected-prefixes.json').read_text())
+        values = [row['avg_session_duration_sec'] for stage in stages for row in stage['values']]
+        self.assertIn(None, values)
+        self.assertIn(3.75, values)
+
+    def test_release_bundle_emits_native_flaredb_config_without_claiming_ingestion(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)/'bundle'
+            broker = 'owned-"broker:9092'
+            manifest = prepare.prepare(directory, broker, 'arc-test', profile_release=True)
+            path = directory/'flaredb/profiles.json'
+            config = json.loads(path.read_text())
+            self.assertEqual(config['ingestionConfig'], {'topic': 'arc-test-profiles', 'brokers': broker})
+            self.assertEqual(manifest['analytics_configs']['flaredb/profiles.json'], hashlib.sha256(path.read_bytes()).hexdigest())
+            self.assertIn('deploy/streamr-native/flaredb/profiles.json', manifest['templates_sha256'])
+            self.assertIn('actual FlareDB ingestion not validated', manifest['analytics_validation'])
+            self.assertFalse(manifest['production_ready'])
+            self.assertNotIn('{{', path.read_text())
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)/'diagnostic'
+            prepare.prepare(directory, 'broker:9092', 'arc-test')
+            self.assertFalse((directory/'flaredb').exists())
 
 
 

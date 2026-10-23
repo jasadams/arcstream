@@ -1,6 +1,6 @@
 {
   "component": "profiles-first-release",
-  "status": "planner-accepted-awaiting-native-runtime-validation",
+  "status": "native-merge-publication-prepared-awaiting-engine-and-application-validation",
   "output_fields": [
     {
       "name": "tenant_id",
@@ -113,7 +113,7 @@
     "STR-64",
     "STR-146"
   ],
-  "wire_format": "debezium_json",
+  "wire_format": "json",
   "wire_business_fields": [
     "tenant_id",
     "canonical_id",
@@ -138,6 +138,30 @@
     "avg_session_duration_sec"
   ],
   "transport_fields": {
-    "action": "standard native CDC operation c/r -> create, u -> update; d is unsupported and raises an explicit application-contract error"
-  }
+    "action": "native MERGE RETURNING action projected by SQL: insert -> create, update -> update; consumer validates and preserves it"
+  },
+  "wire_fields": [
+    "tenant_id",
+    "canonical_id",
+    "first_seen",
+    "last_seen",
+    "total_events",
+    "page_views",
+    "clicks",
+    "logins",
+    "feature_uses",
+    "user_id",
+    "last_page",
+    "last_country",
+    "last_device",
+    "last_browser",
+    "events_1d",
+    "events_7d",
+    "events_30d",
+    "events_90d",
+    "top_pages",
+    "top_features",
+    "avg_session_duration_sec",
+    "action"
+  ]
 }

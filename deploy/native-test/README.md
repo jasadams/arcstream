@@ -24,8 +24,7 @@ No image version or release tag is invented or published by this foundation.
 The Streamr image must be the source-qualified native build, with process workers
 and RocksDB included. The application images must include the approved 22-field
 profile contract. The renderer reuses the maintained `prepare.py --profile-release`
-and requires its explicit `--raw-events-topic` interface (being integrated by the
-coordinating agent); it does not rewrite rendered SQL.
+and requires its explicit `--raw-events-topic` interface (included in this checkout); it does not rewrite rendered SQL.
 
 The bundle uses the current reviewed native flat22 profiles schema rendered by
 `prepare.py`, plus the maintained events/sessions load-tables schemas. Only their
@@ -50,7 +49,7 @@ docker compose -f deploy/native-test/compose.yaml up -d
 ```
 
 The renderer fails if a bundle already exists, retaining prior evidence rather
-than replacing configuration. Save `bundle/images.json`, `bundle/streamr.json`,
+than replacing configuration. Save `bundle/receipt.json` (source and rendered file hashes), `bundle/images.json`, `bundle/streamr.json`,
 `bundle/queries/manifest.json`, rendered Compose and bootstrap logs with the test
 receipt. Configure namespace topics and transaction recovery journals under the
 existing Kafka administration policy before launch. Recovery journals must retain

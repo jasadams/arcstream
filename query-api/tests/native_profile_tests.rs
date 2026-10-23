@@ -12,72 +12,68 @@ fn profile() -> Value {
          "page_views":1, "clicks":1, "logins":0,
         "feature_uses":0, "last_page":"/home", "last_country":"AU",
         "last_device":"desktop", "last_browser":"Firefox",
-        "top_pages":["/home"], "top_features":[]
+        "top_pages":["/home"], "top_features":[], "action":"create"
     })
 }
 
 fn decode_image(
     row: &Value,
 ) -> Result<Option<query_api::streaming::types::ProfileUpdateMessage>, String> {
-    let envelope = json!({"before":null,"after":row,"op":"c"});
-    decode(&serde_json::to_vec(&envelope).unwrap())
+    decode(&serde_json::to_vec(row).unwrap())
 }
 
 #[test]
-fn native_update_publishes_core_after_image() {
-    let mut before = profile();
-    before["total_events"] = json!(1);
-    let payload = json!({"before":before,"after":profile(),"op":"u"});
-    let message = decode(&serde_json::to_vec(&payload).unwrap())
-        .unwrap()
-        .unwrap();
-    assert_eq!(message.tenant_id, "tenant");
-    assert_eq!(message.profile.total_events, 2);
-    assert_eq!(message.action, "update");
-    assert_eq!(message.profile.first_seen, "2025-01-01 00:00:00.000");
-}
-
-#[test]
-fn native_create_and_snapshot_require_complete_application_schema() {
-    for op in ["c", "r"] {
-        let payload = json!({"before":null,"after":profile(),"op":op});
-        assert!(decode(&serde_json::to_vec(&payload).unwrap())
-            .unwrap()
-            .is_some());
+fn native_snapshot_preserves_actual_create_and_update_actions() {
+    for action in ["create", "update"] {
+        let mut row = profile();
+        row["action"] = json!(action);
+        let message = decode_image(&row).unwrap().unwrap();
+        assert_eq!(message.action, action);
+        assert_eq!(message.tenant_id, "tenant");
+        assert_eq!(message.profile.total_events, 2);
+        assert_eq!(message.profile.first_seen, "2025-01-01 00:00:00.000");
     }
+}
+
+#[test]
+fn every_release_field_is_required() {
     for field in profile().as_object().unwrap().keys() {
         let mut partial = profile();
         partial.as_object_mut().unwrap().remove(field);
         assert!(
-            decode_image(&partial).unwrap_err().contains("21"),
+            decode_image(&partial).unwrap_err().contains("22"),
             "accepted missing {field}"
         );
     }
 }
 
 #[test]
-fn native_cdc_rejects_cross_tenant_and_malformed_retractions() {
-    let mut other = profile();
-    other["tenant_id"] = json!("other-tenant");
+fn cdc_envelopes_are_rejected_without_an_alternate_format_fallback() {
     for payload in [
-        json!({"before":other,"after":profile(),"op":"u"}),
-        json!({"before":null,"after":profile(),"op":"u"}),
+        json!({"before":null,"after":profile(),"op":"c"}),
+        json!({"before":profile(),"after":profile(),"op":"u"}),
         json!({"before":profile(),"after":null,"op":"d"}),
-        json!({"before":null,"after":profile(),"op":"unknown"}),
     ] {
         assert!(decode(&serde_json::to_vec(&payload).unwrap()).is_err());
     }
-    let mut wrong_type = profile();
-    wrong_type["avg_session_duration_sec"] = json!("2.5");
-    let payload = json!({"before":null,"after":wrong_type,"op":"c"});
-    assert!(decode(&serde_json::to_vec(&payload).unwrap()).is_err());
+    assert!(decode(b"null").unwrap().is_none());
 }
 
 #[test]
-fn only_native_cdc_images_and_kafka_tombstones_are_supported() {
-    assert!(decode(&serde_json::to_vec(&profile()).unwrap()).is_err());
-    assert!(decode(b"null").unwrap().is_none());
-    assert_eq!(decode_image(&profile()).unwrap().unwrap().action, "create");
+fn malformed_required_types_and_empty_identity_are_rejected() {
+    for (field, value) in [
+        ("avg_session_duration_sec", json!("2.5")),
+        ("total_events", json!("2")),
+        ("first_seen", json!("1735689600000")),
+        ("top_pages", json!("[\"/home\"]")),
+        ("top_features", json!([1])),
+        ("tenant_id", json!("")),
+        ("canonical_id", json!("")),
+    ] {
+        let mut row = profile();
+        row[field] = value;
+        assert!(decode_image(&row).is_err(), "{field}");
+    }
 }
 
 #[test]
@@ -144,10 +140,7 @@ async fn native_profile_reaches_graphql_with_core_and_completed_average() {
 
     let mut after = profile();
     after["avg_session_duration_sec"] = json!(2.125);
-    let payload = json!({"before":null,"after":after,"op":"c"});
-    let message = decode(&serde_json::to_vec(&payload).unwrap())
-        .unwrap()
-        .unwrap();
+    let message = decode_image(&after).unwrap().unwrap();
     let (sender, _) = broadcast::channel::<ProfileUpdateMessage>(16);
     let schema = Schema::build(QueryRoot::default(), EmptyMutation, SubscriptionRoot)
         .data(sender.clone())
@@ -181,27 +174,17 @@ async fn native_profile_reaches_graphql_with_core_and_completed_average() {
 }
 
 #[test]
-fn producer_supplied_action_is_rejected_as_an_unknown_business_field() {
-    for action in ["", "timer", "insert", "delete"] {
+fn unsupported_or_mistyped_native_actions_are_rejected() {
+    for action in [
+        json!(""),
+        json!("timer"),
+        json!("insert"),
+        json!("delete"),
+        json!(null),
+        json!(1),
+    ] {
         let mut row = profile();
-        row["action"] = json!(action);
+        row["action"] = action;
         assert!(decode_image(&row).is_err());
     }
-}
-
-#[test]
-fn update_validates_before_image_and_does_not_hide_native_deletion() {
-    let mut malformed_before = profile();
-    malformed_before
-        .as_object_mut()
-        .unwrap()
-        .remove("top_pages");
-    let update = json!({"before":malformed_before,"after":profile(),"op":"u"});
-    assert!(decode(&serde_json::to_vec(&update).unwrap())
-        .unwrap_err()
-        .contains("21"));
-    let deletion = json!({"before":profile(),"after":null,"op":"d"});
-    assert!(decode(&serde_json::to_vec(&deletion).unwrap())
-        .unwrap_err()
-        .contains("deletion"));
 }

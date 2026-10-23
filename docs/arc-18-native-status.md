@@ -1,3 +1,18 @@
+> Active publication repair (23 October): the approved release is the 22-field
+> core/completed-session profile contract in [release SQL](arc-18-core-release-sql.md).
+> It uses native four-branch MERGE materialization, with a generic STR-150 engine
+> composition repair under validation. The ordinary JOIN/CDC failure is retained
+> as a regression candidate; no consumer filtering substitutes for complete output.
+> All 30 native Python checks and 10 API consumer tests pass. The first new pinned
+> Kafka graph exposed a response-SESSION physical-edge routing error before input;
+> that repair is independently reviewed and a fresh graph run is pending. See
+> `/home/jason/qa-evidence/str150-composed-publication-20261023/` for exact evidence.
+> [Native test deployment configuration](../deploy/native-test/README.md) now renders
+> all five jobs and three schemas with persistent RocksDB and existing Kafka input.
+> Source rendering is not a deployed service or a production recovery result.
+>
+> Older statements below describe their dated source versions.
+
 > Current-source follow-up: [23 October readiness ledger](arc-18-readiness-20261023.md).
 > Historical results below remain bound to their recorded engine revisions.
 

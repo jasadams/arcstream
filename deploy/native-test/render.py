@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build a source-only test deployment bundle. Makes no network or service calls."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -63,6 +64,18 @@ def main():
                                          'brokers': os.environ['KAFKA_BROKERS']}
         (tables / (table + '.json')).write_text(json.dumps(definition, indent=2) + '\n')
     (bundle / 'images.json').write_text(json.dumps({k: os.environ[k] for k in IMAGES}, indent=2) + '\n')
+    sources = [HERE / name for name in ('render.py', 'bootstrap.py', 'compose.yaml', 'gateway.conf')]
+    sources += [args.source_root / 'deploy/streamr-native/runtime-resources.json']
+    sources += [args.source_root / 'deploy/config/flaredb-tables' / (table + '.json')
+                for table in ('events', 'sessions')]
+    receipt = {
+        'status': 'rendered; runtime validation pending',
+        'source_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=args.source_root, text=True).strip(),
+        'source_files_sha256': {str(path.resolve()): hashlib.sha256(path.read_bytes()).hexdigest() for path in sources},
+        'rendered_files_sha256': {str(path.relative_to(bundle)): hashlib.sha256(path.read_bytes()).hexdigest()
+                                  for path in sorted(bundle.rglob('*')) if path.is_file()},
+    }
+    (bundle / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
 
 
 if __name__ == '__main__':

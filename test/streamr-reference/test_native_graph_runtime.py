@@ -43,14 +43,15 @@ class GraphOracleTests(unittest.TestCase):
     def test_unknown_profile_identity_fails(self):
         with self.assertRaises(ValueError):g.normalized([dict(tenant_id='tenant-a',canonical_id='unknown')],{})
 
-    def test_cdc_complete_before_after_and_no_hidden_duplicates(self):
-        first=dict(self.stages[0]['values'][0]);first.pop('action')
-        second=dict(self.stages[1]['values'][-1]);second.pop('action')
-        rows=[dict(before=None,after=first,op='c'),dict(before=first,after=second,op='u')]
-        decoded=g.decode_profiles(rows)
-        self.assertEqual([r['action'] for r in decoded],['create','update'])
-        for bad in (rows+[rows[-1]], [dict(before=None,after=first,op='u')], [dict(before=first,after=None,op='d')], [dict(before=None,after=dict(first,extra=1),op='c')]):
+    def test_native_materialized_snapshots_preserve_actions_and_reject_other_formats(self):
+        first=dict(self.stages[0]['values'][0])
+        second=dict(self.stages[1]['values'][-1])
+        rows=[first,second]
+        self.assertEqual(g.decode_profiles(rows),rows)
+        for bad in ([first,first], [second], [dict(before=None,after=first,op='c')], [dict(first,extra=1)], [dict(first,action='delete')]):
             with self.assertRaises(ValueError):g.decode_profiles(bad)
+        with self.assertRaises(ValueError):
+            g.p.check_snapshots(g.decode_profiles(rows+[second]), rows, ['tenant_id','canonical_id'])
 
     def test_literal_profiles_and_fractional_closed_average(self):
         g.p.validate_stages(self.stages,len(self.raw),1)
