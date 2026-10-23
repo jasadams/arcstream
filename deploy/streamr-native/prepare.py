@@ -93,7 +93,8 @@ def render_flaredb_profiles(broker, namespace):
     if not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,62}', namespace):
         raise ValueError('namespace must be 1..63 lowercase letters, numbers or hyphens')
     config = json.loads((HERE / 'flaredb/profiles.json').read_text())
-    config['ingestionConfig'] = dict(topic=namespace + '-profiles', brokers=broker)
+    config['ingestionConfig'] = dict(topic=namespace + '-profiles', brokers=broker,
+                                     groupId=namespace + '-flaredb-profiles')
     return config
 
 
@@ -146,6 +147,7 @@ def prepare(directory, broker, namespace, fixture=None, profile_release=False, r
         (config_directory / 'profiles.json').write_text(config_text)
         manifest['analytics_configs'] = {'flaredb/profiles.json': hashlib.sha256(config_text.encode()).hexdigest()}
         manifest['analytics_validation'] = 'schema prepared for a dedicated native instance; actual FlareDB ingestion not validated'
+        manifest['required_flaredb_contracts'] = ['FLA-177', 'FLA-178', 'FLA-179']
     (directory / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     return manifest
 

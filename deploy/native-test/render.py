@@ -61,7 +61,8 @@ def main():
     for table, suffix in [('events', 'unified-events'), ('sessions', 'sessions')]:
         definition = json.loads((args.source_root / 'deploy/config/flaredb-tables' / (table + '.json')).read_text())
         definition['ingestionConfig'] = {'topic': os.environ['NATIVE_NAMESPACE'] + '-' + suffix,
-                                         'brokers': os.environ['KAFKA_BROKERS']}
+                                         'brokers': os.environ['KAFKA_BROKERS'],
+                                         'groupId': os.environ['NATIVE_NAMESPACE'] + '-flaredb-' + table}
         (tables / (table + '.json')).write_text(json.dumps(definition, indent=2) + '\n')
     (bundle / 'images.json').write_text(json.dumps({k: os.environ[k] for k in IMAGES}, indent=2) + '\n')
     sources = [HERE / name for name in ('render.py', 'bootstrap.py', 'compose.yaml', 'gateway.conf')]

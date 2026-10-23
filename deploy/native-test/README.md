@@ -34,9 +34,11 @@ profile contract. The renderer reuses the maintained `prepare.py --profile-relea
 and requires its explicit `--raw-events-topic` interface (included in this checkout); it does not rewrite rendered SQL.
 
 The bundle uses the current reviewed native flat22 profiles schema rendered by
-`prepare.py`, plus the maintained events/sessions load-tables schemas. Only their
-Kafka topics/brokers change: `<namespace>-unified-events` and
-`<namespace>-sessions`. Their timestamp/int fields match the native SQL projections;
+`prepare.py`, plus the maintained events/sessions load-tables schemas. Their Kafka topics, brokers and explicit consumer groups are configured: `<namespace>-unified-events` and
+`<namespace>-sessions`. Each ingestion config explicitly supplies
+`groupId=<namespace>-flaredb-<table>` through the native FLA-179 contract. The bundle
+manifest declares FLA-177/178/179 requirements; publishing configuration does not
+claim those engine capabilities have passed executable qualification. Their timestamp/int fields match the native SQL projections;
 SESSION pages/event_types are extra output fields outside these analytics schemas.
 Source inspection of published FlareDB95b58cb found that JSON arrays are rejected
 by Utf8 fields, so the profile schema correctly declares native List(Utf8).
