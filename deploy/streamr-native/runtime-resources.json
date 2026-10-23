@@ -14,7 +14,7 @@
       "write-operations": 128
     },
     "window-state": {
-      "key-bytes": 512,
+      "key-bytes": 32768,
       "max-resident-bytes": 134217728,
       "page-bytes": 131072,
       "page-entries": 64,
@@ -58,7 +58,7 @@
       "max-snapshots": 4,
       "memtable-bytes": 4194304,
       "queued-write-bytes": 100663296,
-      "scan-page-bytes": 4194304
+      "scan-page-bytes": 16777216
     },
     "disk-sql-state": {
       "max-row-bytes": 8192
