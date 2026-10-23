@@ -37,8 +37,7 @@ struct FlareDBStats {
     rows_scanned: usize,
 }
 
-// Historical FlareDB receipts may still contain changed_fields; preserve their typed-array decoding.
-const PROFILE_ARRAY_COLUMNS: [&str; 3] = ["top_pages", "top_features", "changed_fields"];
+const PROFILE_ARRAY_COLUMNS: [&str; 2] = ["top_pages", "top_features"];
 
 fn decode_profile_value(
     name: &str,
@@ -47,15 +46,10 @@ fn decode_profile_value(
     if !PROFILE_ARRAY_COLUMNS.contains(&name) {
         return Ok(value.clone());
     }
-    let decoded = match value {
-        serde_json::Value::String(text) => serde_json::from_str(text)
-            .map_err(|_| format!("Invalid JSON array text in FlareDB profile column {name}"))?,
-        other => other.clone(),
-    };
-    match &decoded {
-        serde_json::Value::Null => Ok(decoded),
+    match value {
+        serde_json::Value::Null => Ok(value.clone()),
         serde_json::Value::Array(values) if values.iter().all(serde_json::Value::is_string) => {
-            Ok(decoded)
+            Ok(value.clone())
         }
         _ => Err(format!(
             "FlareDB profile column {name} requires an array of strings or null"
@@ -180,7 +174,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn profile_json_text_arrays_round_trip_escapes_empty_and_null() {
+    fn native_profile_arrays_preserve_escapes_empty_and_null() {
         let values = json!([
             "quote\"",
             "back\\slash",
@@ -196,11 +190,7 @@ mod tests {
                     "last_page".into(),
                 ],
             },
-            rows: vec![vec![
-                json!(values.to_string()),
-                json!("[]"),
-                json!("[ordinary page]"),
-            ]],
+            rows: vec![vec![values.clone(), json!([]), json!("[ordinary page]")]],
         };
         let decoded: serde_json::Value =
             serde_json::from_str(&table_to_jsonl(&table).unwrap()).unwrap();
@@ -209,7 +199,7 @@ mod tests {
             json!({"top_pages": values, "top_features": [], "last_page": "[ordinary page]"})
         );
         assert_eq!(
-            decode_profile_value("top_pages", &json!("null")).unwrap(),
+            decode_profile_value("top_pages", &json!(null)).unwrap(),
             serde_json::Value::Null
         );
         assert_eq!(
@@ -221,12 +211,16 @@ mod tests {
     #[test]
     fn malformed_profile_arrays_fail_in_every_result_path() {
         for value in [
+            json!("[]"),
+            json!("[\"valid JSON text\"]"),
+            json!("null"),
             json!("not JSON"),
             json!("{}"),
             json!("[1]"),
             json!("[null]"),
             json!(false),
             json!([1]),
+            json!([null]),
         ] {
             for name in PROFILE_ARRAY_COLUMNS {
                 let table = ResultTable {
@@ -245,31 +239,70 @@ mod tests {
 #[cfg(test)]
 mod published_http_tests {
     use super::*;
-    use crate::schema::{event::Event, live_profile::LiveProfile, user_profile::UserProfileRow};
+    use crate::schema::{live_profile::LiveProfile, user_profile::UserProfileRow};
+    use serde_json::json;
 
     #[test]
-    fn published_uncast_profile_response_deserializes_application_models() {
+    fn actual_native_http_profile_response_preserves_all_22_literal_fields() {
+        let response: FlareDBResponse =
+            serde_json::from_str(include_str!("fixtures/flaredb-profile-native-http.json"))
+                .unwrap();
+        let expected = json!([
+            {"tenant_id":"tenant-a","canonical_id":"cf3ebbc9-d5ce-40cc-888c-262e0d437eea",
+             "first_seen":"2020-02-01 10:00:02.000","last_seen":"2020-02-01 10:00:07.000",
+             "total_events":5,"page_views":1,"clicks":1,"logins":1,"feature_uses":2,
+             "user_id":"logged-user","last_page":"/login","last_country":"AU",
+             "last_device":"tablet","last_browser":"Firefox","events_1d":5,"events_7d":5,
+             "events_30d":5,"events_90d":5,"top_pages":["/home","/login"],
+             "top_features":["search","export"],"avg_session_duration_sec":5.0,"action":"update"},
+            {"tenant_id":"tenant-b","canonical_id":"f575e62e-2658-4ffc-9c0b-0ccc30237a53",
+             "first_seen":"2020-02-01 10:30:13.000","last_seen":"2020-02-01 10:30:13.000",
+             "total_events":1,"page_views":1,"clicks":0,"logins":0,"feature_uses":0,
+             "user_id":"","last_page":"/other","last_country":"","last_device":"phone",
+             "last_browser":"","events_1d":1,"events_7d":1,"events_30d":1,"events_90d":1,
+             "top_pages":["/other"],"top_features":[],"avg_session_duration_sec":null,"action":"create"}
+        ]);
+        let jsonl = table_to_jsonl(&response.result_table).unwrap();
+        let rows: Vec<serde_json::Value> = jsonl
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(json!(rows), expected);
+        assert_eq!(response.result_table.data_schema.column_names.len(), 22);
+        let users = crate::db::pinot::parse_jsonl::<UserProfileRow>(&jsonl);
+        assert_eq!(users.len(), 2);
+        for (index, row) in response.result_table.rows.iter().enumerate() {
+            // The same row decoder serves get_live_profile; query and query_with_stats use JSONL.
+            let decoded = decode_result_row(&response.result_table, row).unwrap();
+            let profile: LiveProfile =
+                serde_json::from_value(serde_json::Value::Object(decoded)).unwrap();
+            assert_eq!(profile.first_seen, users[index].first_seen);
+            assert_eq!(
+                profile.top_pages,
+                if index == 0 {
+                    vec!["/home", "/login"]
+                } else {
+                    vec!["/other"]
+                }
+            );
+            assert_eq!(
+                profile.avg_session_duration_sec,
+                if index == 0 { Some(5.0) } else { None }
+            );
+        }
+    }
+
+    #[test]
+    fn historical_string_encoded_array_http_response_is_rejected_unchanged() {
+        // Preserve the original scalar-engine receipt as negative evidence, not a native pass.
         let response: FlareDBResponse =
             serde_json::from_str(include_str!("fixtures/flaredb-profile-scalar-http.json"))
                 .unwrap();
-        let jsonl = table_to_jsonl(&response.result_table).unwrap();
-        let users = crate::db::pinot::parse_jsonl::<UserProfileRow>(&jsonl);
-        assert_eq!(users.len(), 3);
-        assert_eq!(users[0].first_seen, "2026-01-01 00:00:01.000");
-        assert_eq!(users[0].total_events, 1);
-        // Row b has the application's nonnullable array contract; rows a/c additionally test storage null preservation.
-        let decoded =
-            decode_result_row(&response.result_table, &response.result_table.rows[1]).unwrap();
-        let profile: LiveProfile =
-            serde_json::from_value(serde_json::Value::Object(decoded.clone())).unwrap();
-        assert_eq!(profile.first_seen, users[1].first_seen);
-        assert_eq!(profile.top_pages, Vec::<String>::new());
-        assert_eq!(profile.top_features, vec!["x\"\\☃"]);
-        let event: Event = serde_json::from_value(serde_json::json!({
-            "event_id":"fixture-event", "event_type":"page_view", "tenant_id":"fixture-tenant",
-            "canonical_id":"fixture-b", "event_time": decoded["first_seen"],
-            "anonymous_id":null,"user_id":null,"page_url":null,"device_type":null,"browser":null,"country":null
-        })).unwrap();
-        assert_eq!(event.event_time, "2026-01-01 00:00:01.000");
+        assert!(table_to_jsonl(&response.result_table)
+            .unwrap_err()
+            .contains("top_pages"));
+        for row in &response.result_table.rows {
+            assert!(decode_result_row(&response.result_table, row).is_err());
+        }
     }
 }
