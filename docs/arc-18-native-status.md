@@ -1,3 +1,22 @@
+# Native SQL integration status
+
+The approved five-job zero-UDF graph is implemented and has scoped native
+Kafka/RocksDB correctness/recovery evidence. The actual cluster launch passes
+readiness, while FLA-184 generation starvation at the larger live store still blocks production
+routing. Start with the [current delivery snapshot](arc-18-native-delivery-20261023.md)
+for exact versions, immutable pins, approved 22-field scope and remaining gaps.
+Production is not cut over; full parity and completed 90-day replay are not claimed.
+
+Application SQL/policy stays in Arcstream. Native SQL, original stream event time,
+the five-second watermark, state tables and RocksDB govern execution; historical
+Flink equivalence never authorizes a UDF, synthetic timer or semantic workaround.
+
+## Historical source-bound record
+
+The dated statements below are preserved verbatim. References to rejected
+composition, missing native graph or unresolved native List ingestion describe
+those older sources; the current snapshot supersedes them as agent instructions.
+
 > Current result (23 October): [publication and recovery evidence](arc-18-publication-recovery-20261023.md).
 > The approved 22-field native SQL graph passes all 11 real Kafka/RocksDB stages,
 > 13 complete literal profile snapshots, two actual worker SIGKILL/checkpoint

@@ -1,3 +1,7 @@
+> Historical source-bound report. Preserve the results below for their recorded
+> versions; use the [23 October delivery snapshot](arc-18-native-delivery-20261023.md)
+> for current integration and deployment status.
+
 # Native integration on merged engine source
 
 Validated 22 October 2026 against Streamr

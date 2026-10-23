@@ -1,3 +1,7 @@
+> Historical source-bound report. Preserve the results below for their recorded
+> versions; use the [23 October delivery snapshot](arc-18-native-delivery-20261023.md)
+> for current integration and deployment status.
+
 # Native profile publication and recovery — 23 October 2026
 
 The approved 22-field native SQL producer passes the real five-job application
