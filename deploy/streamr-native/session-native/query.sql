@@ -18,5 +18,18 @@ COALESCE(LAST_VALUE(country) FILTER(WHERE country_selected),'') AS country
 FROM selected GROUP BY tenant_id,session_id,window);
 CREATE TABLE result WITH(connector='single_file',path='{{OUTPUT}}',format='json',type='sink');
 CREATE VIEW expanded AS SELECT session_id,canonical_id,tenant_id,start_time,end_time,duration_sec,event_count,pages,device_type,browser,country,window,window_start,window_end,unnest(event_types) AS event_type FROM closed_sessions;
-CREATE VIEW counts AS SELECT session_id,canonical_id,tenant_id,start_time,end_time,duration_sec,event_count,pages,device_type,browser,country,window,window_start,window_end,event_type,COUNT(*) AS n FROM expanded GROUP BY session_id,canonical_id,tenant_id,start_time,end_time,duration_sec,event_count,pages,device_type,browser,country,window,window_start,window_end,event_type;
-INSERT INTO result SELECT session_id,canonical_id,tenant_id,to_char(start_time,'%Y-%m-%d %H:%M:%S%.3f') AS start_time,to_char(end_time,'%Y-%m-%d %H:%M:%S%.3f') AS end_time,duration_sec,event_count,array_sort(array_distinct(pages)) AS pages,map(ARRAY_AGG(event_type ORDER BY event_type),ARRAY_AGG(n ORDER BY event_type)) AS event_types,device_type,browser,country FROM counts GROUP BY session_id,canonical_id,tenant_id,start_time,end_time,duration_sec,event_count,pages,device_type,browser,country,window,window_start,window_end;
+-- Every expanded row for a closed (tenant, session, window) carries the same
+-- summary. Keep that metadata in native aggregate values, rather than repeating
+-- the full pages array in group keys. FIRST_VALUE selects identical copies here.
+CREATE VIEW counts AS SELECT tenant_id,session_id,window,event_type,COUNT(*) AS n,
+FIRST_VALUE(canonical_id) AS canonical_id,FIRST_VALUE(start_time) AS start_time,FIRST_VALUE(end_time) AS end_time,
+FIRST_VALUE(duration_sec) AS duration_sec,FIRST_VALUE(event_count) AS event_count,FIRST_VALUE(pages) AS pages,
+FIRST_VALUE(device_type) AS device_type,FIRST_VALUE(browser) AS browser,FIRST_VALUE(country) AS country
+FROM expanded GROUP BY tenant_id,session_id,window,event_type;
+INSERT INTO result SELECT session_id,FIRST_VALUE(canonical_id) AS canonical_id,tenant_id,
+to_char(FIRST_VALUE(start_time),'%Y-%m-%d %H:%M:%S%.3f') AS start_time,to_char(FIRST_VALUE(end_time),'%Y-%m-%d %H:%M:%S%.3f') AS end_time,
+FIRST_VALUE(duration_sec) AS duration_sec,FIRST_VALUE(event_count) AS event_count,
+array_sort(array_distinct(FIRST_VALUE(pages))) AS pages,
+map(ARRAY_AGG(event_type ORDER BY event_type),ARRAY_AGG(n ORDER BY event_type)) AS event_types,
+FIRST_VALUE(device_type) AS device_type,FIRST_VALUE(browser) AS browser,FIRST_VALUE(country) AS country
+FROM counts GROUP BY tenant_id,session_id,window;

@@ -65,6 +65,7 @@ DESCRIPTIONS = {
     'five-second-cutoff': 'Accept five-second-disordered activity, reject activity 5001 milliseconds behind source progress.',
     'event-time-ordering': 'Admitted out-of-order rows choose identity/start and final metadata by event time, not arrival.',
     'equal-time-ties': 'Equal event-time FIRST keeps first arrival; LAST prefers later write under STR-60.',
+    'large-pages': 'Ten admitted events with long repeated pages exceed the old 512-byte grouping-key budget; native values preserve the full summary.',
     'chronological-recovery': 'Three sequential sessions with distinct identities and source-progress closures; fault after first committed summary while later summaries remain.',
 }
 
@@ -74,7 +75,30 @@ def fixture(case):
     by_id = {row['event_id']: row for row in data['inputs'] if row['kind'] in ('event', 'progress')}
     def progress(name, at):
         return dict(kind='progress', event_id=name, tenant_id='progress', session_id='', canonical_id='progress', event_time=at, event_type='page_view')
-    if case == 'chronological-recovery':
+    if case == 'large-pages':
+        # Input generation is compact; all twelve expected output fields below
+        # are independent literals, never computed by an aggregation oracle.
+        signals = []
+        for index in range(10):
+            signals.append(dict(kind='event', event_id=f'large-{index:03}',
+                                tenant_id='tenant-long', session_id='long-session',
+                                canonical_id='long-first' if index == 0 else f'later-{index}',
+                                event_time=f'2020-02-01 00:{index//60:02}:{index%60:02}.000',
+                                event_type=('page_view','click','feature_used')[index % 3],
+                                page_url=('/catalog/product/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '/checkout/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', '/home/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc')[index % 3],
+                                device_type='desktop' if index == 0 else '',
+                                browser='Firefox' if index == 0 else None,
+                                country='AU' if index == 0 else ''))
+        signals[5].update(device_type='mobile', browser='Chrome', country='GB')
+        signals[9].update(device_type='tablet', browser='Safari', country='NZ')
+        signals.append(progress('close-large', '2020-02-01 00:40:00.000'))
+        expected = [dict(tenant_id='tenant-long', session_id='long-session',
+                         canonical_id='long-first', start_time='2020-02-01 00:00:00.000',
+                         end_time='2020-02-01 00:00:09.000', duration_sec=9,
+                         event_count=10, pages=['/catalog/product/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '/checkout/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', '/home/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'],
+                         event_types={'page_view':4,'click':3,'feature_used':3},
+                         device_type='tablet', browser='Safari', country='NZ')]
+    elif case == 'chronological-recovery':
         signals = []
         expected = []
         # Explicit application oracle: do not derive expected aggregation from
