@@ -3,7 +3,7 @@
 The approved native graph is implemented and has scoped Kafka/RocksDB
 correctness/recovery evidence. Start with the
 [current delivery snapshot](../../docs/arc-18-native-delivery-20261023.md) for exact
-sources, pins, passed cases and the current FLA-183 query-availability blocker.
+sources, pins, passed cases and the current FLA-184 generation-progress blocker.
 Older composition rejection reports remain historical source-bound evidence;
 do not restart that already completed integration work from those reports.
 

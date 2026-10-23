@@ -2,7 +2,7 @@
 
 The approved five-job zero-UDF graph is implemented and has scoped native
 Kafka/RocksDB correctness/recovery evidence. The actual cluster launch passes
-readiness, while FLA-183 concurrent-query availability still blocks production
+readiness, while FLA-184 generation starvation at the larger live store still blocks production
 routing. Start with the [current delivery snapshot](arc-18-native-delivery-20261023.md)
 for exact versions, immutable pins, approved 22-field scope and remaining gaps.
 Production is not cut over; full parity and completed 90-day replay are not claimed.

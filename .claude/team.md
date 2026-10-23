@@ -19,7 +19,7 @@
   correctness and recovery evidence. Native deployment is maintained in private
   `arcstream-cloud`: launch, qualified FlareDB-only update, then separate routing.
 - Read `docs/arc-18-native-delivery-20261023.md` and the current ARC-17/18 ledger
-  before acting. FLA-183 query availability currently blocks cutover; pending
+  before acting. FLA-184 generation starvation currently blocks cutover; pending
   candidates and historical failed reports are not readiness evidence.
 - Image publication, integration readiness, replay completion and production
   cutover are distinct. Cutover requires actual application evidence and explicit
