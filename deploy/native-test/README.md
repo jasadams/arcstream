@@ -21,6 +21,13 @@ GATEWAY_IMAGE. STREAMR_IMAGE must expose the Streamr binary as its entrypoint;
 PYTHON_IMAGE must provide python3; GATEWAY_IMAGE must provide nginx.
 No image version or release tag is invented or published by this foundation.
 
+Application test images are published by the maintained `Publish Docker Images`
+workflow. A manual run on the reviewed source commit publishes only
+`sha-<full commit>` image tags; it does not update the version or `latest` tags.
+Resolve the successful run's dashboard/query-api digests and record them in the
+bundle. Versioned releases continue through the existing explicit version-tag
+workflow. Image publication does not start this Compose project or change ingress.
+
 The Streamr image must be the source-qualified native build, with process workers
 and RocksDB included. The application images must include the approved 22-field
 profile contract. The renderer reuses the maintained `prepare.py --profile-release`
