@@ -29,7 +29,8 @@ create/update. The Kafka sink uses plain JSON with exactly 22 fields. The
 transport adapter validates that snapshot without computing business values or
 inferring an action. There is no CDC fallback or suppression of delete records.
 The earlier JOIN/CDC query is retained as `lifecycle-candidates/join-cdc-release.sql`.
-The new engine composition and this application query require runtime qualification.
+The repaired engine composition and this query pass the scoped Kafka/RocksDB
+fixture described in [publication recovery evidence](arc-18-publication-recovery-20261023.md).
 A closure must publish the entire profile including the new average without
 waiting for another event belonging to that person.
 

@@ -1,6 +1,6 @@
 {
   "component": "profiles-first-release",
-  "status": "native-merge-publication-prepared-awaiting-engine-and-application-validation",
+  "status": "native-merge-kafka-rocksdb-application-fixture-passed; flaredb-ingestion-and-deployment-pending",
   "output_fields": [
     {
       "name": "tenant_id",
@@ -163,5 +163,6 @@
     "top_features",
     "avg_session_duration_sec",
     "action"
-  ]
+  ],
+  "validated_engine_commit": "1314e702a955ad3f19c390b3f10c9d3ee1958d40"
 }
