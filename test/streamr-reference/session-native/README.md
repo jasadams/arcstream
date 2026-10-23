@@ -59,12 +59,16 @@ occupy1100 UTF8 bytes before encoding: the previous grouping of the full raw
 pages array could not fit a512-byte key. The expected12 fields are independent
 literals: first identity `long-first`, count10, duration9, three110-byte literal URLs rooted at
 `/catalog/product`, `/checkout`, `/home`, event counts4page_view/3click/
-3feature_used, final metadata tablet/Safari/NZ. Metadata/page aggregates remain
-native values; no limit is increased, event is removed or result is inferred
-from an engine run. Existing fixture expectations remain unchanged.
+3feature_used, final metadata tablet/Safari/NZ. Pages are normalized to the same final sorted set before downstream grouping;
+metadata and normalized pages remain grouping fields. No event is removed and
+no result is inferred from an engine run. Existing fixture expectations remain
+unchanged. The finite resource configuration is sized separately below.
 
 For bounded runtime qualification, run all nine cases on RocksDB with the
-existing512-byte key limits. Use `native_sql_runtime.py`, `--typed-owners 0`,
+maintained16KiB window-key/32KiB partial/8MiB scan-pool envelope from
+`deploy/streamr-native/runtime-resources.json` and its accompanying resource
+documentation. The baseline512-byte configuration remains failure evidence.
+Use `native_sql_runtime.py`, `--typed-owners 0`,
 `--window-owners 3`, `--unordered-output` and the existing normal resource
 configuration. Use `--fault-prefix 2` for ordinary cases, `--fault-prefix 10`
 for `large-pages` (all10 open-session rows checkpointed before closure), and

@@ -65,7 +65,7 @@ DESCRIPTIONS = {
     'five-second-cutoff': 'Accept five-second-disordered activity, reject activity 5001 milliseconds behind source progress.',
     'event-time-ordering': 'Admitted out-of-order rows choose identity/start and final metadata by event time, not arrival.',
     'equal-time-ties': 'Equal event-time FIRST keeps first arrival; LAST prefers later write under STR-60.',
-    'large-pages': 'Ten admitted events with long repeated pages exceed the old 512-byte grouping-key budget; native values preserve the full summary.',
+    'large-pages': 'Ten admitted events with long repeated pages exceed the old 512-byte grouping-key budget; early scalar pages normalization preserves the full summary.',
     'chronological-recovery': 'Three sequential sessions with distinct identities and source-progress closures; fault after first committed summary while later summaries remain.',
 }
 
