@@ -57,7 +57,8 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
 #[derive(Clone, Copy)]
 pub struct Tick(pub ReadSignal<u64>);
 
-pub type UserRow = (String, RwSignal<UserProfile>, RwSignal<bool>);
+pub type ProfileKey = (String, String);
+pub type UserRow = (ProfileKey, RwSignal<UserProfile>, RwSignal<bool>);
 
 /// Whether the dev panel feature is available (controlled by `DEV_PANEL` env var).
 /// Uses a signal so SSR and WASM both start with `false` (no hydration mismatch),
@@ -75,7 +76,7 @@ pub struct DevMode {
 pub struct UserListCache {
     pub page: RwSignal<u32>,
     pub rows: RwSignal<Vec<UserRow>>,
-    pub lookup: StoredValue<HashMap<String, RwSignal<UserProfile>>>,
+    pub lookup: StoredValue<HashMap<ProfileKey, RwSignal<UserProfile>>>,
     pub last_fetched_page: StoredValue<Option<u32>>,
     pub total: RwSignal<Option<u64>>,
     pub owner: StoredValue<Owner>,

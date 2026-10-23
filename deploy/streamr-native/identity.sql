@@ -8,7 +8,7 @@ CREATE TABLE raw_events (
   page_url TEXT, referrer TEXT, element_id TEXT, feature_name TEXT,
   device_type TEXT, browser TEXT, os TEXT, country TEXT, properties TEXT,
   event_ts TIMESTAMP GENERATED ALWAYS AS (CAST(event_time AS TIMESTAMP)) STORED,
-  WATERMARK FOR event_ts AS event_ts - INTERVAL '5 seconds'
+  WATERMARK FOR event_ts AS CAST(event_time AS TIMESTAMP) - INTERVAL '5 seconds'
 ) WITH (
   connector = 'kafka', bootstrap_servers = 'broker:9092',
   topic = 'arc-native-raw-events', format = 'json', type = 'source',
@@ -28,8 +28,7 @@ CREATE TABLE identity_capture (
   topic = 'arc-native-identity-capture', format = 'json', type = 'sink',
   'sink.commit_mode' = 'exactly_once',
   'sink.recovery_topic' = 'arc-native-identity-commits',
-  'sink.recovery_max_bytes' = '8388608',
-  client_configs = 'transaction.timeout.ms=10000,compression.type=lz4'
+  client_configs = 'transaction.timeout.ms=60000,compression.type=lz4'
 );
 
 CREATE STATE TABLE anonymous_bindings (

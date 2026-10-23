@@ -5,92 +5,75 @@ fn profile() -> Value {
     json!({
         "canonical_id":"person", "tenant_id":"tenant", "user_id":"user",
         "first_seen":1735689600000u64, "last_seen":1735689605000u64,
-        "updated_at":1735689605000u64, "total_events":2, "total_sessions":1,
+        "total_events":2,
         "events_1d":2, "events_7d":2, "events_30d":2, "events_90d":2,
-        "sessions_1d":1, "sessions_7d":1, "sessions_30d":1, "sessions_90d":1,
-        "avg_session_duration_sec":0, "current_session_active":true,
-        "current_session_duration_sec":5, "page_views":1, "clicks":1, "logins":0,
+
+        "avg_session_duration_sec":null,
+         "page_views":1, "clicks":1, "logins":0,
         "feature_uses":0, "last_page":"/home", "last_country":"AU",
         "last_device":"desktop", "last_browser":"Firefox",
-        "top_pages":["/home"], "top_features":[], "action":"update",
-        "changed_fields":["total_events","clicks"],
-        "timestamp":"2025-01-01 00:00:05.000", "trigger":"event"
+        "top_pages":["/home"], "top_features":[], "action":"create"
     })
 }
 
-#[test]
-fn native_update_publishes_after_image_with_real_session_fields() {
-    let mut before = profile();
-    before["total_events"] = json!(1);
-    before["current_session_duration_sec"] = json!(0);
-    let payload = json!({"before":before,"after":profile(),"op":"u"});
-    let message = decode(&serde_json::to_vec(&payload).unwrap())
-        .unwrap()
-        .unwrap();
-    assert_eq!(message.tenant_id, "tenant");
-    assert_eq!(message.profile.total_events, 2);
-    assert_eq!(message.profile.sessions_30d, 1);
-    assert_eq!(message.profile.sessions_90d, 1);
-    assert!(message.profile.current_session_active);
-    assert_eq!(message.profile.current_session_duration_sec, 5);
-    assert_eq!(message.profile.first_seen, "2025-01-01 00:00:00.000");
-    assert_eq!(message.changed_fields, vec!["total_events", "clicks"]);
-    assert_eq!(message.trigger, "event");
+fn decode_image(
+    row: &Value,
+) -> Result<Option<query_api::streaming::types::ProfileUpdateMessage>, String> {
+    decode(&serde_json::to_vec(row).unwrap())
 }
 
 #[test]
-fn native_create_and_snapshot_require_complete_application_schema() {
-    for op in ["c", "r"] {
-        let payload = json!({"before":null,"after":profile(),"op":op});
-        assert!(decode(&serde_json::to_vec(&payload).unwrap())
-            .unwrap()
-            .is_some());
+fn native_snapshot_preserves_actual_create_and_update_actions() {
+    for action in ["create", "update"] {
+        let mut row = profile();
+        row["action"] = json!(action);
+        let message = decode_image(&row).unwrap().unwrap();
+        assert_eq!(message.action, action);
+        assert_eq!(message.tenant_id, "tenant");
+        assert_eq!(message.profile.total_events, 2);
+        assert_eq!(message.profile.first_seen, "2025-01-01 00:00:00.000");
     }
-    let mut partial = profile();
-    for field in [
-        "updated_at",
-        "avg_session_duration_sec",
-        "current_session_active",
-        "current_session_duration_sec",
-        "action",
-        "changed_fields",
-        "timestamp",
-        "trigger",
-    ] {
+}
+
+#[test]
+fn every_release_field_is_required() {
+    for field in profile().as_object().unwrap().keys() {
+        let mut partial = profile();
         partial.as_object_mut().unwrap().remove(field);
+        assert!(
+            decode_image(&partial).unwrap_err().contains("22"),
+            "accepted missing {field}"
+        );
     }
-    let payload = json!({"before":null,"after":partial,"op":"c"});
-    assert!(decode(&serde_json::to_vec(&payload).unwrap())
-        .unwrap_err()
-        .contains("33"));
 }
 
 #[test]
-fn native_cdc_rejects_cross_tenant_and_malformed_retractions() {
-    let mut other = profile();
-    other["tenant_id"] = json!("other-tenant");
+fn cdc_envelopes_are_rejected_without_an_alternate_format_fallback() {
     for payload in [
-        json!({"before":other,"after":profile(),"op":"u"}),
-        json!({"before":null,"after":profile(),"op":"u"}),
+        json!({"before":null,"after":profile(),"op":"c"}),
+        json!({"before":profile(),"after":profile(),"op":"u"}),
         json!({"before":profile(),"after":null,"op":"d"}),
-        json!({"before":null,"after":profile(),"op":"unknown"}),
     ] {
         assert!(decode(&serde_json::to_vec(&payload).unwrap()).is_err());
     }
-    let mut wrong_type = profile();
-    wrong_type["current_session_active"] = json!("true");
-    let payload = json!({"before":null,"after":wrong_type,"op":"c"});
-    assert!(decode(&serde_json::to_vec(&payload).unwrap()).is_err());
+    assert!(decode(b"null").unwrap().is_none());
 }
 
 #[test]
-fn flat_application_profile_and_kafka_tombstones_are_supported() {
-    let message = decode(&serde_json::to_vec(&profile()).unwrap())
-        .unwrap()
-        .unwrap();
-    assert!(message.profile.current_session_active);
-    assert_eq!(message.profile.current_session_duration_sec, 5);
-    assert!(decode(b"null").unwrap().is_none());
+fn malformed_required_types_and_empty_identity_are_rejected() {
+    for (field, value) in [
+        ("avg_session_duration_sec", json!("2.5")),
+        ("total_events", json!("2")),
+        ("first_seen", json!("1735689600000")),
+        ("top_pages", json!("[\"/home\"]")),
+        ("top_features", json!([1])),
+        ("tenant_id", json!("")),
+        ("canonical_id", json!("")),
+    ] {
+        let mut row = profile();
+        row[field] = value;
+        assert!(decode_image(&row).is_err(), "{field}");
+    }
 }
 
 #[test]
@@ -98,9 +81,7 @@ fn historical_profile_timestamps_preserve_pre_epoch_source_time() {
     let mut historical = profile();
     historical["first_seen"] = json!(-1000);
     historical["last_seen"] = json!(-1);
-    let message = decode(&serde_json::to_vec(&historical).unwrap())
-        .unwrap()
-        .unwrap();
+    let message = decode_image(&historical).unwrap().unwrap();
     assert_eq!(message.profile.first_seen, "1969-12-31 23:59:59.000");
     assert_eq!(message.profile.last_seen, "1969-12-31 23:59:59.999");
 }
@@ -109,21 +90,48 @@ fn historical_profile_timestamps_preserve_pre_epoch_source_time() {
 fn out_of_range_profile_time_is_rejected_instead_of_blank_timestamp() {
     let mut invalid = profile();
     invalid["first_seen"] = json!(i64::MAX);
-    assert!(decode(&serde_json::to_vec(&invalid).unwrap()).is_err());
+    assert!(decode_image(&invalid).is_err());
 }
 
 #[test]
-fn live_session_duration_retains_signed_clock_skew() {
-    let mut future_session = profile();
-    future_session["current_session_duration_sec"] = json!(-30);
-    let message = decode(&serde_json::to_vec(&future_session).unwrap())
-        .unwrap()
-        .unwrap();
-    assert_eq!(message.profile.current_session_duration_sec, -30);
+fn completed_average_preserves_null_and_fractional_values() {
+    for value in [Value::Null, json!(2.125), json!(0.0)] {
+        let mut row = profile();
+        row["avg_session_duration_sec"] = value.clone();
+        let message = decode_image(&row).unwrap().unwrap();
+        assert_eq!(
+            serde_json::to_value(message.profile.avg_session_duration_sec).unwrap(),
+            value
+        );
+    }
+    let mut invalid = profile();
+    invalid["avg_session_duration_sec"] = json!(-0.5);
+    assert!(decode_image(&invalid).is_err());
+}
+
+#[test]
+fn deferred_fields_are_rejected_instead_of_silently_filled() {
+    for field in [
+        "total_sessions",
+        "sessions_1d",
+        "sessions_7d",
+        "sessions_30d",
+        "sessions_90d",
+        "current_session_active",
+        "current_session_duration_sec",
+        "updated_at",
+        "timestamp",
+        "trigger",
+        "changed_fields",
+    ] {
+        let mut row = profile();
+        row[field] = json!(0);
+        assert!(decode_image(&row).is_err(), "{field}");
+    }
 }
 
 #[tokio::test]
-async fn native_profile_reaches_graphql_with_session_state_and_all_window_counters() {
+async fn native_profile_reaches_graphql_with_core_and_completed_average() {
     use async_graphql::{EmptyMutation, Schema};
     use futures_util::StreamExt;
     use query_api::schema::{subscription::SubscriptionRoot, QueryRoot};
@@ -131,17 +139,14 @@ async fn native_profile_reaches_graphql_with_session_state_and_all_window_counte
     use tokio::sync::broadcast;
 
     let mut after = profile();
-    after["current_session_duration_sec"] = json!(-30);
-    let payload = json!({"before":null,"after":after,"op":"c"});
-    let message = decode(&serde_json::to_vec(&payload).unwrap())
-        .unwrap()
-        .unwrap();
+    after["avg_session_duration_sec"] = json!(2.125);
+    let message = decode_image(&after).unwrap().unwrap();
     let (sender, _) = broadcast::channel::<ProfileUpdateMessage>(16);
     let schema = Schema::build(QueryRoot::default(), EmptyMutation, SubscriptionRoot)
         .data(sender.clone())
         .finish();
     let mut stream = Box::pin(schema.execute_stream(
-        "subscription { profileUpdates(tenantId: \"tenant\") { tenantId trigger profile { canonicalId totalEvents sessions1D sessions7D sessions30D sessions90D currentSessionActive currentSessionDurationSec topPages } } }"
+        "subscription { profileUpdates(tenantId: \"tenant\") { tenantId action profile { canonicalId totalEvents events1D events7D events30D events90D avgSessionDurationSec topPages } } }"
     ));
     let (response, ()) = tokio::time::timeout(std::time::Duration::from_secs(2), async {
         tokio::join!(stream.next(), async {
@@ -159,12 +164,27 @@ async fn native_profile_reaches_graphql_with_session_state_and_all_window_counte
     assert_eq!(
         data["profileUpdates"],
         json!({
-            "tenantId":"tenant", "trigger":"event", "profile": {
+            "tenantId":"tenant", "action":"create", "profile": {
                 "canonicalId":"person", "totalEvents":2,
-                "sessions1D":1, "sessions7D":1, "sessions30D":1, "sessions90D":1,
-                "currentSessionActive":true, "currentSessionDurationSec":-30,
+                "events1D":2, "events7D":2, "events30D":2, "events90D":2, "avgSessionDurationSec":2.125,
                 "topPages":["/home"]
             }
         })
     );
+}
+
+#[test]
+fn unsupported_or_mistyped_native_actions_are_rejected() {
+    for action in [
+        json!(""),
+        json!("timer"),
+        json!("insert"),
+        json!("delete"),
+        json!(null),
+        json!(1),
+    ] {
+        let mut row = profile();
+        row["action"] = action;
+        assert!(decode_image(&row).is_err());
+    }
 }

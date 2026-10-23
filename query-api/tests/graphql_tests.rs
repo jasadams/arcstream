@@ -1,8 +1,6 @@
 use async_graphql::{EmptyMutation, Schema};
 use async_trait::async_trait;
-use query_api::db::pinot::{
-    parse_jsonl, sanitize_input, sanitize_timestamp, PinotQuerier,
-};
+use query_api::db::pinot::{parse_jsonl, sanitize_input, sanitize_timestamp, PinotQuerier};
 use query_api::db::LiveProfileProvider;
 use query_api::schema::subscription::SubscriptionRoot;
 use query_api::schema::QueryRoot;
@@ -232,7 +230,6 @@ mod enums {
         assert_eq!(UserSort::FirstSeen.to_column(), "first_seen");
         assert_eq!(UserSort::LastSeen.to_column(), "last_seen");
         assert_eq!(UserSort::TotalEvents.to_column(), "total_events");
-        assert_eq!(UserSort::TotalSessions.to_column(), "total_sessions");
     }
 
     #[test]
@@ -325,9 +322,7 @@ mod schema_tests {
                     return Ok(r#"{"unique_users":10}"#.into());
                 }
                 if sql.contains("GROUP BY tenant_id") {
-                    return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
-                    );
+                    return Ok(r#"{"tenant_id":"acme-corp","total_events":100}"#.into());
                 }
                 assert!(sql.contains("tenant_id = 'acme-corp'"));
                 assert!(sql.contains("ORDER BY event_time DESC"));
@@ -360,9 +355,7 @@ mod schema_tests {
                     return Ok(r#"{"unique_users":10}"#.into());
                 }
                 if sql.contains("GROUP BY tenant_id") {
-                    return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
-                    );
+                    return Ok(r#"{"tenant_id":"acme-corp","total_events":100}"#.into());
                 }
                 assert!(
                     sql.contains("event_type = 'page_view'"),
@@ -394,9 +387,7 @@ mod schema_tests {
                     return Ok(r#"{"unique_users":10}"#.into());
                 }
                 if sql.contains("GROUP BY tenant_id") {
-                    return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
-                    );
+                    return Ok(r#"{"tenant_id":"acme-corp","total_events":100}"#.into());
                 }
                 assert!(
                     sql.contains("event_time >= '2026-05-01T00:00:00'"),
@@ -428,9 +419,7 @@ mod schema_tests {
                     return Ok(r#"{"unique_users":10}"#.into());
                 }
                 if sql.contains("GROUP BY tenant_id") {
-                    return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
-                    );
+                    return Ok(r#"{"tenant_id":"acme-corp","total_events":100}"#.into());
                 }
                 assert!(sql.contains("GROUP BY event_type"));
                 Ok(r#"{"event_type":"page_view","total_events":500}
@@ -460,9 +449,7 @@ mod schema_tests {
                     return Ok(r#"{"unique_users":10}"#.into());
                 }
                 if sql.contains("GROUP BY tenant_id") {
-                    return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
-                    );
+                    return Ok(r#"{"tenant_id":"acme-corp","total_events":100}"#.into());
                 }
                 assert!(
                     sql.contains("country as key"),
@@ -480,9 +467,7 @@ mod schema_tests {
         );
 
         let resp = schema
-            .execute(
-                r#"{ tenant(id: "acme-corp") { aggregate(groupBy: COUNTRY) { key count } } }"#,
-            )
+            .execute(r#"{ tenant(id: "acme-corp") { aggregate(groupBy: COUNTRY) { key count } } }"#)
             .await;
 
         assert!(resp.errors.is_empty(), "errors: {:?}", resp.errors);
@@ -500,9 +485,7 @@ mod schema_tests {
                     return Ok(r#"{"unique_users":10}"#.into());
                 }
                 if sql.contains("GROUP BY tenant_id") {
-                    return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
-                    );
+                    return Ok(r#"{"tenant_id":"acme-corp","total_events":100}"#.into());
                 }
                 assert!(
                     sql.contains("device_type as key"),
@@ -538,9 +521,7 @@ mod schema_tests {
                     return Ok(r#"{"unique_users":10}"#.into());
                 }
                 if sql.contains("GROUP BY tenant_id") {
-                    return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
-                    );
+                    return Ok(r#"{"tenant_id":"acme-corp","total_events":100}"#.into());
                 }
                 if sql.contains("country as key") {
                     return Ok(r#"{"key":"US","count":500}"#.into());
@@ -578,9 +559,7 @@ mod schema_tests {
                     return Ok(r#"{"unique_users":10}"#.into());
                 }
                 if sql.contains("GROUP BY tenant_id") {
-                    return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
-                    );
+                    return Ok(r#"{"tenant_id":"acme-corp","total_events":100}"#.into());
                 }
                 if sql.contains("COUNT(*) AS total") {
                     return Ok(r#"{"total":42}"#.into());
@@ -593,7 +572,7 @@ mod schema_tests {
                     sql.contains("ORDER BY first_seen ASC"),
                     "expected sort, got: {sql}"
                 );
-                Ok(r#"{"tenant_id":"acme-corp","canonical_id":"u1","first_seen":"2026-01-01 00:00:00Z","last_seen":"2026-05-23 12:00:00Z","total_events":50,"total_sessions":5,"page_views":30,"clicks":10,"signups":1,"logins":3,"feature_uses":6,"last_country":"US","last_device":"desktop","last_browser":"Chrome"}"#.into())
+                Ok(r#"{"tenant_id":"acme-corp","canonical_id":"u1","first_seen":"2026-01-01 00:00:00Z","last_seen":"2026-05-23 12:00:00Z","total_events":50,"page_views":30,"clicks":10,"logins":3,"feature_uses":6,"last_country":"US","last_device":"desktop","last_browser":"Chrome"}"#.into())
             },
             no_profile,
         );
@@ -619,27 +598,25 @@ mod schema_tests {
                     return Ok(r#"{"unique_users":10}"#.into());
                 }
                 if sql.contains("GROUP BY tenant_id") {
-                    return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
-                    );
+                    return Ok(r#"{"tenant_id":"acme-corp","total_events":100}"#.into());
                 }
                 if sql.contains("COUNT(*) AS total") {
                     return Ok(r#"{"total":1}"#.into());
                 }
-                Ok(r#"{"tenant_id":"acme-corp","canonical_id":"u1","first_seen":"2026-01-01 00:00:00Z","last_seen":"2026-05-23 12:00:00Z","total_events":50,"total_sessions":5,"page_views":30,"clicks":10,"signups":1,"logins":3,"feature_uses":6,"last_country":"US","last_device":"desktop","last_browser":"Chrome"}"#.into())
+                Ok(r#"{"tenant_id":"acme-corp","canonical_id":"u1","first_seen":"2026-01-01 00:00:00Z","last_seen":"2026-05-23 12:00:00Z","total_events":50,"page_views":30,"clicks":10,"logins":3,"feature_uses":6,"last_country":"US","last_device":"desktop","last_browser":"Chrome"}"#.into())
             },
             |tenant, id| {
                 assert_eq!(tenant, "acme-corp");
                 assert_eq!(id, "u1");
                 Ok(Some(
-                    r#"{"canonical_id":"u1","user_id":"alice","total_events":50,"total_sessions":5,"events_1d":3,"events_7d":20,"events_30d":40,"events_90d":50,"sessions_1d":1,"sessions_7d":3,"avg_session_duration_sec":120,"current_session_active":true,"current_session_duration_sec":300,"page_views":30,"clicks":10,"logins":3,"feature_uses":6,"last_page":"/dashboard","last_country":"US","last_device":"desktop","last_browser":"Chrome","top_pages":["/home","/settings"],"top_features":["search","export"]}"#.into(),
+                    r#"{"canonical_id":"u1","user_id":"alice","total_events":50,"events_1d":3,"events_7d":20,"events_30d":40,"events_90d":50,"avg_session_duration_sec":120,"page_views":30,"clicks":10,"logins":3,"feature_uses":6,"last_page":"/dashboard","last_country":"US","last_device":"desktop","last_browser":"Chrome","top_pages":["/home","/settings"],"top_features":["search","export"]}"#.into(),
                 ))
             },
         );
 
         let resp = schema
             .execute(
-                r#"{ tenant(id: "acme-corp") { users(limit: 1) { nodes { canonicalId liveProfile { userId currentSessionActive topPages topFeatures } } } } }"#,
+                r#"{ tenant(id: "acme-corp") { users(limit: 1) { nodes { canonicalId liveProfile { userId avgSessionDurationSec topPages topFeatures } } } } }"#,
             )
             .await;
 
@@ -647,7 +624,7 @@ mod schema_tests {
         let data = resp.data.into_json().unwrap();
         let profile = &data["tenant"]["users"]["nodes"][0]["liveProfile"];
         assert_eq!(profile["userId"], "alice");
-        assert_eq!(profile["currentSessionActive"], true);
+        assert_eq!(profile["avgSessionDurationSec"], 120.0);
         assert_eq!(profile["topPages"][0], "/home");
         assert_eq!(profile["topFeatures"][0], "search");
     }
@@ -660,14 +637,12 @@ mod schema_tests {
                     return Ok(r#"{"unique_users":10}"#.into());
                 }
                 if sql.contains("GROUP BY tenant_id") {
-                    return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
-                    );
+                    return Ok(r#"{"tenant_id":"acme-corp","total_events":100}"#.into());
                 }
                 if sql.contains("COUNT(*) AS total") {
                     return Ok(r#"{"total":1}"#.into());
                 }
-                Ok(r#"{"tenant_id":"acme-corp","canonical_id":"u1","first_seen":"2026-01-01 00:00:00Z","last_seen":"2026-05-23 12:00:00Z","total_events":50,"total_sessions":5,"page_views":30,"clicks":10,"signups":1,"logins":3,"feature_uses":6,"last_country":"US","last_device":"desktop","last_browser":"Chrome"}"#.into())
+                Ok(r#"{"tenant_id":"acme-corp","canonical_id":"u1","first_seen":"2026-01-01 00:00:00Z","last_seen":"2026-05-23 12:00:00Z","total_events":50,"page_views":30,"clicks":10,"logins":3,"feature_uses":6,"last_country":"US","last_device":"desktop","last_browser":"Chrome"}"#.into())
             },
             no_profile,
         );
@@ -691,15 +666,13 @@ mod schema_tests {
                     return Ok(r#"{"unique_users":10}"#.into());
                 }
                 if sql.contains("GROUP BY tenant_id") {
-                    return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
-                    );
+                    return Ok(r#"{"tenant_id":"acme-corp","total_events":100}"#.into());
                 }
                 if sql.contains("COUNT(*) AS total") {
                     return Ok(r#"{"total":1}"#.into());
                 }
                 if sql.contains("FROM profiles") {
-                    return Ok(r#"{"tenant_id":"acme-corp","canonical_id":"u1","first_seen":"2026-01-01 00:00:00Z","last_seen":"2026-05-23 12:00:00Z","total_events":50,"total_sessions":5,"page_views":30,"clicks":10,"signups":1,"logins":3,"feature_uses":6,"last_country":"US","last_device":"desktop","last_browser":"Chrome"}"#.into());
+                    return Ok(r#"{"tenant_id":"acme-corp","canonical_id":"u1","first_seen":"2026-01-01 00:00:00Z","last_seen":"2026-05-23 12:00:00Z","total_events":50,"page_views":30,"clicks":10,"logins":3,"feature_uses":6,"last_country":"US","last_device":"desktop","last_browser":"Chrome"}"#.into());
                 }
                 assert!(
                     sql.contains("canonical_id = 'u1'"),
@@ -728,41 +701,29 @@ mod schema_tests {
     }
 
     #[tokio::test]
-    async fn query_tenant_active_sessions() {
-        let schema = build_schema(
-            |sql| {
-                if sql.contains("unique_users") {
-                    return Ok(r#"{"unique_users":10}"#.into());
-                }
-                if sql.contains("GROUP BY tenant_id") {
-                    return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
-                    );
-                }
-                if sql.contains("DISTINCTCOUNTHLL(session_id)") {
-                    assert!(
-                        sql.contains("tenant_id = 'acme-corp'"),
-                        "expected tenant filter, got: {sql}"
-                    );
-                    assert!(
-                        sql.contains("event_time >"),
-                        "expected time filter, got: {sql}"
-                    );
-                    return Ok(r#"{"active_sessions":7}"#.into());
-                }
-                Ok("".into())
-            },
-            no_profile,
-        );
-
-        let resp = schema
-            .execute(r#"{ tenant(id: "acme-corp") { id activeSessions } }"#)
-            .await;
-
-        assert!(resp.errors.is_empty(), "errors: {:?}", resp.errors);
-        let data = resp.data.into_json().unwrap();
-        assert_eq!(data["tenant"]["id"], "acme-corp");
-        assert_eq!(data["tenant"]["activeSessions"], 7);
+    async fn deferred_profile_fields_are_absent_from_public_schema() {
+        let schema = build_schema(|_| Ok("".into()), no_profile);
+        let sdl = schema.sdl();
+        for field in [
+            "totalSessions",
+            "sessions1D",
+            "sessions7D",
+            "sessions30D",
+            "sessions90D",
+            "currentSessionActive",
+            "currentSessionDurationSec",
+            "activeSessions",
+            "totalClosedSessions",
+            "TOTAL_SESSIONS",
+            "changedFields",
+            "updatedAt",
+            "trigger",
+        ] {
+            assert!(
+                !sdl.contains(field),
+                "deferred field leaked into schema: {field}"
+            );
+        }
     }
 
     #[tokio::test]
@@ -836,14 +797,12 @@ mod schema_tests {
                     return Ok(r#"{"unique_users":10}"#.into());
                 }
                 if sql.contains("GROUP BY tenant_id") {
-                    return Ok(
-                        r#"{"tenant_id":"acme-corp","total_events":100}"#.into(),
-                    );
+                    return Ok(r#"{"tenant_id":"acme-corp","total_events":100}"#.into());
                 }
                 if sql.contains("COUNT(*) AS total") {
                     return Ok(r#"{"total":1}"#.into());
                 }
-                Ok(r#"{"tenant_id":"acme-corp","canonical_id":"u1","first_seen":"2026-01-01 00:00:00Z","last_seen":"2026-05-23 12:00:00Z","total_events":100,"total_sessions":10,"page_views":60,"clicks":20,"signups":1,"logins":5,"feature_uses":14,"last_country":"US","last_device":"desktop","last_browser":"Chrome","events_1d":5,"events_7d":30,"events_30d":70,"events_90d":100,"sessions_1d":2,"sessions_7d":6,"sessions_30d":8,"sessions_90d":10,"total_closed_sessions":9,"avg_session_duration_sec":180}"#.into())
+                Ok(r#"{"tenant_id":"acme-corp","canonical_id":"u1","first_seen":"2026-01-01 00:00:00Z","last_seen":"2026-05-23 12:00:00Z","total_events":100,"page_views":60,"clicks":20,"logins":5,"feature_uses":14,"last_country":"US","last_device":"desktop","last_browser":"Chrome","events_1d":5,"events_7d":30,"events_30d":70,"events_90d":100,"avg_session_duration_sec":180}"#.into())
             },
             no_profile,
         );
@@ -852,8 +811,7 @@ mod schema_tests {
             .execute(
                 r#"{ tenant(id: "acme-corp") { users(limit: 1) { nodes {
                     events1D events7D events30D events90D
-                    sessions1D sessions7D sessions30D sessions90D
-                    totalClosedSessions avgSessionDurationSec
+                    avgSessionDurationSec
                 } } } }"#,
             )
             .await;
@@ -865,10 +823,7 @@ mod schema_tests {
         assert_eq!(node["events7D"], 30);
         assert_eq!(node["events30D"], 70);
         assert_eq!(node["events90D"], 100);
-        assert_eq!(node["sessions1D"], 2);
-        assert_eq!(node["sessions7D"], 6);
-        assert_eq!(node["totalClosedSessions"], 9);
-        assert_eq!(node["avgSessionDurationSec"], 180);
+        assert_eq!(node["avgSessionDurationSec"], 180.0);
     }
 
     #[tokio::test]
@@ -876,8 +831,11 @@ mod schema_tests {
         let schema = build_schema(
             |sql| {
                 if sql.contains("event_hour") {
-                    return Ok(r#"{"time_bucket":"2026-05-26 14","event_type":"page_view","value":100}
-{"time_bucket":"2026-05-26 15","event_type":"page_view","value":200}"#.into());
+                    return Ok(
+                        r#"{"time_bucket":"2026-05-26 14","event_type":"page_view","value":100}
+{"time_bucket":"2026-05-26 15","event_type":"page_view","value":200}"#
+                            .into(),
+                    );
                 }
                 Ok("".into())
             },
@@ -902,8 +860,11 @@ mod schema_tests {
         let schema = build_schema(
             |sql| {
                 if sql.contains("event_hour") {
-                    return Ok(r#"{"time_bucket":"1779804000000","event_type":"page_view","value":100}
-{"time_bucket":"1779807600000","event_type":"page_view","value":200}"#.into());
+                    return Ok(
+                        r#"{"time_bucket":"1779804000000","event_type":"page_view","value":100}
+{"time_bucket":"1779807600000","event_type":"page_view","value":200}"#
+                            .into(),
+                    );
                 }
                 Ok("".into())
             },

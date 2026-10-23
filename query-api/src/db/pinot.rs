@@ -182,10 +182,9 @@ impl super::LiveProfileProvider for PinotClient {
     ) -> Result<Option<String>, String> {
         let sql = format!(
             "SELECT canonical_id, user_id, tenant_id, first_seen, last_seen, \
-             total_events, total_sessions, \
+             total_events, \
              events_1d, events_7d, events_30d, events_90d, \
-             sessions_1d, sessions_7d, sessions_30d, sessions_90d, \
-             avg_session_duration_sec, current_session_active, current_session_duration_sec, \
+             avg_session_duration_sec, \
              page_views, clicks, logins, feature_uses, \
              last_page, last_country, last_device, last_browser, \
              top_pages, top_features \

@@ -1,0 +1,168 @@
+{
+  "component": "profiles-first-release",
+  "status": "native-merge-kafka-rocksdb-application-fixture-passed; flaredb-ingestion-and-deployment-pending",
+  "output_fields": [
+    {
+      "name": "tenant_id",
+      "sql_type": "TEXT"
+    },
+    {
+      "name": "canonical_id",
+      "sql_type": "TEXT"
+    },
+    {
+      "name": "first_seen",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "last_seen",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "total_events",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "page_views",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "clicks",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "logins",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "feature_uses",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "user_id",
+      "sql_type": "TEXT"
+    },
+    {
+      "name": "last_page",
+      "sql_type": "TEXT"
+    },
+    {
+      "name": "last_country",
+      "sql_type": "TEXT"
+    },
+    {
+      "name": "last_device",
+      "sql_type": "TEXT"
+    },
+    {
+      "name": "last_browser",
+      "sql_type": "TEXT"
+    },
+    {
+      "name": "events_1d",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "events_7d",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "events_30d",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "events_90d",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "top_pages",
+      "sql_type": "TEXT[]"
+    },
+    {
+      "name": "top_features",
+      "sql_type": "TEXT[]"
+    },
+    {
+      "name": "avg_session_duration_sec",
+      "sql_type": "DOUBLE",
+      "nullable": true
+    },
+    {
+      "name": "action",
+      "sql_type": "TEXT"
+    }
+  ],
+  "deferred_session_fields": [
+    "total_sessions",
+    "sessions_1d",
+    "sessions_7d",
+    "sessions_30d",
+    "sessions_90d",
+    "current_session_active",
+    "current_session_duration_sec"
+  ],
+  "omitted_publication_fields": [
+    "updated_at",
+    "changed_fields",
+    "timestamp",
+    "trigger"
+  ],
+  "required_contracts": [
+    "STR-29",
+    "STR-60",
+    "STR-64",
+    "STR-146"
+  ],
+  "wire_format": "json",
+  "wire_business_fields": [
+    "tenant_id",
+    "canonical_id",
+    "first_seen",
+    "last_seen",
+    "total_events",
+    "page_views",
+    "clicks",
+    "logins",
+    "feature_uses",
+    "user_id",
+    "last_page",
+    "last_country",
+    "last_device",
+    "last_browser",
+    "events_1d",
+    "events_7d",
+    "events_30d",
+    "events_90d",
+    "top_pages",
+    "top_features",
+    "avg_session_duration_sec"
+  ],
+  "transport_fields": {
+    "action": "native MERGE RETURNING action projected by SQL: insert -> create, update -> update; consumer validates and preserves it"
+  },
+  "wire_fields": [
+    "tenant_id",
+    "canonical_id",
+    "first_seen",
+    "last_seen",
+    "total_events",
+    "page_views",
+    "clicks",
+    "logins",
+    "feature_uses",
+    "user_id",
+    "last_page",
+    "last_country",
+    "last_device",
+    "last_browser",
+    "events_1d",
+    "events_7d",
+    "events_30d",
+    "events_90d",
+    "top_pages",
+    "top_features",
+    "avg_session_duration_sec",
+    "action"
+  ],
+  "validated_engine_commit": "1314e702a955ad3f19c390b3f10c9d3ee1958d40"
+}

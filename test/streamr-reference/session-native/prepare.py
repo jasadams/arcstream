@@ -49,11 +49,11 @@ def source_rows(signals):
     rows = []
     for signal in signals:
         at = signal['event_time']
-        rows.append(dict(event_id=signal['event_id'], session_id=signal.get('session_id') or '',
+        rows.append(dict(event_id=signal['event_id'], session_id=signal.get('session_id'),
                          tenant_id=signal['tenant_id'], canonical_id=signal['canonical_id'],
                          event_type=signal.get('event_type', ''),
                          **{key: signal.get(key) for key in ('page_url', 'device_type', 'browser', 'country')},
-                         event_ts=at, event_ms=milliseconds(at), arrival_seq=len(rows)))
+                         event_time=at))
     return rows
 
 
@@ -63,6 +63,8 @@ DESCRIPTIONS = {
     'reopened-late': 'After closure and reopening at 00:40, twenty-minute-late a5 is dropped.',
     'tenant-reopen': 'Four native summaries, tenant isolation, reopening, null session exclusion and rejection of ancient activity.',
     'five-second-cutoff': 'Accept five-second-disordered activity, reject activity 5001 milliseconds behind source progress.',
+    'event-time-ordering': 'Admitted out-of-order rows choose identity/start and final metadata by event time, not arrival.',
+    'equal-time-ties': 'Equal event-time FIRST keeps first arrival; LAST prefers later write under STR-60.',
     'chronological-recovery': 'Three sequential sessions with distinct identities and source-progress closures; fault after first committed summary while later summaries remain.',
 }
 
@@ -98,13 +100,25 @@ def fixture(case):
                                  duration_sec=120, event_count=2, pages=['/first'],
                                  event_types={'custom_event': 1, 'page_view': 1},
                                  device_type='mobile', browser='Firefox', country='US'))
+    elif case == 'event-time-ordering':
+        first = dict(by_id['a1'], event_id='ordered-middle', event_time='2020-02-01 00:00:04.000')
+        earlier = dict(by_id['a2'], event_id='ordered-first', event_time='2020-02-01 00:00:02.000', canonical_id='earliest', device_type='phone', browser='Earlier', country='NZ')
+        latest = dict(by_id['a3'], event_id='ordered-last', event_time='2020-02-01 00:00:06.000', device_type='tablet', browser='Latest', country='GB')
+        later_arrival = dict(by_id['a2'], event_id='ordered-final-arrival', event_time='2020-02-01 00:00:03.000', device_type='wrong-arrival', browser='WrongArrival', country='US')
+        signals = [first, earlier, latest, later_arrival, progress('close','2020-02-01 00:40:00.000')]
+        expected = [dict(data['expected'][0],canonical_id='earliest',start_time='2020-02-01 00:00:02.000',end_time='2020-02-01 00:00:06.000',duration_sec=4,event_count=4,pages=['/first','/late'],event_types={'page_view':1,'custom_event':3},device_type='tablet',browser='Latest',country='GB')]
+    elif case == 'equal-time-ties':
+        first = dict(by_id['a1'],event_id='tie-first',event_time='2020-02-01 00:00:04.000')
+        last = dict(by_id['a3'],event_id='tie-last',event_time='2020-02-01 00:00:04.000',browser='LastTie')
+        signals = [first,last,progress('close','2020-02-01 00:40:00.000')]
+        expected = [dict(data['expected'][0],start_time='2020-02-01 00:00:04.000',end_time='2020-02-01 00:00:04.000',duration_sec=0,browser='LastTie')]
     elif case == 'five-second-cutoff':
         first = dict(by_id['a1'], event_id='cutoff-first', event_time='2020-02-01 00:00:10.000')
         inside = dict(by_id['a2'], event_id='cutoff-inside', event_time='2020-02-01 00:00:05.000', event_type='click', page_url='/inside')
         outside = dict(by_id['a2'], event_id='cutoff-outside', event_time='2020-02-01 00:00:04.999', page_url='/outside', browser='Rejected')
         last = dict(by_id['a3'], event_id='cutoff-last', event_time='2020-02-01 00:00:12.000')
         signals = [first, inside, outside, last, progress('close', '2020-02-01 00:40:00.000')]
-        expected = [dict(data['expected'][0], start_time='2020-02-01 00:00:10.000', end_time='2020-02-01 00:00:12.000', duration_sec=2, event_count=3, pages=['/first','/inside'], event_types={'page_view':1,'click':1,'custom_event':1}, browser='Chrome')]
+        expected = [dict(data['expected'][0], canonical_id='later-a', start_time='2020-02-01 00:00:05.000', end_time='2020-02-01 00:00:12.000', duration_sec=7, event_count=3, pages=['/first','/inside'], event_types={'page_view':1,'click':1,'custom_event':1}, browser='Firefox')]
     elif case == 'tenant-reopen':
         signals = data['inputs'] + [progress('final-progress', '2020-02-01 02:00:00.000')]
         expected = data['expected']

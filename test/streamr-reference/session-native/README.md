@@ -12,7 +12,9 @@ ancient records is intentionally removed under the user's explicit instruction.
 | late-first-arrival | Thirty-second-late activity is dropped |
 | reopened-late | Reopened session excludes activity twenty minutes behind current progress |
 | tenant-reopen | Four explicit summaries, tenant isolation, reopening, null-session exclusion and ancient-event rejection |
-| five-second-cutoff | Accept 5,000ms disorder, drop 5,001ms disorder; preserve arrival metadata among accepted rows |
+| five-second-cutoff | Accept 5,000ms disorder, drop 5,001ms disorder; choose identity/start and metadata by event time among admitted rows |
+| event-time-ordering | Four admitted events arrive out of timestamp order; earlier arrival must not choose first identity/start or final metadata |
+| equal-time-ties | FIRST keeps the first equal-time arrival; LAST uses the later write |
 | chronological-recovery | Three independently specified summaries; first committed before worker loss, two fresh afterward |
 
 The tenant-reopen product oracle explicitly expects four summaries. Historical
@@ -38,3 +40,13 @@ Four additional raw progress rows separate the first closure from the next
 session. The supervisor must observe nonempty committed output and unwritten
 application results at the fault, verify actual SIGKILL and selected checkpoint
 restoration, preserve committed bytes and compare all three exact summaries.
+
+The source payload carries only the application `event_time` text. Typed timestamp
+and millisecond columns are generated in SQL, with no fabricated `arrival_seq`.
+The event-time-ordering fixture deliberately makes event-time and arrival answers
+different: arrivals at seconds 4, 2, 6, 3 yield start 2, end 6, identity from second
+2 and last metadata from second 6. All four are admitted by five-second disorder.
+The cutoff fixture's accepted second-5 event changes the first identity/start;
+the second-4.999 event is dropped. Equal-event-time expectations follow STR-60's
+first-arrival FIRST and later-write LAST rule. These are independent expectations,
+not observed engine results. Runtime qualification remains pending STR-60.

@@ -1,0 +1,4 @@
+{"tenant_id":"tenant-a","canonical_id":"person-a","previous_total":null,"total_events":1,"action":"insert"}
+{"tenant_id":"tenant-a","canonical_id":"person-a","previous_total":1,"total_events":2,"action":"update"}
+{"tenant_id":"tenant-a","canonical_id":"person-a","previous_total":2,"total_events":3,"action":"update"}
+{"tenant_id":"tenant-a","canonical_id":"person-a","previous_total":3,"total_events":4,"action":"update"}

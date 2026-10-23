@@ -33,8 +33,20 @@ jobs:
         run: python3 deploy/streamr-native/fixture-run.py --help
       - name: Check native SESSION product fixtures
         run: python3 -m unittest discover -s test/streamr-reference/session-native -p 'test_*.py' -v
+      - name: Check native profile fixtures
+        run: python3 -m unittest discover -s test/streamr-reference/profile-native -p 'test_*.py' -v
+      - name: Check closed-session metric fixtures
+        run: python3 -m unittest discover -s test/streamr-reference/closed-session-metrics -p 'test_*.py' -v
+      - name: Check native integration preparation arguments
+        run: python3 deploy/streamr-native/prepare.py --help
+      - name: Check native Kafka recovery arguments
+        run: python3 test/streamr-reference/native_kafka_fixture.py --help
       - name: Check native SQL recovery runner arguments
         run: python3 test/streamr-reference/native_sql_runtime.py --help
+      - name: Check transactional profile fixture arguments
+        run: python3 test/streamr-reference/native_profile_fixture.py --help
+      - name: Check transactional profile runtime arguments
+        run: python3 test/streamr-reference/native_profile_runtime.py --help
       - name: Check pinned FlareDB smoke arguments
         run: python3 test/streamr-reference/flaredb_image_smoke.py --help
       - name: Validate scratch-aware service readiness configuration

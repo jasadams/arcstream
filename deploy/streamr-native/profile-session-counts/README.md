@@ -1,3 +1,8 @@
+> Historical candidate and source-bound evidence. The cursor/arrival/emission-clock
+> instructions below do not govern the current native integration. See
+> [current preparation](../README.md) and ARC-18. No legacy cursor or timer graph
+> is used by the new renderer.
+
 Current repaired-source qualification (2026-10-11): all8 memory/RocksDB × controller/leader × batch1/8 configurations passed, with independent source-derived typed-value, checkpoint byte-prefix and fresh-worker suffix audits. Executable source25d8b554c9396c6e49e4be61a6bfc1c5f35f8d39, ELF5254dd09df9b677d5d9e640fbbfe8425d20edca8e1ab4ce363c314213bf848ab. Exact build receipt and captures: /home/jason/qa-evidence/str32-post-merge-20261011/ordered-window-repair/; independent application-independent-audit.json/.md. This supersedes historical pending matrix statements below. Finite fixture qualification does not establish full profile lifecycle, clock/emission parity, capacity or live Kafka transaction recovery.
 
 Only query-guarded.sql is qualified. All25 typed fields and CDC chains, source-prefix2 checkpoint and prefix9 finals passed; the9-row fixture does not test timeout reset or every emitted prefix. query.sql remains an unqualified diagnostic.

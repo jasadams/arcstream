@@ -1,0 +1,107 @@
+{
+  "component": "profile-core",
+  "status": "blocked-on-demonstrated-native-composition-limits",
+  "output_fields": [
+    {
+      "name": "tenant_id",
+      "sql_type": "TEXT"
+    },
+    {
+      "name": "canonical_id",
+      "sql_type": "TEXT"
+    },
+    {
+      "name": "first_seen",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "last_seen",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "total_events",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "page_views",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "clicks",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "logins",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "feature_uses",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "user_id",
+      "sql_type": "TEXT"
+    },
+    {
+      "name": "last_page",
+      "sql_type": "TEXT"
+    },
+    {
+      "name": "last_country",
+      "sql_type": "TEXT"
+    },
+    {
+      "name": "last_device",
+      "sql_type": "TEXT"
+    },
+    {
+      "name": "last_browser",
+      "sql_type": "TEXT"
+    },
+    {
+      "name": "events_1d",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "events_7d",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "events_30d",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "events_90d",
+      "sql_type": "BIGINT"
+    },
+    {
+      "name": "top_pages",
+      "sql_type": "TEXT[]"
+    },
+    {
+      "name": "top_features",
+      "sql_type": "TEXT[]"
+    }
+  ],
+  "pending_application_fields": [
+    "total_sessions",
+    "sessions_1d",
+    "sessions_7d",
+    "sessions_30d",
+    "sessions_90d",
+    "avg_session_duration_sec",
+    "current_session_active",
+    "current_session_duration_sec",
+    "updated_at",
+    "action",
+    "changed_fields",
+    "timestamp",
+    "trigger"
+  ],
+  "required_contracts": [
+    "STR-29",
+    "STR-60",
+    "STR-64",
+    "STR-146"
+  ]
+}

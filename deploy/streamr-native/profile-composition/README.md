@@ -1,3 +1,8 @@
+> Historical candidate and source-bound evidence. The cursor/arrival/emission-clock
+> instructions below do not govern the current native integration. See
+> [current preparation](../README.md) and ARC-18. No legacy cursor or timer graph
+> is used by the new renderer.
+
 Native 20-field composition passed the finite memory/controller/batch1 fixture on repaired SQL pin `9baf16501c77a5a30bf87c50c2d3693a14986ae92d253731cda5370953e6d2ed`. This is not a qualified full33-field profile or a live Kafka profile deployment.
 
 The current runnable query is `query-union.sql`: native core aggregates and page/feature counts feed a typed tagged UNION ALL, then an outer native aggregate emits the20fields. Retractable outer FIRST_VALUE expressions have explicit ORDER BY total_events ASC; exactly one current core row per key makes that order preserve the selected value. Four aggregate owners require STREAMR_TEST_MAX_OPEN_DATABASES=4; byte budgets are unchanged.

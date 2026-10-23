@@ -1,0 +1,56 @@
+# Separate Compose project/network/volumes. Existing Kafka is external.
+name: ${NATIVE_NAMESPACE:?set a fresh native test namespace}
+services:
+  streamr:
+    image: ${STREAMR_IMAGE:?set an immutable image digest}
+    command: ["--config", "/bundle/streamr.json", "cluster"]
+    volumes:
+      - ./bundle:/bundle:ro
+      - streamr-state:/state
+    restart: unless-stopped
+  bootstrap:
+    image: ${PYTHON_IMAGE:?set an immutable Python image digest}
+    command: ["python3", "/bootstrap.py"]
+    volumes:
+      - ./bootstrap.py:/bootstrap.py:ro
+      - ./bundle:/bundle:ro
+    depends_on: [streamr]
+    restart: "no"
+  flaredb:
+    image: ${FLAREDB_IMAGE:?set an immutable image digest}
+    command: ["--data-dir", "/data", "--http", "0.0.0.0:8099", "--load-tables", "/config", "--brokers", "${KAFKA_BROKERS:?set externally reachable Kafka brokers}"]
+    stop_signal: SIGINT
+    volumes:
+      - flaredb-state:/data
+      - ./bundle/flaredb:/config:ro
+    restart: unless-stopped
+  query-api:
+    image: ${QUERY_API_IMAGE:?set an immutable image digest}
+    environment:
+      FLAREDB_URL: http://flaredb:8099
+      KAFKA_BROKERS: ${KAFKA_BROKERS}
+      KAFKA_EVENTS_TOPIC: ${NATIVE_NAMESPACE}-unified-events
+      KAFKA_EVENTS_GROUP_ID: ${NATIVE_NAMESPACE}-api-events
+      KAFKA_PROFILES_TOPIC: ${NATIVE_NAMESPACE}-profiles
+      KAFKA_PROFILES_GROUP_ID: ${NATIVE_NAMESPACE}-api-profiles
+    depends_on: [flaredb]
+    restart: unless-stopped
+  dashboard:
+    image: ${DASHBOARD_IMAGE:?set an immutable image digest}
+    environment:
+      QUERY_API_URL: http://query-api:8080/graphql
+      LEPTOS_SITE_ROOT: /site
+      LEPTOS_SITE_PKG_DIR: pkg
+      LEPTOS_SITE_ADDR: 0.0.0.0:3000
+      LEPTOS_OUTPUT_NAME: dashboard
+    depends_on: [query-api]
+    restart: unless-stopped
+  gateway:
+    image: ${GATEWAY_IMAGE:?set an immutable nginx image digest}
+    ports: ["${NATIVE_BIND_ADDRESS:-127.0.0.1}:${NATIVE_TEST_PORT:?set a dedicated test port}:8080"]
+    volumes: ["./gateway.conf:/etc/nginx/nginx.conf:ro"]
+    depends_on: [query-api, dashboard]
+    restart: unless-stopped
+volumes:
+  streamr-state:
+  flaredb-state:

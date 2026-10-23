@@ -1,0 +1,39 @@
+[
+  {
+    "input_lines": 1,
+    "native_finalized_rows": [],
+    "required_live_profile_subset": {
+      "total_sessions": 1,
+      "current_session_active": true
+    },
+    "duration_note": "Live duration clock policy remains undecided; no fabricated expected value."
+  },
+  {
+    "input_lines": 2,
+    "native_finalized_rows": [],
+    "required_live_profile_subset": {
+      "total_sessions": 1,
+      "current_session_active": true
+    },
+    "duration_note": "No approved clock policy for live duration; event-span candidate would be 2 seconds."
+  },
+  {
+    "input_lines": 3,
+    "native_finalized_rows": [
+      {
+        "tenant_id": "tenant-a",
+        "canonical_id": "person-a",
+        "session_id": "session-a",
+        "start_ms": 1580551200000,
+        "end_ms": 1580551202000,
+        "event_count": 2
+      }
+    ],
+    "required_live_profile_subset": {
+      "total_sessions": 1,
+      "current_session_active": false,
+      "current_session_duration_sec": 0,
+      "avg_session_duration_sec": 2
+    }
+  }
+]
