@@ -80,7 +80,15 @@ stopped. Streamr APIs are internal to the Compose network; the only host binding
 the gateway on loopback by default, with GraphQL/WebSocket and dashboard sharing
 one origin. Use a separately authorized test-host ingress to access it remotely.
 
-`runtime-resources.json` is copied without relaxing RocksDB or state limits. The
+`runtime-resources.json` is copied verbatim into the bundle. Its current
+RocksDB budgets are **256 MiB shared cache, including 64 MiB shared memtables,
+per worker process**, shared by that process's state owners. The memtable budget
+is part of the cache budget, not an additional 64 MiB. These user-approved
+power-of-two sizes exceed the old Flink default-derived capacities; they replace
+the earlier 8 MiB/4 MiB qualification-fixture settings. The separate 32 MiB
+decoded-value budget and other state/resource limits remain unchanged. These
+are allocation ceilings rather than preallocated memory. This configuration
+change does not deploy a bundle or establish a throughput improvement. The
 current native profile route uses state-table MERGE rather than an ordinary JOIN;
 the legacy configured JOIN cap100 is therefore not its retained profile limit.
 The remaining allocation question is the actual source-qualified graph's disk-owner
