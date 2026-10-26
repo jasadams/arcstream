@@ -50,13 +50,13 @@
       "scope-operations": 128
     },
     "live-state-resources": {
-      "block-cache-bytes": 8388608,
+      "block-cache-bytes": 268435456,
       "decoded-value-bytes": 33554432,
       "disk-reserve-bytes": 67108864,
       "max-blocking-operations": 2,
       "max-open-databases": 8,
       "max-snapshots": 4,
-      "memtable-bytes": 4194304,
+      "memtable-bytes": 67108864,
       "queued-write-bytes": 100663296,
       "scan-page-bytes": 8388608
     },
