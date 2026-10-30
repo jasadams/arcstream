@@ -28,7 +28,7 @@ CREATE TABLE unified_events (
   topic = 'arc-native-unified-events', format = 'json', type = 'sink',
   'sink.commit_mode' = 'exactly_once',
   'sink.recovery_topic' = 'arc-native-unified-commits',
-  client_configs = 'transaction.timeout.ms=60000,compression.type=lz4'
+  client_configs = 'transaction.timeout.ms=900000,compression.type=lz4'
 );
 
 INSERT INTO unified_events
