@@ -89,3 +89,11 @@ required, preserve and report its runnable failed SQL before adding one.
 
 Production cutover remains separately authorized work. This bundle deliberately
 has complete_mvp=false and production_ready=false.
+
+## Kafka transaction timeout
+
+Rendered native Kafka sinks use `transaction.timeout.ms=900000` (15 minutes).
+This is the commit and recovery window qualified in STR-158; the broker must
+allow at least this timeout. It does not change event-time watermarks, SQL
+results, source offsets or resource budgets. Apply changes to existing jobs
+through the reviewed checkpoint-preserving rollout and recovery procedure.
